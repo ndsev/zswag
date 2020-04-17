@@ -73,7 +73,7 @@ def package(src_file: str = "", *, package_prefix: str = ""):
         from myfile import *
         ```
 
-    :param src: Source zserio file.
+    :param src_file: Source zserio file.
     :return: True if succesfull, False otherwise.
     """
     global zs_jar_path
@@ -89,6 +89,8 @@ def package(src_file: str = "", *, package_prefix: str = ""):
         "java", "-jar", zs_jar_path,
         "-src", zs_pkg_path,
         "-python", zs_build_path,
+        *(("-setTopLevelPackage", package_prefix) if package_prefix else tuple()),
         os.path.basename(src_file)])
     if zs_build_path not in sys.path:
         sys.path.append(zs_build_path)
+    return True

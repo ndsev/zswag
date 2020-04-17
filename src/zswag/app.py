@@ -37,7 +37,7 @@ class ZserioSwaggerApp(connexion.App):
             In file my.app.__init__:
 
                 from gen.zserio import Service
-                from swaggermyzs import ZserioSwaggerApp
+                from zswag import ZserioSwaggerApp
 
                 app = ZserioSwaggerApp(my.app.controller, Service)
 
@@ -55,9 +55,10 @@ class ZserioSwaggerApp(connexion.App):
 
         General call structure:
 
-            OpenAPI `yaml_file` "paths/serviceMethod" references
-             Zserio-generated Server instance (ns.service.serviceMethod(blob): blob), which calls
-             ns.service.serviceImpl(value), which is remapped to
+            OpenAPI `yaml_file` "paths/service" references
+             Zserio Server instance injected method (ns.service.service(base64): blob), which calls
+             ns.service._serviceMethod(blob), which calls
+             ns.service._serviceImpl(value) which is remapped to
              Runtime-generated user function (ns.serviceImpl(value): value).
 
         """
@@ -127,7 +128,7 @@ class ZserioSwaggerApp(connexion.App):
         with open(self.yaml_path, "r") as yaml_file:
             schema = yaml.load(yaml_file)
             for methodName in self.service_instance._methodMap:
-                assert sum(1 for path in schema["paths"] if path.endswith(f"/{methodName}")) > 0
+                assert any(path for path in schema["paths"] if path.endswith(f"/{methodName}"))
 
     def generate_openapi_schema(self):
         print(f"NOTE: Writing OpenApi schema to {self.yaml_path}")
