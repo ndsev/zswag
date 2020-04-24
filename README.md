@@ -11,22 +11,6 @@ Clone this repository, and run
 pip3 install -e .
 ```
 
-## Importing zserio package sources
-
-```py
-import zswag
-
-# Automatically sets up zserio runtime environment
-#  and inserts a new python module called `mypackage`.
-zswag.package("mypackage/all.zs")
-
-# You can now access structs from your zserio sources!
-from mypackage.all import CoolStruct
-```
-
-**Note:** If you require zserio at a specific version,
-just run `zswag.setup(ver="x.y.z")` before running `zswag.package(...)`.
-
 ## Creating a Swagger service from zserio
 
 `ZserioSwaggerApp` gives you the power to marry a user-written app controller
@@ -37,9 +21,10 @@ and a fitting Swagger OpenAPI spec.
 
 ```py
 import zswag
+import zserio
 import my.app.controller
 
-zswag.package("myapp/service.zs")
+zserio.require("myapp/service.zs")
 from myapp.service import Service
 
 # The OpenApi argument `yaml_path=...` is optional
