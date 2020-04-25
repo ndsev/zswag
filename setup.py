@@ -16,8 +16,8 @@ packages = setuptools.find_packages("src")
 
 setuptools.setup(
     name="zswag",
-    version="0.1.0",
-    url="https://github.com/klebert-engineering/swagger-my-zserio",
+    version="0.2.0",
+    url="https://github.com/klebert-engineering/zswag",
     author="Klebert Engineering",
     author_email="j.birkner@klebert-engineering.de",
 

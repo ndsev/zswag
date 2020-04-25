@@ -1,8 +1,9 @@
 import zswag
+import zserio
 import sys
 from os.path import dirname, abspath
 
-zswag.package(dirname(abspath(__file__))+"/calculator.zs")
+zserio.require(dirname(abspath(__file__))+"/calculator.zs")
 
 import calc.client
 import calc.server
