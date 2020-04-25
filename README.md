@@ -1,11 +1,17 @@
 # Zswag
 
-Convience functionality to create python modules from zserio services at warp speed.
+Convenience functionality to create python modules from zserio services at warp speed.
 Translate/verify Zserio services to/with OpenAPI/Swagger and serve them in Flask/Connexion WSGI apps.
 
 ## Installation
 
-Clone this repository, and run
+Just run
+
+```bash
+pip3 install zswag
+```
+
+Alternatively, clone this repository, and run
 
 ```bash
 pip3 install -e .
@@ -49,7 +55,7 @@ def myApi(request):
 
 The OpenAPI spec is auto-generated if you do not specify an existing file.
 If you specify an empty YAML path, the yaml file is placed next to the
-zserio python-service source-file.
+`<service>.zs` source-file.
 
 If you have installed `pip install connexion[swagger-ui]`, you can view
 API docs of your service under `[/prefix]/ui`.
