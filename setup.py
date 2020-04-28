@@ -16,12 +16,12 @@ packages = setuptools.find_packages("src")
 
 setuptools.setup(
     name="zswag",
-    version="0.2.0",
+    version="0.3.0",
     url="https://github.com/klebert-engineering/zswag",
     author="Klebert Engineering",
     author_email="j.birkner@klebert-engineering.de",
 
-    description="Convience functionality to create python modules from zserio services at warp speed.",
+    description="Convenience functionality to create python modules from zserio services at warp speed.",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
