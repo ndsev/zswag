@@ -104,7 +104,7 @@ enclosed by `/*! .... !*/` markers preceding the declaration:
 I choose to __highlight__ this word.
 !*/
 
-sruct MyStruct {
+struct MyStruct {
     ...
 }
 ``` 
