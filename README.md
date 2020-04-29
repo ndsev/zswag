@@ -54,7 +54,7 @@ def myApi(request):
 **Note:** The server is currently generated such that the
 zserio RPC method parameter is expected to be a Base64-encoded
 string called `requestData`, which is placed in the URL query part.
-It is planned to making this more flexible in a future release.
+It is planned to make this more flexible in a future release.
 
 ## Using the client
 
@@ -82,10 +82,10 @@ API docs of your service under `[/prefix]/ui`.
 
 ### YAML file location/auto-generation
 
-* If you do not specify a non-existing file path, the OpenAPI spec is auto-generated.
+* If you specify a non-empty path to a file which does not yet exist, the OpenAPI spec is auto-generated in that location.
 * If you specify an empty YAML path, the yaml file is placed next to the
 `<service>.zs` source-file.
-* If you specify an existing file, the `zswag` will simply verify
+* If you specify an existing file, `zswag` will simply verify
   all the methods specified in your zserio service are also reflected in
   the OpenAPI-spec.
 
@@ -93,7 +93,7 @@ API docs of your service under `[/prefix]/ui`.
 
 When the OpenAPI/Swagger YAML is auto-generated, `ZserioSwaggerApp`
 tries to populate the service/method/argument/result descriptions
-with doc-strings extracted from the zserio sources.
+with doc-strings which are extracted from the zserio sources.
 
 For structs and services, the documentation is expected to be
 enclosed by `/*! .... !*/` markers preceding the declaration:
@@ -112,7 +112,7 @@ sruct MyStruct {
 For service methods, a single-line doc-string is parsed which
 immediately precedes the declaration:
 
-```
+```C
 /** This method is documented. */
 ReturnType myMethod(ArgumentType);
 ```
