@@ -8,9 +8,24 @@ import sys
 from types import ModuleType
 from typing import Type
 
+from .doc import get_doc_str, IdentType, md_filter_definition
+
 
 # Name of variable that is added to controller
 CONTROLLER_SERVICE_INSTANCE = "_service"
+
+
+class MethodInfo:
+    """
+    (Private) Return value of ZserioSwaggerApp._method_info()
+    """
+    def __init__(self, *, name, docstring="", returntype="", argtype="", returndoc="", argdoc=""):
+        self.name = name
+        self.docstring = docstring
+        self.returntype = returntype
+        self.argtype = argtype
+        self.returndoc = returndoc
+        self.argdoc = argdoc
 
 
 class ZserioSwaggerApp(connexion.App):
@@ -18,6 +33,7 @@ class ZserioSwaggerApp(connexion.App):
     def __init__(self, *,
                  controller: ModuleType,
                  service_type: Type[zserio.ServiceInterface],
+                 zs_pkg_path: str = None,
                  yaml_path: str = None):
         """
         Brief
@@ -32,11 +48,13 @@ class ZserioSwaggerApp(connexion.App):
             If you have installed `pip install connexion[swagger-ui]`, you can view
             API docs of your service under [/prefix]/ui.
 
+            Documentation for the service is automatically extracted if `zs_pkg_path` is issued.
+
         Code example
 
             In file my.app.__init__:
 
-                from gen.zserio import Service
+                from zserio_gen.my.service import Service
                 from zswag import ZserioSwaggerApp
 
                 app = ZserioSwaggerApp(my.app.controller, Service)
@@ -71,6 +89,7 @@ class ZserioSwaggerApp(connexion.App):
         self.yaml_path = yaml_path
         yaml_parent_path = os.path.dirname(yaml_path)
         yaml_basename = os.path.basename(yaml_path)
+        self.zs_pkg_path = zs_pkg_path
 
         # Initialise zserio service
         self.service_type = service_type
@@ -132,11 +151,17 @@ class ZserioSwaggerApp(connexion.App):
 
     def generate_openapi_schema(self):
         print(f"NOTE: Writing OpenApi schema to {self.yaml_path}")
+        service_name_parts = self.service_instance.SERVICE_FULL_NAME.split(".")
         schema = {
             "openapi": "3.0.0",
             "info": {
-                "title": self.service_instance.SERVICE_FULL_NAME,
-                "description": f"REST API for {self.service_instance.SERVICE_FULL_NAME}",
+                "title": ".".join(service_name_parts[1:]),
+                "description": md_filter_definition(get_doc_str(
+                    ident_type=IdentType.SERVICE,
+                    pkg_path=self.zs_pkg_path,
+                    ident=self.service_instance.SERVICE_FULL_NAME,
+                    fallback=[f"REST API for {self.service_instance.SERVICE_FULL_NAME}"]
+                )[0]),
                 "contact": {
                     "email": "TODO"
                 },
@@ -147,24 +172,25 @@ class ZserioSwaggerApp(connexion.App):
             },
             "servers": [],
             "paths": {
-                f"/{methodName}": {
+                f"/{method_info.name}": {
                     "get": {
-                        "summary": "TODO: Brief one-liner.",
-                        "description": "TODO: Describe operation in more detail.",
-                        "operationId": methodName,
+                        "summary": method_info.docstring,
+                        "description": method_info.docstring,
+                        "operationId": method_info.name,
                         "parameters": [{
                             "name": "requestData",
                             "in": "query",
-                            "description": "TODO: Describe parameter",
+                            "description": method_info.argdoc,
                             "required": True,
                             "schema": {
-                              "type": "string",
-                              "format": "byte"
+                                "type": "string",
+                                "default": "Base64-encoded bytes",
+                                "format": "byte"
                             }
                         }],
                         "responses": {
                             "200": {
-                                "description": "TODO: Describe response content",
+                                "description": method_info.returndoc,
                                 "content": {
                                     "application/octet-stream": {
                                         "schema": {
@@ -177,8 +203,33 @@ class ZserioSwaggerApp(connexion.App):
                         },
                         "x-openapi-router-controller": self.service_instance_path
                     },
-                } for methodName in self.service_instance._methodMap
+                } for method_info in (self._method_info(method_name) for method_name in self.service_instance._methodMap)
             }
         }
         with open(self.yaml_path, "w") as yaml_file:
             yaml.dump(schema, yaml_file, default_flow_style=False)
+
+    def _method_info(self, method_name: str) -> MethodInfo:
+        result = MethodInfo(name=method_name)
+        if not self.zs_pkg_path:
+            return result
+        doc_strings = get_doc_str(
+            ident_type=IdentType.RPC,
+            pkg_path=self.zs_pkg_path,
+            ident=f"{self.service_instance.SERVICE_FULL_NAME}.{method_name}")
+        if not doc_strings:
+            return result
+        result.docstring = doc_strings[0]
+        result.returntype = doc_strings[1]
+        result.argtype = doc_strings[2]
+        result.returndoc = md_filter_definition(get_doc_str(
+            ident_type=IdentType.STRUCT,
+            pkg_path=self.zs_pkg_path,
+            ident=result.returntype,
+            fallback=[f"### struct {result.returntype}"])[0])
+        result.argdoc = md_filter_definition(get_doc_str(
+            ident_type=IdentType.STRUCT,
+            pkg_path=self.zs_pkg_path,
+            ident=result.argtype,
+            fallback=[f"### struct {result.argtype}"])[0])
+        return result
