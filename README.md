@@ -30,7 +30,7 @@ import zswag
 import zserio
 import my.app.controller
 
-zserio.require("myapp/service.zs", package_prefix="myapp")
+zserio.generate("myapp/service.zs", "myapp")
 from myapp.service import Service
 
 # The OpenApi argument `yaml_path=...` is optional

@@ -3,7 +3,7 @@ import zserio
 import sys
 from os.path import dirname, abspath
 
-zserio.require(dirname(abspath(__file__))+"/calculator.zs")
+zserio.generate(dirname(abspath(__file__))+"/calculator.zs")
 
 import calc.client
 import calc.server
