@@ -4,6 +4,7 @@ import base64
 
 from .spec import ZserioSwaggerSpec, HttpMethod, ParamFormat
 from urllib.parse import urlparse
+import os
 
 
 class HttpClient(zserio.ServiceInterface):
@@ -35,7 +36,7 @@ class HttpClient(zserio.ServiceInterface):
               extracted from the specification:
               - A path to the service is extracted from the first entry in the servers-list.
                 If such an entry is not available, the client will fall back to the
-                path-part of the spec URL.
+                path-part of the spec URL (without the trailing openapi.json).
               - For each operation:
                 * HTTP method (GET or POST)
                 * Argument passing scheme (Base64-URL-Param or Binary Body)
@@ -57,7 +58,8 @@ class HttpClient(zserio.ServiceInterface):
             f"{host}:{port}" if host and port else \
             spec_url_parts.netloc
         self.spec = ZserioSwaggerSpec(spec)
-        self.path: str = f"{proto or spec_url_parts.scheme}://{netloc}{self.spec.path() or spec_url_parts.path}"
+        path = self.spec.path() or os.path.split(spec_url_parts.path)[0]
+        self.path: str = f"{proto or spec_url_parts.scheme}://{netloc}{path}"
         if not self.path.endswith("/"):
             self.path += "/"
 
