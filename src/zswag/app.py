@@ -9,7 +9,7 @@ from types import ModuleType
 from typing import Type
 
 from .doc import get_doc_str, IdentType, md_filter_definition
-from zswag_client.spec import ZserioSwaggerSpec
+from zswag_client.spec import ZserioSwaggerSpec, ParamFormat
 
 
 # Name of variable that is added to controller
@@ -104,34 +104,39 @@ class ZserioSwaggerApp(connexion.App):
             setattr(self.controller, CONTROLLER_SERVICE_INSTANCE, self.service_type())
         self.service_instance = getattr(self.controller, CONTROLLER_SERVICE_INSTANCE)
 
-        # Re-route service impl methods
-        for methodName in self.service_instance._methodMap:
-            user_function = getattr(self.controller, methodName)
-            zserio_modem_function = getattr(self.service_instance, f"_{methodName}Method")
-            assert zserio_modem_function
-            if not user_function or not inspect.isfunction(user_function):
-                print(f"WARNING: The controller {self.controller_path} does not implement {methodName}!")
-                continue
-
-            print(f"Found {self.controller_path}.{methodName}.")
-            if len(inspect.signature(user_function).parameters) != 1:
-                print(f"ERROR: {self.controller_path}.{methodName} must have single 'request' parameter!")
-                continue
-
-            def wsgi_method(request_data, fun=zserio_modem_function):
-                request_data = base64.urlsafe_b64decode(request_data)
-                return bytes(fun(request_data, None))
-            setattr(self.service_instance, methodName, wsgi_method)
-
-            def method_impl(request, ctx=None, fun=user_function):
-                return fun(request)
-            setattr(self.service_instance, f"_{methodName}Impl", method_impl)
-
         # Verify or generate yaml file
         if not os.path.isfile(yaml_path):
             self.generate_openapi_schema()
         self.spec = ZserioSwaggerSpec(yaml_path)
         self.verify_openapi_schema()
+
+        # Re-route service impl methods
+        for method_name in self.service_instance._methodMap:
+            user_function = getattr(self.controller, method_name)
+            zserio_modem_function = getattr(self.service_instance, f"_{method_name}Method")
+            assert zserio_modem_function
+            if not user_function or not inspect.isfunction(user_function):
+                print(f"WARNING: The controller {self.controller_path} does not implement {method_name}!")
+                continue
+
+            print(f"Found {self.controller_path}.{method_name}.")
+            if len(inspect.signature(user_function).parameters) != 1:
+                print(f"ERROR: {self.controller_path}.{method_name} must have single 'request' parameter!")
+                continue
+
+            method_spec = self.spec.method_spec(method_name)
+            if method_spec.param_format == ParamFormat.QUERY_PARAM_BASE64:
+                def wsgi_method(request_data, fun=zserio_modem_function):
+                    request_data = base64.urlsafe_b64decode(request_data)
+                    return bytes(fun(request_data, None))
+            else:
+                def wsgi_method(body, fun=zserio_modem_function):
+                    return bytes(fun(body, None))
+            setattr(self.service_instance, method_name, wsgi_method)
+
+            def method_impl(request, ctx=None, fun=user_function):
+                return fun(request)
+            setattr(self.service_instance, f"_{method_name}Impl", method_impl)
 
         # Initialise connexion app
         super(ZserioSwaggerApp, self).__init__(

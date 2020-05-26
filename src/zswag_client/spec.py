@@ -62,7 +62,8 @@ class ZserioSwaggerSpec:
                 name = method_spec["operationId"]
                 param_format = ParamFormat.BODY_BINARY
                 expected_param_name = "requestData"
-                if any(param for param in method_spec["parameters"] if param["name"] == expected_param_name):
+                if "parameters" in method_spec and \
+                   any(param for param in method_spec["parameters"] if param["name"] == expected_param_name):
                     param_format = ParamFormat.QUERY_PARAM_BASE64
                 else:
                     expected_param_name = ""
