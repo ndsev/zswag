@@ -65,8 +65,7 @@ will automatically generate a client for the service under
 ```python
 from my.package import Service
 import zswag
-
-client = Service.Client(zswag.HttpClient(host=host, port=port))
+client = Service.Client(zswag.HttpClient(spec=f"http://localhost:5000/openapi.json"))
 ```
 
 `zswag.HttpClient` provides the service client interface expected
