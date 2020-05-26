@@ -89,4 +89,4 @@ class ZserioSwaggerSpec:
                 if "url" in server and server["url"]:
                     server = urlparse(server["url"])
                     return server.path
-        return "/"
+        return None
