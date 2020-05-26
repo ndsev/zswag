@@ -9,6 +9,7 @@ from types import ModuleType
 from typing import Type
 
 from .doc import get_doc_str, IdentType, md_filter_definition
+from zswag_client.spec import ZserioSwaggerSpec
 
 
 # Name of variable that is added to controller
@@ -127,10 +128,10 @@ class ZserioSwaggerApp(connexion.App):
             setattr(self.service_instance, f"_{methodName}Impl", method_impl)
 
         # Verify or generate yaml file
-        if os.path.isfile(yaml_path):
-            self.verify_openapi_schema()
-        else:
+        if not os.path.isfile(yaml_path):
             self.generate_openapi_schema()
+        self.spec = ZserioSwaggerSpec(yaml_path)
+        self.verify_openapi_schema()
 
         # Initialise connexion app
         super(ZserioSwaggerApp, self).__init__(
@@ -144,10 +145,8 @@ class ZserioSwaggerApp(connexion.App):
             pythonic_params=True)
 
     def verify_openapi_schema(self):
-        with open(self.yaml_path, "r") as yaml_file:
-            schema = yaml.load(yaml_file)
-            for methodName in self.service_instance._methodMap:
-                assert any(path for path in schema["paths"] if path.endswith(f"/{methodName}"))
+        for method_name in self.service_instance._methodMap:
+            assert self.spec.method_spec(method_name)
 
     def generate_openapi_schema(self):
         print(f"NOTE: Writing OpenApi schema to {self.yaml_path}")
