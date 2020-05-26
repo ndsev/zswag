@@ -2,32 +2,38 @@ import requests
 import zserio
 import base64
 
+from .spec import ZserioSwaggerSpec, HttpMethod, ParamFormat
+
 
 class HttpClient(zserio.ServiceInterface):
     """
     Implementation of HTTP client as Zserio generic service interface.
     """
 
-    def __init__(self, *, method_prefix="/", proto="http", host="localhost", port=5000, op="GET"):
+    def __init__(self, *, proto="http", host="localhost", port=5000, spec_url_or_path):
         """
         Constructor.
-        :param method_prefix: Prefix for request URLs to put after proto://host:port and in front of method-names.
         :param host: Host to connect.
         :param port: Port to connect.
         """
-        self.url_base = f"{proto}://{host}:{port}{method_prefix}"
-        self.op = op
+        self.spec = ZserioSwaggerSpec(spec_url_or_path)
+        self.path = f"{proto}://{host}:{port}{self.spec.path()}"
 
-    def callMethod(self, methodName, requestData, context=None):
+    def callMethod(self, method_name, request_data, context=None):
         """
         Implementation of ServiceInterface.callMethod.
         """
         try:
-            params = {"requestData": base64.urlsafe_b64encode(requestData)}
-            if self.op == "GET":
-                response = requests.get(self.url_base + methodName, params=params)
+            method_spec = self.spec.method_spec(method_name)
+            kwargs = {}
+            if method_spec.param_format == ParamFormat.QUERY_PARAM_BASE64:
+                kwargs["params"] = {"requestData": base64.urlsafe_b64encode(request_data)}
             else:
-                response = requests.post(self.url_base + methodName, params=params)
+                kwargs["data"] = request_data
+            if method_spec.http_method == HttpMethod.GET:
+                response = requests.get(self.path + method_name, **kwargs)
+            else:
+                response = requests.post(self.path + method_name, **kwargs)
             if response.status_code != requests.codes.ok:
                 raise zserio.ServiceException(str(response.status_code))
             return response.content
