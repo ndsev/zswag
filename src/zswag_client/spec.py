@@ -1,5 +1,14 @@
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Optional
 from enum import Enum
+
+import yaml
+import json
+import os
+import requests
+from urllib.parse import urlparse
+
+
+ALLOWED_SPEC_URI_EXTS = {".json", ".yml", ".yaml"}
 
 
 class HttpMethod(Enum):
@@ -30,14 +39,53 @@ class MethodSpec:
 
 class ZserioSwaggerSpec:
 
-    def __init__(self, yaml_path, zserio_service_class=None):
-        pass
+    def __init__(self, spec_url_or_path: str):
+        spec_url_parts = urlparse(spec_url_or_path)
+        extension = "yaml"
+        if "." in spec_url_parts.path:
+            extension = os.path.splitext(spec_url_parts.path)[1].lower()
+        if spec_url_parts.scheme in {"http", "https"}:
+            spec_str = requests.get(spec_url_or_path).text
+        else:
+            with open(spec_url_or_path, "r") as spec_file:
+                spec_str = spec_file.read()
+        assert extension in ALLOWED_SPEC_URI_EXTS
+        if extension == ".json":
+            self.spec = json.loads(spec_str)
+        else:
+            self.spec = yaml.load(spec_str)
 
-    def method_spec(self) -> MethodSpec:
-        pass
+        self.methods: Dict[str, MethodSpec] = {}
+        for path, path_spec in self.spec["paths"].items():
+            for method, method_spec in path_spec.items():
+                http_method = HttpMethod[method.upper()]
+                name = method_spec["operationId"]
+                param_format = ParamFormat.BODY_BINARY
+                expected_param_name = "requestData"
+                if any(param for param in method_spec["parameters"] if param["name"] == expected_param_name):
+                    param_format = ParamFormat.QUERY_PARAM_BASE64
+                else:
+                    expected_param_name = ""
+                method_spec_object = MethodSpec(
+                    name=name,
+                    path=path,
+                    http_method=http_method,
+                    param_format=param_format,
+                    param_name=expected_param_name)
+                assert name not in self.methods
+                self.methods[name] = method_spec_object
 
-    def has_valid_method_spec(self, method: str) -> bool:
-        pass
+    def method_spec(self, method: str) -> Optional[MethodSpec]:
+        if method not in self.methods:
+            return None
+        return self.methods[method]
 
-    def servers(self) -> List[str]:
-        raise NotImplementedError()
+    def path(self) -> Optional[str]:
+        if "servers" in self.spec:
+            servers = self.spec["servers"]
+            if len(servers):
+                server = servers[0]
+                if "url" in server and server["url"]:
+                    server = urlparse(server["url"])
+                    return server.path
+        return "/"
