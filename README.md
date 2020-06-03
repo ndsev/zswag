@@ -129,7 +129,7 @@ parameters:
 
 #### Option: Binary Body Parameter Format
 
-To use the Binary Body Parameter Format, use the snippet below in you method spec.
+To use the Binary Body Parameter Format, use the snippet below in your method spec and remove the `requestData` parameter.
 ```yaml
 requestBody:
   content:
