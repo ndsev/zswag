@@ -8,9 +8,6 @@ import requests
 from urllib.parse import urlparse
 
 
-ALLOWED_SPEC_URI_EXTS = {".json", ".yml", ".yaml"}
-
-
 class HttpMethod(Enum):
     GET = 0
     POST = 1
@@ -41,20 +38,12 @@ class ZserioSwaggerSpec:
 
     def __init__(self, spec_url_or_path: str):
         spec_url_parts = urlparse(spec_url_or_path)
-        extension = "yaml"
-        if "." in spec_url_parts.path:
-            extension = os.path.splitext(spec_url_parts.path)[1].lower()
-        if spec_url_parts.scheme in {"http", "https"}:
+        if spec_url_parts.scheme in {"http", "https", "file"}:
             spec_str = requests.get(spec_url_or_path).text
         else:
             with open(spec_url_or_path, "r") as spec_file:
                 spec_str = spec_file.read()
-        assert extension in ALLOWED_SPEC_URI_EXTS
-        if extension == ".json":
-            self.spec = json.loads(spec_str)
-        else:
-            self.spec = yaml.load(spec_str)
-
+        self.spec = yaml.load(spec_str)
         self.methods: Dict[str, MethodSpec] = {}
         for path, path_spec in self.spec["paths"].items():
             for method, method_spec in path_spec.items():
