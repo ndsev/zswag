@@ -38,7 +38,7 @@ class ZserioSwaggerSpec:
 
     def __init__(self, spec_url_or_path: str):
         spec_url_parts = urlparse(spec_url_or_path)
-        if spec_url_parts.scheme in {"http", "https", "file"}:
+        if spec_url_parts.scheme in {"http", "https"}:
             spec_str = requests.get(spec_url_or_path).text
         else:
             with open(spec_url_or_path, "r") as spec_file:
