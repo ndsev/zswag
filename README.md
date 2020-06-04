@@ -64,14 +64,14 @@ will automatically generate a client for the service under
 
 ```python
 from my.package import Service
-import zswag
-
-client = Service.Client(zswag.HttpClient(host=host, port=port))
+import zswag_client
+client = Service.Client(zswag_client.HttpClient(spec=f"http://localhost:5000/openapi.json"))
 ```
 
-`zswag.HttpClient` provides the service client interface expected
-For more options with `HttpClient` apart from `host` and `port`,
-check out it's doc-string.
+`zswag.HttpClient` provides the service client interface expected by zserio.
+It reads HTTP specifics for the service from an OpenAPI YAML or JSON spec
+that must be located under the given path or URL. 
+For more options with the `HttpClient` constructor check out it's doc-string.
 
 ## Swagger UI 
 
@@ -88,6 +88,69 @@ API docs of your service under `[/prefix]/ui`.
 * If you specify an existing file, `zswag` will simply verify
   all the methods specified in your zserio service are also reflected in
   the OpenAPI-spec.
+
+### OpenAPI Spec Options
+
+#### Options Overview
+
+`ZserioSwaggerApp` and `zswag_client.HttpClient` currently
+offer several degrees of freedom regarding HTTP-specifics in the
+OpenAPI YAML file:
+* **HTTP Method**
+* **Parameter Format**
+* **Server URL Base Path**
+
+#### Option: HTTP method
+
+To change the **HTTP method**, simply place either `get` or `post`
+as the key under the method path, such as in the following example:
+```yaml
+paths:
+  /methodName:
+    {get|post}:
+      ...
+```
+
+#### Option: Base64 URL Parameter Format
+
+To use the __Base64 URL parameter format__, use the snippet below in you method spec.
+Zswag will use this format if a parameter named `requestData` exists.
+```yaml
+parameters:
+- description: ''
+  in: query
+  name: requestData
+  required: true
+  schema:
+    default: Base64-encoded bytes
+    format: byte
+    type: string
+```
+
+#### Option: Binary Body Parameter Format
+
+To use the Binary Body Parameter Format, use the snippet below in your method spec and remove the `requestData` parameter.
+```yaml
+requestBody:
+  content:
+    application/x-binary:
+      schema:
+        type: string
+```
+Note: Binary parameter passing is only allowed with `POST` http requests.
+
+#### Option: Server URL Base Path
+
+OpenAPI allows for a `servers` field in the spec that lists URL path prefixes
+under which the specified API may be reached. A `zswag_client.HttpClient`
+instance looks into this list and determines the URL base path it uses from
+the first entry in this list. A sample entry might look as follows:
+```
+servers:
+- http://unused-host-information/path/to/my/api
+``` 
+The `zswag_client.HttpClient` will then call methods with your specified host
+and port, but prefix the `/path/to/my/api` string. 
 
 ### Documentation extraction
 

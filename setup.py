@@ -16,7 +16,7 @@ packages = setuptools.find_packages("src")
 
 setuptools.setup(
     name="zswag",
-    version="0.4.1",
+    version="0.5.0",
     url="https://github.com/klebert-engineering/zswag",
     author="Klebert Engineering",
     author_email="j.birkner@klebert-engineering.de",
@@ -32,7 +32,7 @@ setuptools.setup(
     dependency_links=required_url,
     python_requires='>=3.6',
 
-    license = "BSD-3 Clause",
+    license="BSD-3 Clause",
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
