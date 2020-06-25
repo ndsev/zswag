@@ -114,15 +114,14 @@ paths:
 #### Option: Base64 URL Parameter Format
 
 To use the __Base64 URL parameter format__, use the snippet below in you method spec.
-Zswag will use this format if a parameter named `requestData` exists.
 ```yaml
 parameters:
 - description: ''
   in: query
   name: requestData
   required: true
+  x-zserio-request-part: "*"  # The parameter represents the whole zserio request object
   schema:
-    default: Base64-encoded bytes
     format: byte
     type: string
 ```
@@ -133,11 +132,10 @@ To use the Binary Body Parameter Format, use the snippet below in your method sp
 ```yaml
 requestBody:
   content:
-    application/x-binary:
+    application/x-zserio-object:
       schema:
         type: string
 ```
-Note: Binary parameter passing is only allowed with `POST` http requests.
 
 #### Option: Server URL Base Path
 
