@@ -17,7 +17,7 @@ Alternatively, clone this repository, and run
 pip3 install -e .
 ```
 
-## Running the calc test example
+## Running the remote calculator test example
 
 ```bash
 PYTHONPATH=$PWD/test

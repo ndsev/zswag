@@ -8,7 +8,7 @@ import requests
 from urllib.parse import urlparse
 
 
-ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-request-part"
+ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object"
 ZSERIO_REQUEST_PART = "x-zserio-request-part"
 ZSERIO_REQUEST_PART_WHOLE = "*"
 
