@@ -151,7 +151,7 @@ class ZserioSwaggerApp(connexion.App):
         self.add_api(
             yaml_basename,
             arguments={"title": f"REST API for {service_type.__name__}"},
-            pythonic_params=True)
+            pythonic_params=False)
 
     def verify_openapi_schema(self):
         for method_name in self.service_instance._methodMap:
