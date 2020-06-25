@@ -2,7 +2,7 @@ import requests
 import zserio
 import base64
 
-from .spec import ZserioSwaggerSpec, HttpMethod, ParamFormat
+from .spec import ZserioSwaggerSpec, HttpMethod, ParamFormat, ParamLocation, ParamSpec
 from urllib.parse import urlparse
 import os
 
@@ -70,14 +70,23 @@ class HttpClient(zserio.ServiceInterface):
         try:
             method_spec = self.spec.method_spec(method_name)
             kwargs = {}
-            if method_spec.param_format == ParamFormat.QUERY_PARAM_BASE64:
-                kwargs["params"] = {"requestData": base64.urlsafe_b64encode(request_data)}
-            else:
-                kwargs["data"] = request_data
+            for param in method_spec.params:
+                if param.location == ParamLocation.QUERY:
+                    kwargs["params"] = {"requestData": base64.urlsafe_b64encode(request_data)}
+                elif param.location == ParamLocation.BODY:
+                    kwargs["data"] = request_data
             if method_spec.http_method == HttpMethod.GET:
                 response = requests.get(self.path + method_name, **kwargs)
-            else:
+            elif method_spec.http_method == HttpMethod.POST:
                 response = requests.post(self.path + method_name, **kwargs)
+            elif method_spec.http_method == HttpMethod.DELETE:
+                response = requests.delete(self.path + method_name, **kwargs)
+            elif method_spec.http_method == HttpMethod.PUT:
+                response = requests.put(self.path + method_name, **kwargs)
+            elif method_spec.http_method == HttpMethod.PATCH:
+                response = requests.patch(self.path + method_name, **kwargs)
+            else:
+                raise zserio.ServiceException("Unsupported HTTP method!")
             if response.status_code != requests.codes.ok:
                 raise zserio.ServiceException(str(response.status_code))
             return response.content
