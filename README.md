@@ -17,6 +17,14 @@ Alternatively, clone this repository, and run
 pip3 install -e .
 ```
 
+## Running the calc test example
+
+```bash
+PYTHONPATH=$PWD/test
+python3 -m calc server &
+python3 -m calc client
+```
+
 ## Creating a Swagger service from zserio
 
 `ZserioSwaggerApp` gives you the power to marry a user-written app controller
@@ -102,12 +110,12 @@ OpenAPI YAML file:
 
 #### Option: HTTP method
 
-To change the **HTTP method**, simply place either `get` or `post`
+To change the **HTTP method**, simply place the desired method
 as the key under the method path, such as in the following example:
 ```yaml
 paths:
   /methodName:
-    {get|post}:
+    {get|post|put|patch|delete}:
       ...
 ```
 
