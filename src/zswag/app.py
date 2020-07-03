@@ -186,6 +186,7 @@ class ZserioSwaggerApp(connexion.App):
                         "description": method_info.docstring,
                         "operationId": method_info.name,
                         "requestBody": {
+                            "description": method_info.argdoc,
                             "content": {
                                 ZSERIO_OBJECT_CONTENT_TYPE: {
                                     "schema": {
