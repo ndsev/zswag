@@ -9,7 +9,7 @@ from types import ModuleType
 from typing import Type
 
 from .doc import get_doc_str, IdentType, md_filter_definition
-from zswag_client.spec import ZserioSwaggerSpec, ParamFormat
+from zswag_client.spec import ZserioSwaggerSpec, ParamFormat, ParamLocation, ZSERIO_REQUEST_PART, ZSERIO_OBJECT_CONTENT_TYPE, ZSERIO_REQUEST_PART_WHOLE
 
 
 # Name of variable that is added to controller
@@ -125,13 +125,17 @@ class ZserioSwaggerApp(connexion.App):
                 continue
 
             method_spec = self.spec.method_spec(method_name)
-            if method_spec.param_format == ParamFormat.QUERY_PARAM_BASE64:
-                def wsgi_method(request_data, fun=zserio_modem_function):
-                    request_data = base64.urlsafe_b64decode(request_data)
-                    return bytes(fun(request_data, None))
-            else:
-                def wsgi_method(body, fun=zserio_modem_function):
-                    return bytes(fun(body, None))
+            param_spec = method_spec.params[0]
+
+            def wsgi_method(fun=zserio_modem_function, param=param_spec, **kwargs):
+                param_name = param.name if param.location != ParamLocation.BODY else "body"
+                assert param_name in kwargs
+                param_value = kwargs[param_name]
+                if param.format == ParamFormat.BYTE:
+                    param_value = base64.b64decode(param_value)
+                else:
+                    assert param.format == ParamFormat.BINARY
+                return bytes(fun(param_value, None))
             setattr(self.service_instance, method_name, wsgi_method)
 
             def method_impl(request, ctx=None, fun=user_function):
@@ -147,7 +151,7 @@ class ZserioSwaggerApp(connexion.App):
         self.add_api(
             yaml_basename,
             arguments={"title": f"REST API for {service_type.__name__}"},
-            pythonic_params=True)
+            pythonic_params=False)
 
     def verify_openapi_schema(self):
         for method_name in self.service_instance._methodMap:
@@ -177,21 +181,20 @@ class ZserioSwaggerApp(connexion.App):
             "servers": [],
             "paths": {
                 f"/{method_info.name}": {
-                    "get": {
+                    "post": {
                         "summary": method_info.docstring,
                         "description": method_info.docstring,
                         "operationId": method_info.name,
-                        "parameters": [{
-                            "name": "requestData",
-                            "in": "query",
+                        "requestBody": {
                             "description": method_info.argdoc,
-                            "required": True,
-                            "schema": {
-                                "type": "string",
-                                "default": "Base64-encoded bytes",
-                                "format": "byte"
+                            "content": {
+                                ZSERIO_OBJECT_CONTENT_TYPE: {
+                                    "schema": {
+                                        "type": "string"
+                                    }
+                                }
                             }
-                        }],
+                        },
                         "responses": {
                             "200": {
                                 "description": method_info.returndoc,

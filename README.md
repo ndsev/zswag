@@ -17,6 +17,14 @@ Alternatively, clone this repository, and run
 pip3 install -e .
 ```
 
+## Running the remote calculator test example
+
+```bash
+PYTHONPATH=$PWD/test
+python3 -m calc server &
+python3 -m calc client
+```
+
 ## Creating a Swagger service from zserio
 
 `ZserioSwaggerApp` gives you the power to marry a user-written app controller
@@ -102,27 +110,26 @@ OpenAPI YAML file:
 
 #### Option: HTTP method
 
-To change the **HTTP method**, simply place either `get` or `post`
+To change the **HTTP method**, simply place the desired method
 as the key under the method path, such as in the following example:
 ```yaml
 paths:
   /methodName:
-    {get|post}:
+    {get|post|put|patch|delete}:
       ...
 ```
 
 #### Option: Base64 URL Parameter Format
 
 To use the __Base64 URL parameter format__, use the snippet below in you method spec.
-Zswag will use this format if a parameter named `requestData` exists.
 ```yaml
 parameters:
 - description: ''
   in: query
   name: requestData
   required: true
+  x-zserio-request-part: "*"  # The parameter represents the whole zserio request object
   schema:
-    default: Base64-encoded bytes
     format: byte
     type: string
 ```
@@ -133,11 +140,10 @@ To use the Binary Body Parameter Format, use the snippet below in your method sp
 ```yaml
 requestBody:
   content:
-    application/x-binary:
+    application/x-zserio-object:
       schema:
         type: string
 ```
-Note: Binary parameter passing is only allowed with `POST` http requests.
 
 #### Option: Server URL Base Path
 

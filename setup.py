@@ -16,7 +16,7 @@ packages = setuptools.find_packages("src")
 
 setuptools.setup(
     name="zswag",
-    version="0.5.0",
+    version="0.6.0",
     url="https://github.com/klebert-engineering/zswag",
     author="Klebert Engineering",
     author_email="j.birkner@klebert-engineering.de",
