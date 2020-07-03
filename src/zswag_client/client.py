@@ -72,7 +72,7 @@ class HttpClient(zserio.ServiceInterface):
             kwargs = {}
             for param in method_spec.params:
                 if param.location == ParamLocation.QUERY:
-                    kwargs["params"] = {"requestData": base64.urlsafe_b64encode(request_data)}
+                    kwargs["params"] = {"requestData": base64.b64encode(request_data)}
                 elif param.location == ParamLocation.BODY:
                     kwargs["data"] = request_data
             if method_spec.http_method == HttpMethod.GET:

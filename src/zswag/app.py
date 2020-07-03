@@ -132,7 +132,7 @@ class ZserioSwaggerApp(connexion.App):
                 assert param_name in kwargs
                 param_value = kwargs[param_name]
                 if param.format == ParamFormat.BYTE:
-                    param_value = base64.urlsafe_b64decode(param_value)
+                    param_value = base64.b64decode(param_value)
                 else:
                     assert param.format == ParamFormat.BINARY
                 return bytes(fun(param_value, None))
