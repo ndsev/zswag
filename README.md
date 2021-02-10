@@ -59,11 +59,6 @@ def myApi(request):
 # _service._myApiImpl = my.app.controller.myApi
 ```
 
-**Note:** The server is currently generated such that the
-zserio RPC method parameter is expected to be a Base64-encoded
-string called `requestData`, which is placed in the URL query part.
-It is planned to make this more flexible in a future release.
-
 ## Using the client
 
 If you have a service called `my.package.Service`, then zserio
