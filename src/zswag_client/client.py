@@ -73,9 +73,7 @@ class HttpClient(zserio.ServiceInterface):
         try:
             method_spec = self.spec.method_spec(method_name)
             kwargs = {}
-
-            for key, value in self.headers.items():
-                kwargs['headers'] = {key: value}
+            kwargs['headers'] = self.headers
             for param in method_spec.params:
                 if param.location == ParamLocation.QUERY:
                     kwargs["params"] = {"requestData": base64.b64encode(request_data)}
