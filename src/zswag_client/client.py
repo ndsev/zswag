@@ -12,7 +12,7 @@ class HttpClient(zserio.ServiceInterface):
     Implementation of HTTP client as Zserio generic service interface.
     """
 
-    def __init__(self, *, proto=None, host=None, port=None, spec):
+    def __init__(self, *, proto=None, host=None, port=None, headers=None, spec):
         """
         Brief
 
@@ -51,6 +51,8 @@ class HttpClient(zserio.ServiceInterface):
 
             `port`: (Optional) Port to use for connection. MUST be issued together with
               `host`. If the argument is set and `host` is not, it will be ignored.
+            
+            `headers`: (Optional) Headers to use in the HTTP connection
         """
         spec_url_parts = urlparse(spec)
         netloc = \
@@ -62,6 +64,7 @@ class HttpClient(zserio.ServiceInterface):
         self.path: str = f"{proto or spec_url_parts.scheme}://{netloc}{path}"
         if not self.path.endswith("/"):
             self.path += "/"
+        self.headers = headers
 
     def callMethod(self, method_name, request_data, context=None):
         """
@@ -70,6 +73,9 @@ class HttpClient(zserio.ServiceInterface):
         try:
             method_spec = self.spec.method_spec(method_name)
             kwargs = {}
+
+            for key, value in self.headers.items():
+                kwargs['headers'] = {key: value}
             for param in method_spec.params:
                 if param.location == ParamLocation.QUERY:
                     kwargs["params"] = {"requestData": base64.b64encode(request_data)}
