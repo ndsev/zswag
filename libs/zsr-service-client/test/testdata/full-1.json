@@ -1,0 +1,104 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "NDS.Islands smart.services.SmartLayerTileService",
+    "description": "NDS.Live Islands SmartLayerTileService",
+    "version": "2020.05"
+  },
+  "servers": [
+    {
+      "url": "https://my.server.com/api"
+    }
+  ],
+  "paths": {
+    "/single/{id}": {
+      "get": {
+        "operationId": "single",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "x-zserio-request-part": "id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "headers": {
+              "Content-Type": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/binary"
+                }
+              }
+            }
+          }
+        },
+        "x-openapi-router-controller":"livesmart.server._service"
+      }
+    },
+    "/multi/{first}/{second}": {
+      "get": {
+        "operationId": "multi",
+        "parameters": [
+          {
+            "name": "first",
+            "in": "path",
+            "required": true,
+            "x-zserio-request-part": "id1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "second",
+            "in": "path",
+            "required": true,
+            "x-zserio-request-part": "id2",
+            "schema": {
+              "type": "int"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "headers": {
+              "Content-Type": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/binary"
+                }
+              }
+            }
+          }
+        },
+        "x-openapi-router-controller":"livesmart.server._service"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "binary": {
+        "type": "string",
+        "format": "binary"
+      }
+    }
+  }
+}
