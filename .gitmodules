@@ -19,3 +19,6 @@
 [submodule "deps/stx"]
 	path = deps/stx
 	url = https://github.com/Klebert-Engineering/stx.git
+[submodule "deps/yaml-cpp"]
+	path = deps/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git
