@@ -9,7 +9,7 @@
 #include "zsr/variant.hpp"
 #include "zsr/reflection-main.hpp"
 
-using namespace zsr_service;
+using namespace zswagcl;
 
 static zsr::Service dummyService(nullptr);
 static zsr::ServiceMethod dummyServiceMethod(&dummyService);
@@ -65,12 +65,12 @@ static auto make2ParamRequest(std::string first, int second)
 
 TEST_CASE("HTTP-Service", "[http-service]") {
 
-    ndsafw::MockHttpClient configClient;
+    httpcl::MockHttpClient configClient;
     configClient.getFun = [&](const std::string& uri) {
         REQUIRE(uri == "https://dummy");
 
         std::ifstream spec(TESTDATA "/full-1.json");
-        return ndsafw::IHttpClient::Result{200, std::string(std::istreambuf_iterator<char>(spec),
+        return httpcl::IHttpClient::Result{200, std::string(std::istreambuf_iterator<char>(spec),
                                                             std::istreambuf_iterator<char>())};
     };
 
@@ -84,7 +84,7 @@ TEST_CASE("HTTP-Service", "[http-service]") {
 
         /* Setup mock client */
         auto getCalled = false;
-        auto client = std::make_unique<ndsafw::MockHttpClient>();
+        auto client = std::make_unique<httpcl::MockHttpClient>();
 
         /* Define mock behavior */
         client->getFun = [&](const std::string& uri) {
@@ -92,7 +92,7 @@ TEST_CASE("HTTP-Service", "[http-service]") {
 
             REQUIRE(uri == "https://my.server.com/api/single/12345");
 
-            return ndsafw::IHttpClient::Result{200, {}};
+            return httpcl::IHttpClient::Result{200, {}};
         };
 
         /* Create request object */
@@ -113,7 +113,7 @@ TEST_CASE("HTTP-Service", "[http-service]") {
 
         /* Setup mock client */
         auto getCalled = false;
-        auto client = std::make_unique<ndsafw::MockHttpClient>();
+        auto client = std::make_unique<httpcl::MockHttpClient>();
 
         /* Define mock behavior */
         client->getFun = [&](const std::string& uri) {
@@ -121,7 +121,7 @@ TEST_CASE("HTTP-Service", "[http-service]") {
 
             REQUIRE(uri == "https://my.server.com/api/multi/hello/12345");
 
-            return ndsafw::IHttpClient::Result{200, {}};
+            return httpcl::IHttpClient::Result{200, {}};
         };
 
         /* Create request object */
