@@ -22,3 +22,6 @@
 [submodule "deps/yaml-cpp"]
 	path = deps/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "deps/python-cmake-wheel"]
+	path = deps/python-cmake-wheel
+	url = https://github.com/klebert-engineering/python-cmake-wheel.git

@@ -1,5 +1,5 @@
 from enum import Enum
-import zswag_client
+import pyzswagcl
 import calculator.api as api
 
 

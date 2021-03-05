@@ -1,10 +1,21 @@
 cmake_minimum_required(VERSION 3.14)
 project(zswag)
 
+set (ZSWAG_VERSION 0.7.0)
+if (NOT MSVC)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(CMAKE_CXX_FLAGS -fPIC)
+endif()
+
 ##############
 # deps
 
 find_package(OpenSSL REQUIRED)
+
+if (NOT TARGET wheel)
+  set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
+  include(python-wheel)
+endif ()
 
 if (NOT TARGET yaml-cpp)
   add_subdirectory(deps/yaml-cpp)
@@ -45,6 +56,6 @@ endif ()
 ##############
 # libs
 
-add_subdirectory(libs/zswagcl)
-# add_subdirectory(libs/pyzswagcl)
 add_subdirectory(libs/httpcl)
+add_subdirectory(libs/zswagcl)
+add_subdirectory(libs/pyzswagcl)
