@@ -1,8 +1,8 @@
 // Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
 #include "openapi-parser.hpp"
 
-#include "http-client/http-settings.hpp"
-#include "http-client/uri.hpp"
+#include "httpcl/http-settings.hpp"
+#include "httpcl/uri.hpp"
 
 #include "yaml-cpp/yaml.h"
 #include <httplib.h>
@@ -12,7 +12,7 @@
 
 using namespace std::string_literals;
 
-namespace zsr_service
+namespace zswagcl
 {
 
 static auto parseParameterLocation(const YAML::Node& inNode)
@@ -180,9 +180,9 @@ static void parseServer(const YAML::Node& serverNode,
         if (urlStr.empty()) {
             // Ignore empty URLs.
         } else if (urlStr.front() == '/') {
-            config.uri = ndsafw::URIComponents::fromStrPath(urlStr);
+            config.uri = httpcl::URIComponents::fromStrPath(urlStr);
         } else {
-            config.uri = ndsafw::URIComponents::fromStrRfc3986(urlStr);
+            config.uri = httpcl::URIComponents::fromStrRfc3986(urlStr);
         }
     }
 }
@@ -196,7 +196,7 @@ HTTPService::Config parseOpenAPIConfig(std::istream& s)
         auto first = servers.begin();
         if (first != servers.end()) {
             try { parseServer(*first, config); }
-            catch (const ndsafw::URIError& e) {
+            catch (const httpcl::URIError& e) {
                 throw std::runtime_error(std::string("OpenAPI spec doesn't contain a valid server config - details: ")
                                          .append(e.what()));
             }
@@ -215,10 +215,10 @@ HTTPService::Config parseOpenAPIConfig(std::istream& s)
 }
 
 HTTPService::Config fetchOpenAPIConfig(const std::string& url,
-                                       ndsafw::IHttpClient& client)
+                                       httpcl::IHttpClient& client)
 {
     // Load client config content
-    auto uriParts = ndsafw::URIComponents::fromStrRfc3986(url);
+    auto uriParts = httpcl::URIComponents::fromStrRfc3986(url);
     auto res = client.get(uriParts.build());
 
     // Create client from loaded config JSON

@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace zsr_service
+namespace zswagcl
 {
 
 std::string base64_encode(unsigned char const* bytes_to_encode,

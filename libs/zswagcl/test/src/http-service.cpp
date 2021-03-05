@@ -2,8 +2,8 @@
 
 #include <fstream>
 
-#include "zsr-service-client/http-service.hpp"
-#include "zsr-service-client/openapi-parser.hpp"
+#include "zswagcl/http-service.hpp"
+#include "zswagcl/openapi-parser.hpp"
 
 #include "zsr/find.hpp"
 #include "zsr/variant.hpp"

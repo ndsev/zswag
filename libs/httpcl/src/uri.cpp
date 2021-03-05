@@ -5,7 +5,7 @@
 #include <cstring>
 #include <cctype>
 
-namespace ndsafw
+namespace httpcl
 {
 
 /**

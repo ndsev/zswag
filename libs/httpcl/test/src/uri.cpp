@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include "http-client/uri.hpp"
+#include "httpcl/uri.hpp"
 
 TEST_CASE("Valid URIs are parsed correctly", "[uri]") {
     SECTION("Empty") {

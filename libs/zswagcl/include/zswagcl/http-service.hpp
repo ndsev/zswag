@@ -1,8 +1,8 @@
 // Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
 #pragma once
 
-#include "http-client/uri.hpp"
-#include "http-client/http-client.hpp"
+#include "httpcl/uri.hpp"
+#include "httpcl/http-client.hpp"
 
 #include <zserio/IService.h>
 
@@ -16,7 +16,7 @@ namespace zsr
 class Variant;
 }
 
-namespace zsr_service
+namespace zswagcl
 {
 
 class HTTPService : public zserio::IService
@@ -28,7 +28,7 @@ public:
      * Creates a new http service with the configuration specified.
      */
     explicit HTTPService(const Config& cfg,
-                         std::unique_ptr<ndsafw::IHttpClient> client);
+                         std::unique_ptr<httpcl::IHttpClient> client);
 
     ~HTTPService() override;
 
@@ -155,7 +155,7 @@ struct HTTPService::Config
     /**
      * URI parts.
      */
-    ndsafw::URIComponents uri;
+    httpcl::URIComponents uri;
 
     /**
      * Map from service method name to path configuration.

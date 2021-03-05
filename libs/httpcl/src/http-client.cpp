@@ -1,14 +1,14 @@
 #include "http-client.hpp"
 #include "uri.hpp"
 
-#include "http-client/http-settings.hpp"
+#include "httpcl/http-settings.hpp"
 
 #include <httplib.h>
 
 namespace
 {
 
-ndsafw::IHttpClient::Result makeResult(httplib::Result&& result)
+httpcl::IHttpClient::Result makeResult(httplib::Result&& result)
 {
     if (result)
         return {result->status, std::move(result->body)};
@@ -17,14 +17,14 @@ ndsafw::IHttpClient::Result makeResult(httplib::Result&& result)
 
 }
 
-namespace ndsafw
+namespace httpcl
 {
 
 using Result = HttpLibHttpClient::Result;
 
 struct HttpLibHttpClient::Impl
 {
-    ndsafw::HTTPSettings settings;
+    httpcl::HTTPSettings settings;
 
     auto makeClient(const URIComponents& uri)
     {
