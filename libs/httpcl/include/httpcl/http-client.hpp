@@ -4,7 +4,7 @@
 #include <memory>
 #include <functional>
 
-namespace ndsafw
+namespace httpcl
 {
 
 class IHttpClient

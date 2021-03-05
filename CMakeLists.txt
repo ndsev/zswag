@@ -45,6 +45,6 @@ endif ()
 ##############
 # libs
 
-add_subdirectory(libs/zswacl)
-# add_subdirectory(libs/pyzswacl)
-add_subdirectory(libs/http-client)
+add_subdirectory(libs/zswagcl)
+# add_subdirectory(libs/pyzswagcl)
+add_subdirectory(libs/httpcl)

@@ -3,13 +3,13 @@
 
 #include <istream>
 
-#include "zsr-service-client/http-service.hpp"
+#include "zswagcl/http-service.hpp"
 
-namespace zsr_service
+namespace zswagcl
 {
 
 HTTPService::Config fetchOpenAPIConfig(const std::string& url,
-                                       ndsafw::IHttpClient& client);
+                                       httpcl::IHttpClient& client);
 HTTPService::Config parseOpenAPIConfig(std::istream&);
 
 }

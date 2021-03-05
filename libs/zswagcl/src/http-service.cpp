@@ -3,7 +3,7 @@
 
 #include "base64.hpp"
 #include "openapi-parser.hpp"
-#include "http-client/uri.hpp"
+#include "httpcl/uri.hpp"
 
 #include "zsr/types.hpp"
 #include "zsr/find.hpp"
@@ -12,7 +12,7 @@
 #include <optional>
 #include <string>
 
-namespace zsr_service
+namespace zswagcl
 {
 
 static std::optional<std::string>
@@ -126,7 +126,7 @@ resolvePathParameters(const HTTPService::Config::Path& path,
                                                parameter->second.format,
                                                *obj,
                                                bin))
-                        val = ndsafw::URIComponents::encode(*str);
+                        val = httpcl::URIComponents::encode(*str);
                 }
 
                 if (!val.empty()) {
@@ -147,17 +147,17 @@ resolvePathParameters(const HTTPService::Config::Path& path,
 
 struct HTTPService::Impl
 {
-    std::unique_ptr<ndsafw::IHttpClient> client;
+    std::unique_ptr<httpcl::IHttpClient> client;
     HTTPService::Config const cfg;
 
-    Impl(Config cfg, std::unique_ptr<ndsafw::IHttpClient> client)
+    Impl(Config cfg, std::unique_ptr<httpcl::IHttpClient> client)
         : client(std::move(client))
         , cfg(std::move(cfg))
     {}
 };
 
 HTTPService::HTTPService(const Config& cfg,
-                         std::unique_ptr<ndsafw::IHttpClient> client)
+                         std::unique_ptr<httpcl::IHttpClient> client)
     : impl(std::make_unique<HTTPService::Impl>(cfg, std::move(client)))
 {}
 
@@ -180,7 +180,7 @@ void HTTPService::callMethod(const std::string& methodName,
         if (methodSpec != methods.end()) {
             auto httpMethod = methodSpec->second.httpMethod;
 
-            ndsafw::URIComponents uri(impl->cfg.uri);
+            httpcl::URIComponents uri(impl->cfg.uri);
             uri.appendPath(resolvePathParameters(methodSpec->second,
                                                  ctx->request,
                                                  requestData));

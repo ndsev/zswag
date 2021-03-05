@@ -5,7 +5,7 @@
 #include <map>
 #include <stdexcept>
 
-namespace ndsafw
+namespace httpcl
 {
 
 struct URIError : std::runtime_error {

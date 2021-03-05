@@ -1,18 +1,18 @@
 #include <catch2/catch.hpp>
 
-#include "http-client/uri.hpp"
+#include "httpcl/uri.hpp"
 
 TEST_CASE("Valid URIs are parsed correctly", "[uri]") {
     SECTION("Empty") {
         REQUIRE_THROWS(
-            ndsafw::URIComponents::fromStrRfc3986("")
+            httpcl::URIComponents::fromStrRfc3986("")
         );
     }
 
     SECTION("Scheme+Host") {
-        ndsafw::URIComponents uri;
+        httpcl::URIComponents uri;
         REQUIRE_NOTHROW(
-            uri = ndsafw::URIComponents::fromStrRfc3986("http://host")
+            uri = httpcl::URIComponents::fromStrRfc3986("http://host")
         );
 
         REQUIRE(uri.scheme == "http");
@@ -20,9 +20,9 @@ TEST_CASE("Valid URIs are parsed correctly", "[uri]") {
     }
 
     SECTION("Scheme+IPv4") {
-        ndsafw::URIComponents uri;
+        httpcl::URIComponents uri;
         REQUIRE_NOTHROW(
-            uri = ndsafw::URIComponents::fromStrRfc3986("http://1.1.1.1")
+            uri = httpcl::URIComponents::fromStrRfc3986("http://1.1.1.1")
         );
 
         REQUIRE(uri.scheme == "http");
@@ -30,9 +30,9 @@ TEST_CASE("Valid URIs are parsed correctly", "[uri]") {
     }
 
     SECTION("Scheme+User+Host") {
-        ndsafw::URIComponents uri;
+        httpcl::URIComponents uri;
         REQUIRE_NOTHROW(
-            uri = ndsafw::URIComponents::fromStrRfc3986("http://user:pass@host")
+            uri = httpcl::URIComponents::fromStrRfc3986("http://user:pass@host")
         );
 
         REQUIRE(uri.scheme == "http");
@@ -40,9 +40,9 @@ TEST_CASE("Valid URIs are parsed correctly", "[uri]") {
     }
 
     SECTION("Scheme+IPv6+Port") {
-        ndsafw::URIComponents uri;
+        httpcl::URIComponents uri;
         REQUIRE_NOTHROW(
-            uri = ndsafw::URIComponents::fromStrRfc3986("http://[::1]:123")
+            uri = httpcl::URIComponents::fromStrRfc3986("http://[::1]:123")
         );
 
         REQUIRE(uri.scheme == "http");
@@ -51,27 +51,27 @@ TEST_CASE("Valid URIs are parsed correctly", "[uri]") {
     }
 
     SECTION("Path") {
-        ndsafw::URIComponents uri;
+        httpcl::URIComponents uri;
         REQUIRE_NOTHROW(
-            uri = ndsafw::URIComponents::fromStrRfc3986("http://host/%3c%3E/%20/end")
+            uri = httpcl::URIComponents::fromStrRfc3986("http://host/%3c%3E/%20/end")
         );
 
         REQUIRE(uri.path == "/<>/ /end");
     }
 
     SECTION("Query") {
-        ndsafw::URIComponents uri;
+        httpcl::URIComponents uri;
         REQUIRE_NOTHROW(
-            uri = ndsafw::URIComponents::fromStrRfc3986("http://host?i(@am=the&query%3e")
+            uri = httpcl::URIComponents::fromStrRfc3986("http://host?i(@am=the&query%3e")
         );
 
         REQUIRE(uri.query == "i(@am=the&query>");
     }
 
     SECTION("Query+Fragment") {
-        ndsafw::URIComponents uri;
+        httpcl::URIComponents uri;
         REQUIRE_NOTHROW(
-            uri = ndsafw::URIComponents::fromStrRfc3986("http://host?query#fragment")
+            uri = httpcl::URIComponents::fromStrRfc3986("http://host?query#fragment")
         );
 
         REQUIRE(uri.query == "query");
@@ -80,7 +80,7 @@ TEST_CASE("Valid URIs are parsed correctly", "[uri]") {
 
 TEST_CASE("Build URIs", "[uri-builder]") {
     SECTION("Missing scheme") {
-        ndsafw::URIComponents builder;
+        httpcl::URIComponents builder;
         builder.host = "host";
 
         REQUIRE_THROWS(
@@ -89,7 +89,7 @@ TEST_CASE("Build URIs", "[uri-builder]") {
     }
 
     SECTION("Missing host") {
-        ndsafw::URIComponents builder;
+        httpcl::URIComponents builder;
         builder.scheme = "scheme";
 
         REQUIRE_THROWS(
@@ -98,7 +98,7 @@ TEST_CASE("Build URIs", "[uri-builder]") {
     }
 
     SECTION("Full URI") {
-        ndsafw::URIComponents builder;
+        httpcl::URIComponents builder;
         builder.scheme = "ftp";
         builder.host = "host";
         builder.port = 123;

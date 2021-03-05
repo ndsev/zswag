@@ -10,7 +10,7 @@
 #include <regex>
 #include <future>
 
-using namespace ndsafw;
+using namespace httpcl;
 using namespace std::string_literals;
 
 static const std::chrono::minutes KEYCHAIN_TIMEOUT{1};

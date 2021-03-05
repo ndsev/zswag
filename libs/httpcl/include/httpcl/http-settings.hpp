@@ -7,7 +7,7 @@
 #include <vector>
 #include <string>
 
-namespace ndsafw
+namespace httpcl
 {
 
 /**
