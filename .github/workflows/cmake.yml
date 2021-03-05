@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Setup
+      run: |
+        mkdir build
+    - name: Configure
+      working-directory: build
+      run: |
+        cmake ..
+    - name: Build
+      working-directory: build
+      run: |
+        cmake --build .
+
+  build-windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Setup
+      run: |
+        mkdir build
+    - name: Configure
+      working-directory: build
+      run: |
+        cmake ..
+      shell: cmd
+    - name: Build
+      working-directory: build
+      run: |
+        cmake --build .
+      shell: cmd
+
+  build-macos:
+    name: MacOS
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Setup
+      run: |
+        mkdir build
+    - name: Configure
+      working-directory: build
+      run: |
+        cmake ..
+    - name: Build
+      working-directory: build
+      run: |
+        cmake --build .
