@@ -1,15 +1,15 @@
-project(http-client-test)
+project(httpcl-test)
 
-add_executable(http-client-test
+add_executable(httpcl-test
   src/main.cpp
   src/uri.cpp)
 
-target_link_libraries(http-client-test
+target_link_libraries(httpcl-test
   PUBLIC
-  http-client
-  zsr
-  Catch2::Catch2)
+    httpcl
+    zsr
+    Catch2::Catch2)
 
 include(CTest)
-add_test(NAME http-client-test
-  COMMAND "$<TARGET_FILE:http-client-test>")
+add_test(NAME httpcl-test
+  COMMAND "$<TARGET_FILE:httpcl-test>")
