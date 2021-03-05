@@ -3,6 +3,11 @@ project(zswag)
 
 set (ZSWAG_VERSION 0.7.0)
 
+if (NOT MSVC)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(CMAKE_CXX_FLAGS -fPIC)
+endif()
+
 ##############
 # deps
 
