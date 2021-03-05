@@ -11,6 +11,10 @@ add_library(httpcl STATIC
   src/http-settings.cpp
   src/uri.cpp)
 
+target_compile_features(httpcl
+  INTERFACE
+    cxx_std_17)
+
 target_link_libraries(httpcl
   PRIVATE
     stx
@@ -19,8 +23,6 @@ target_link_libraries(httpcl
     httplib::httplib
     yaml-cpp
   )
-
-set_target_properties(httpcl PROPERTIES CXX_STANDARD 17)
 
 target_include_directories(httpcl
   PRIVATE

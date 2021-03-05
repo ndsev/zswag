@@ -18,7 +18,9 @@ target_link_libraries(zswagcl
     yaml-cpp
     ZserioCppRuntime)
 
-set_target_properties(zswagcl PROPERTIES CXX_STANDARD 17)
+target_compile_features(zswagcl
+  INTERFACE
+    cxx_std_17)
 
 target_include_directories(zswagcl
   PRIVATE

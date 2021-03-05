@@ -10,6 +10,10 @@ target_link_libraries(pyzswagcl
   PRIVATE
     zswagcl)
 
+target_compile_features(pyzswagcl
+  INTERFACE
+    cxx_std_17)
+
 add_wheel(pyzswagcl
   VERSION ${ZSWAG_VERSION}
   DESCRIPTION "Python bindings for the zswag client library."

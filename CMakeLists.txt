@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(zswag)
 
-set (ZSWAG_VERSION 0.7.0)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(ZSWAG_VERSION 0.7.0)
+
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   set(CMAKE_CXX_FLAGS -fPIC)
@@ -13,6 +16,7 @@ endif()
 find_package(OpenSSL REQUIRED)
 
 if (NOT TARGET wheel)
+  set(Python3_FIND_STRATEGY LOCATION)
   set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
   include(python-wheel)
 endif ()
