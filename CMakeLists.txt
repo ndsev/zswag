@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
 project(zswag)
 
+if (NOT MSVC)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(CMAKE_CXX_FLAGS -fPIC)
+endif()
+
 ##############
 # deps
 
