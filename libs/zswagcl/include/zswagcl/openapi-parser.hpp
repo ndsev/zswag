@@ -3,13 +3,25 @@
 
 #include <istream>
 
-#include "zswagcl/http-service.hpp"
+#include "zswagcl/openapi-config.hpp"
+#include "httpcl/http-client.hpp"
 
 namespace zswagcl
 {
 
-HTTPService::Config fetchOpenAPIConfig(const std::string& url,
-                                       httpcl::IHttpClient& client);
-HTTPService::Config parseOpenAPIConfig(std::istream&);
+/**
+ * Download and parse OpenAPI config from URL.
+ *
+ * Throws on error.
+ */
+OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
+                                 httpcl::IHttpClient& client);
+
+/**
+ * Parse OpenAPI config from input-stream.
+ *
+ * Throws on error.
+ */
+OpenAPIConfig parseOpenAPIConfig(std::istream&);
 
 }

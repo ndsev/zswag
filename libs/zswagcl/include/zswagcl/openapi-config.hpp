@@ -1,60 +1,27 @@
-// Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
 #pragma once
 
-#include "httpcl/uri.hpp"
-#include "httpcl/http-client.hpp"
-
-#include <zserio/IService.h>
-
-#include <map>
-#include <memory>
-#include <vector>
 #include <string>
+#include <vector>
+#include <map>
 
-namespace zsr
-{
-class Variant;
-}
+#include "httpcl/uri.hpp"
 
 namespace zswagcl
 {
 
-class HTTPService : public zserio::IService
-{
-public:
-    struct Config;
-
-    /**
-     * Creates a new http service with the configuration specified.
-     */
-    explicit HTTPService(const Config& cfg,
-                         std::unique_ptr<httpcl::IHttpClient> client);
-
-    ~HTTPService() override;
-
-    /**
-     * Calls the configured service method with the given name, resolving
-     * all parameters.
-     *
-     * @param context  Pointer to object of type zsr::ServiceMethod::Context
-     */
-    void callMethod(const std::string& methodName,
-                    const std::vector<uint8_t>& requestData,
-                    std::vector<uint8_t>& responseData,
-                    void* context) override;
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> impl;
-};
-
-struct HTTPService::Config
+struct OpenAPIConfig
 {
     struct Parameter {
         enum Location {
             Path,
             Query,
         } location = Query;
+
+        /**
+         * Parameter identifier (from template) without style/explode
+         * hints ({?X*} -> X).
+         */
+        std::string ident;
 
         /**
          * Zserio structure field or function identifier.
@@ -104,19 +71,28 @@ struct HTTPService::Config
         enum Style {
             /**
              * Simple style parameter defined by RFC 6570.
+             * Template: {X}
              */
             Simple,
 
             /**
+             * Label style parameter defined by RFC 6570.
+             * Template: {.X}
+             */
+            Label,
+
+            /**
              * Form style parameter defined by RFC 6570.
+             * Template: {?X}
              */
             Form,
 
             /**
              * Path style parameter defined by RFC 6570.
+             * Template {;X}
              */
             Matrix,
-        } style = Simple; // TODO: Not used
+        } style = Simple;
 
         /**
          * If true, generate separate parameters for each array-value
@@ -149,7 +125,7 @@ struct HTTPService::Config
          *
          * Ignored if HTTP-Method is GET.
          */
-        bool bodyRequestObject = true; // TODO: Not used
+        bool bodyRequestObject = true;
     };
 
     /**
@@ -163,8 +139,8 @@ struct HTTPService::Config
     std::map<std::string, Path> methodPath;
 };
 
-const std::string ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
-const std::string ZSERIO_REQUEST_PART = "x-zserio-request-part";
-const std::string ZSERIO_REQUEST_PART_WHOLE = "*";
+extern const std::string ZSERIO_OBJECT_CONTENT_TYPE;
+extern const std::string ZSERIO_REQUEST_PART;
+extern const std::string ZSERIO_REQUEST_PART_WHOLE;
 
 }

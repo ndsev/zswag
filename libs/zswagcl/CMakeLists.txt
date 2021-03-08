@@ -5,13 +5,15 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_library(zswagcl SHARED
   src/base64.cpp
-  src/http-service.cpp
+  #src/http-service.cpp
+  src/openapi-client.cpp
+  src/openapi-config.cpp
+  src/openapi-parameter-helper.cpp
   src/openapi-parser.cpp)
 
 target_link_libraries(zswagcl
-  PRIVATE
-    stx
   PUBLIC
+    stx
     httpcl
     zsr
     httplib::httplib
@@ -19,7 +21,7 @@ target_link_libraries(zswagcl
     ZserioCppRuntime)
 
 target_compile_features(zswagcl
-  INTERFACE
+  PUBLIC
     cxx_std_17)
 
 target_include_directories(zswagcl
