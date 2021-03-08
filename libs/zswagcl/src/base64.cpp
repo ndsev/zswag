@@ -158,7 +158,10 @@ std::string base64_encode(unsigned char const* bytes_to_encode,
 std::string base64url_encode(unsigned char const* bytes_to_encode,
                           unsigned int in_len)
 {
-    return encode(base64url_chars, bytes_to_encode, in_len);
+    auto str = encode(base64url_chars, bytes_to_encode, in_len);
+    while (str.back() == '=')
+        str.erase(str.size() - 1);
+    return str;
 }
 
 std::string base64_decode(std::string const& encoded_string)
