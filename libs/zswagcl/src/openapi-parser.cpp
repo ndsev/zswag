@@ -19,9 +19,9 @@ static auto parseParameterLocation(const YAML::Node& inNode)
 {
     auto str = inNode.as<std::string>();
     if (str == "query")
-        return HTTPService::Config::Parameter::Query;
+        return OpenAPIConfig::Parameter::Query;
     else if (str == "path")
-        return HTTPService::Config::Parameter::Path;
+        return OpenAPIConfig::Parameter::Path;
 
     throw std::runtime_error("Unsupported parameter location");
 }
@@ -35,17 +35,21 @@ static auto parseParameterSchema(const YAML::Node& schemaNode)
     if (auto formatNode = schemaNode["format"]) {
         auto format = formatNode.as<std::string>();
 
+        if (format == "string")
+            return OpenAPIConfig::Parameter::String;
         if (format == "byte" || format == "base64")
-            return HTTPService::Config::Parameter::Base64;
+            return OpenAPIConfig::Parameter::Base64;
+        if (format == "base64url")
+            return OpenAPIConfig::Parameter::Base64url;
         if (format == "hex")
-            return HTTPService::Config::Parameter::Hex;
+            return OpenAPIConfig::Parameter::Hex;
         if (format == "binary")
-            return HTTPService::Config::Parameter::Binary;
+            return OpenAPIConfig::Parameter::Binary;
 
         throw std::runtime_error("Unsupported format");
     }
 
-    return HTTPService::Config::Parameter::String;
+    return OpenAPIConfig::Parameter::String;
 }
 
 
@@ -55,37 +59,36 @@ static auto parseParameterSchema(const YAML::Node& schemaNode)
  * Documentation: https://swagger.io/specification/#parameter-style
  */
 static void parseParameterStyle(const YAML::Node& styleNode,
-                                HTTPService::Config::Parameter& parameter)
+                                OpenAPIConfig::Parameter& parameter)
 {
     /* Set default style for parameter location */
     switch (parameter.location) {
-    case HTTPService::Config::Parameter::Query:
-        parameter.style = HTTPService::Config::Parameter::Form;
+    case OpenAPIConfig::Parameter::Query:
+        parameter.style = OpenAPIConfig::Parameter::Form;
+        parameter.explode = true;
         break;
-    case HTTPService::Config::Parameter::Path:
-        parameter.style = HTTPService::Config::Parameter::Simple;
+    case OpenAPIConfig::Parameter::Path:
+        parameter.style = OpenAPIConfig::Parameter::Simple;
+        parameter.explode = false;
         break;
     }
 
     if (styleNode) {
         const auto& styleStr = styleNode.as<std::string>();
         if (styleStr == "matrix")
-            parameter.style = HTTPService::Config::Parameter::Matrix;
+            parameter.style = OpenAPIConfig::Parameter::Matrix;
+        if (styleStr == "label")
+            parameter.style = OpenAPIConfig::Parameter::Label;
         if (styleStr == "form")
-            parameter.style = HTTPService::Config::Parameter::Form;
+            parameter.style = OpenAPIConfig::Parameter::Form;
         if (styleStr == "simple")
-            parameter.style = HTTPService::Config::Parameter::Simple;
+            parameter.style = OpenAPIConfig::Parameter::Simple;
     }
 }
 
 static void parseParameterExplode(const YAML::Node& explodeNode,
-                                  HTTPService::Config::Parameter& parameter)
+                                  OpenAPIConfig::Parameter& parameter)
 {
-    if (parameter.style == HTTPService::Config::Parameter::Matrix)
-        parameter.explode = true;
-    else
-        parameter.explode = false;
-
     if (explodeNode) {
         auto explodeBool = explodeNode.as<bool>();
 
@@ -94,13 +97,15 @@ static void parseParameterExplode(const YAML::Node& explodeNode,
 }
 
 static bool parseMethodParameter(const YAML::Node& parameterNode,
-                                 HTTPService::Config::Path& path)
+                                 OpenAPIConfig::Path& path)
 {
     auto nameNode = parameterNode["name"];
     if (!nameNode)
         throw std::runtime_error("Missing required node 'name'");
 
     auto& parameter = path.parameters[nameNode.as<std::string>()];
+    parameter.ident = nameNode.as<std::string>();
+
     if (auto inNode = parameterNode["in"]) {
         parameter.location = parseParameterLocation(inNode);
     }
@@ -121,7 +126,7 @@ static bool parseMethodParameter(const YAML::Node& parameterNode,
 }
 
 static void parseMethodBody(const YAML::Node& methodNode,
-                            HTTPService::Config::Path& path)
+                            OpenAPIConfig::Path& path)
 {
     if (auto bodyNode = methodNode["requestBody"]) {
         if (auto contentNode = bodyNode["content"]) {
@@ -136,7 +141,7 @@ static void parseMethodBody(const YAML::Node& methodNode,
 static void parseMethod(const std::string& method,
                         const std::string& uriPath,
                         const YAML::Node& pathNode,
-                        HTTPService::Config& config)
+                        OpenAPIConfig& config)
 {
     if (auto methodNode = pathNode[method]) {
         auto opIdNode = methodNode["operationId"];
@@ -161,7 +166,7 @@ static void parseMethod(const std::string& method,
 
 static void parsePath(const std::string& uriPath,
                       const YAML::Node& pathNode,
-                      HTTPService::Config& config)
+                      OpenAPIConfig& config)
 {
     static const char* supportedMethods[] = {
         "get", "post", "put", "patch", "delete"
@@ -173,7 +178,7 @@ static void parsePath(const std::string& uriPath,
 }
 
 static void parseServer(const YAML::Node& serverNode,
-                        HTTPService::Config& config)
+                        OpenAPIConfig& config)
 {
     if (auto urlNode = serverNode["url"]) {
         auto urlStr = urlNode.as<std::string>();
@@ -187,9 +192,9 @@ static void parseServer(const YAML::Node& serverNode,
     }
 }
 
-HTTPService::Config parseOpenAPIConfig(std::istream& s)
+OpenAPIConfig parseOpenAPIConfig(std::istream& s)
 {
-    HTTPService::Config config;
+    OpenAPIConfig config;
 
     auto doc = YAML::Load(s);
     if (auto servers = doc["servers"]) {
@@ -214,8 +219,8 @@ HTTPService::Config parseOpenAPIConfig(std::istream& s)
     return config;
 }
 
-HTTPService::Config fetchOpenAPIConfig(const std::string& url,
-                                       httpcl::IHttpClient& client)
+OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
+                                 httpcl::IHttpClient& client)
 {
     // Load client config content
     auto uriParts = httpcl::URIComponents::fromStrRfc3986(url);

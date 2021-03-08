@@ -8,7 +8,8 @@ add_zserio_module(zscl-test
 
 add_executable(zswagcl-test
   src/main.cpp
-  src/http-service.cpp
+  #src/http-service.cpp
+  src/openapi-parameter-helper.cpp
   src/base64.cpp)
 
 target_link_libraries(zswagcl-test
