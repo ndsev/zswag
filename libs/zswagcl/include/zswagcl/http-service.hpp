@@ -142,14 +142,14 @@ struct HTTPService::Config
         std::map<std::string, Parameter> parameters;
 
         /**
-         * Zserio structure field or function identifier that is transfered
+         * Zserio structure field or function identifier that is transferred
          * as request body.
          * The special identifier '*' represents the binary
          * encoded request object.
          *
          * Ignored if HTTP-Method is GET.
          */
-        std::string bodyField = "*"; // TODO: Not used
+        bool bodyRequestObject = true; // TODO: Not used
     };
 
     /**
@@ -162,5 +162,9 @@ struct HTTPService::Config
      */
     std::map<std::string, Path> methodPath;
 };
+
+const std::string ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
+const std::string ZSERIO_REQUEST_PART = "x-zserio-request-part";
+const std::string ZSERIO_REQUEST_PART_WHOLE = "*";
 
 }
