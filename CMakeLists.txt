@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.14)
 project(zswag)
 
-set (ZSWAG_VERSION 0.7.0)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(ZSWAG_VERSION 0.7.0)
 
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
