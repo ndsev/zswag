@@ -1,5 +1,7 @@
 project(pyzswagcl)
 
+set(WHEEL_DEPLOY_DIRECTORY "${CMAKE_BINARY_DIR}")
+
 pybind11_add_module(pyzswagcl SHARED pyzswagcl.cpp)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
@@ -10,8 +12,12 @@ target_link_libraries(pyzswagcl
   PRIVATE
     zswagcl)
 
+target_compile_features(pyzswagcl
+  INTERFACE
+    cxx_std_17)
+
 add_wheel(pyzswagcl
-  VERSION ${ZSWAG_VERSION}
+  VERSION "${ZSWAG_VERSION}"
   DESCRIPTION "Python bindings for the zswag client library."
   TARGET_DEPENDENCIES
-    zswagcl)
+    zswagcl zsr)
