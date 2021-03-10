@@ -9,6 +9,7 @@
 
 namespace py = pybind11;
 using namespace py::literals;
+using namespace std::string_literals;
 
 PYBIND11_MODULE(pyzswagcl, m)
 {
@@ -71,7 +72,7 @@ PYBIND11_MODULE(pyzswagcl, m)
                     return it->second;
                 else
                     throw std::runtime_error(
-                        std::string("Could not find OpenAPi config for method name ")+methodName);
+                        "Could not find OpenAPI config for method name "s+methodName);
             }, py::is_operator(), py::return_value_policy::reference_internal, "method_name"_a)
             ;
 
