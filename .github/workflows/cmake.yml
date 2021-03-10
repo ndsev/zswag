@@ -17,35 +17,33 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
-    - name: Setup (Common)
-      run: |
-        mkdir build
-        python -m pip install setuptools wheel
-    - name: Setup (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew install openssl
-        echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl)" >> $GITHUB_ENV
-        echo "VIRTUAL_ENV=/Users/runner/hostedtoolcache/Python/${{ matrix.python-version }}" >> $GITHUB_ENV
-    - name: Setup (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        choco install openssl
-        echo "VIRTUAL_ENV=C:\\hostedtoolcache\\windows\\Python\\${{ matrix.python-version }}" >> $GITHUB_ENV
-    - name: Configure
+    - run: python -m pip install setuptools wheel
+    - run: mkdir build
+    - name: Configure (Linux)
+      if: matrix.os == 'ubuntu-latest'
       working-directory: build
       run: |
         cmake ..
+    - name: Configure (macOS)
+      if: matrix.os == 'macos-latest'
+      working-directory: build
+      run: |
+        brew install openssl
+        export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
+        cmake -DPython3_ROOT_DIR=$pythonLocation -DPython3_FIND_FRAMEWORK=LAST ..
+    - name: Configure (Windows)
+      if: matrix.os == 'windows-latest'
+      working-directory: build
+      run: |
+        choco install --no-progress -y openssl
+        echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
+        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST ..
     - name: Build
       working-directory: build
       run: |
         cmake --build . && cmake --build . --target wheel
-    - name: Wheel
-      working-directory: build
-      run: |
-        cmake --build . --target wheel
     - name: Upload Artifact
       uses: actions/upload-artifact@v2
       with:
-        name: pyzswagcl-wheel
+        name: pyzswagcl-py${{ matrix.python-version }}-${{ matrix.os }}
         path: build/pyzswagcl*.whl

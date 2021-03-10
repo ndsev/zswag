@@ -16,6 +16,7 @@ endif()
 find_package(OpenSSL REQUIRED)
 
 if (NOT TARGET wheel)
+  set(Python3_FIND_STRATEGY LOCATION)
   set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
   include(python-wheel)
 endif ()
