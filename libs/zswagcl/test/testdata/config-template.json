@@ -1,0 +1,24 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "NDS OpenAPI Testdata Template",
+    "description": "NDS OpenAPI Testdata Template",
+    "version": "2021.01"
+  },
+  "servers": [
+    {
+      "url": "https://my.server.com/api"
+    }
+  ],
+  "paths": {
+    <<PATHS>>
+  },
+  "components": {
+    "schemas": {
+      "binary": {
+        "type": "string",
+        "format": "binary"
+      }
+    }
+  }
+}

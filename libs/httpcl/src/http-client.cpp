@@ -100,6 +100,8 @@ Result MockHttpClient::post(const std::string& uri,
                             const std::string& body,
                             const std::string& bodyType)
 {
+    if (postFun)
+        return postFun(uri, body, bodyType);
     return {0, ""};
 }
 

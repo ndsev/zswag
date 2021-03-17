@@ -1,10 +1,18 @@
 package service_client_test;
 
-struct Request {
-  int32 id;
+struct Flat {
+  string role;
+  string firstName;
 };
 
-struct MultiRequest {
-  string id1;
-  int32 id2;
+struct Request {
+  /* Primitive */
+  string str;
+
+  /* Array */
+  int32 strLen;
+  string strArray[strLen];
+
+  /* Object */
+  Flat flat;
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <memory>
 #include <functional>
 
@@ -60,7 +61,10 @@ private:
 class MockHttpClient : public IHttpClient
 {
 public:
-    std::function<IHttpClient::Result(const std::string&)> getFun;
+    std::function<IHttpClient::Result(std::string_view /* uri */)> getFun;
+    std::function<IHttpClient::Result(std::string_view /* uri */,
+                                      std::string_view /* body */,
+                                      std::string_view /* type */)> postFun;
 
     Result get(const std::string& uri) override;
     Result post(const std::string& uri,

@@ -38,7 +38,7 @@ struct FormatHelper<_Type, std::enable_if_t<std::is_integral_v<_Type>>>
         switch (f) {
         case Format::Hex: {
             std::array<char, 30> buffer;
-            if (std::is_unsigned_v<_Type>)
+            if constexpr (std::is_unsigned_v<_Type>)
                 std::snprintf(buffer.data(), buffer.size(), "%llx",
                               (unsigned long long)v);
             else
