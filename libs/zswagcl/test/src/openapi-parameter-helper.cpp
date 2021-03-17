@@ -234,7 +234,7 @@ TEST_CASE("openapi path parameters - formats", "[zswagcl::open-api-format-helper
                 });
 
                 INFO("Hex: " << stx::to_hex(r.begin(), r.end()));
-                REQUIRE(r == "BQAAAA"); /* TODO: Byte order? */
+                REQUIRE(r == "AAAABQ");
             }
         }
 
@@ -247,7 +247,7 @@ TEST_CASE("openapi path parameters - formats", "[zswagcl::open-api-format-helper
                 });
 
                 INFO("Hex: " << stx::to_hex(r.begin(), r.end()));
-                REQUIRE(r == std::string("\x5\x0\x0\x0", 4)); /* TODO: Byte order? */
+                REQUIRE(r == std::string("\x0\x0\x0\x5", 4));
             }
         }
     }

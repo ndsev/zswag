@@ -24,7 +24,19 @@ namespace impl
 
 using Format = OpenAPIConfig::Parameter::Format;
 
-/* Format buffer to string */
+/** Convert host to big endian */
+template <class _Type>
+static _Type htobe(_Type v)
+{
+    static_assert(std::is_arithmetic_v<_Type>);
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    for (int i = 0u; i < sizeof(v) / 2u; ++i)
+        std::swap(((uint8_t *)&v)[i], ((uint8_t *)&v)[sizeof(v) - 1u - i]);
+#endif
+    return v;
+}
+
+/** Format buffer to string */
 std::string formatBuffer(Format f, const std::uint8_t* ptr, std::size_t size);
 
 template <class _Type, class _Enable = void>
@@ -51,8 +63,10 @@ struct FormatHelper<_Type, std::enable_if_t<std::is_integral_v<_Type>>>
         case Format::String:
             return stx::to_string(v);
 
-        default:
-            return formatBuffer(f, reinterpret_cast<const std::uint8_t*>(&v), sizeof(_Type));
+        default: {
+            auto be = htobe(v);
+            return formatBuffer(f, reinterpret_cast<const std::uint8_t*>(&be), sizeof(be));
+        }
         }
     }
 };
@@ -92,8 +106,10 @@ struct FormatHelper<_Type, std::enable_if_t<std::is_floating_point_v<_Type>>>
         case Format::String:
             return stx::to_string(v);
 
-        default:
-            return formatBuffer(f, reinterpret_cast<const std::uint8_t*>(&v), sizeof(v));
+        default: {
+            auto be = htobe(v);
+            return formatBuffer(f, reinterpret_cast<const std::uint8_t*>(&be), sizeof(be));
+        }
         }
     }
 };
