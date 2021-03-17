@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 
+#include "export.hpp"
 #include "httpcl/uri.hpp"
 
 namespace zswagcl
@@ -139,8 +140,8 @@ struct OpenAPIConfig
     std::map<std::string, Path> methodPath;
 };
 
-extern const std::string ZSERIO_OBJECT_CONTENT_TYPE;
-extern const std::string ZSERIO_REQUEST_PART;
-extern const std::string ZSERIO_REQUEST_PART_WHOLE;
+ZSWAGCL_EXPORT extern const std::string ZSERIO_OBJECT_CONTENT_TYPE;
+ZSWAGCL_EXPORT extern const std::string ZSERIO_REQUEST_PART;
+ZSWAGCL_EXPORT extern const std::string ZSERIO_REQUEST_PART_WHOLE;
 
 }

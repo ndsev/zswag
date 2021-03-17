@@ -12,11 +12,17 @@ add_library(zswagcl SHARED
   include/zswagcl/zsr-client.hpp
 
   src/base64.cpp
+  src/base64.hpp
   src/openapi-client.cpp
+  include/zswagcl/openapi-client.hpp
   src/openapi-config.cpp
+  include/zswagcl/openapi-config.hpp
   src/openapi-parameter-helper.cpp
+  include/zswagcl/openapi-parameter-helper.hpp
   src/openapi-parser.cpp
-  src/zsr-client.cpp)
+  include/zswagcl/openapi-parser.hpp
+  src/zsr-client.cpp
+  include/zswagcl/zsr-client.hpp)
 
 target_link_libraries(zswagcl
   PUBLIC
@@ -26,6 +32,10 @@ target_link_libraries(zswagcl
     httplib::httplib
     yaml-cpp
     ZserioCppRuntime)
+
+target_compile_definitions(zswagcl
+  PRIVATE
+    -DZSWAG_BUILD=1)
 
 target_compile_features(zswagcl
   PUBLIC
