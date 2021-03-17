@@ -333,14 +333,15 @@ std::string URIComponents::buildPath() const
 
 std::string URIComponents::encode(std::string str)
 {
-    static const auto uriAlphabet =
+    static const auto alpha =
         "0123456789"
         "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "-._~";
+        "-._~"        /* unreserved */
+        "!$&'()*+,;=" /* sub-delims */;
 
     for (std::string::size_type i = 0;;) {
-        i = str.find_first_not_of(uriAlphabet, i);
+        i = str.find_first_not_of(alpha, i);
         if (i == std::string::npos)
             break;
 

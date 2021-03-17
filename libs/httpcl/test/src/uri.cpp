@@ -106,6 +106,6 @@ TEST_CASE("Build URIs", "[uri-builder]") {
         builder.query = "hello;";
         builder.addQuery("<var>", "<value>");
 
-        REQUIRE(builder.build() == "ftp://host:123/this/is/%3a%29/the/path?hello%3b&%3cvar%3e=%3cvalue%3e");
+        REQUIRE(builder.build() == "ftp://host:123/this/is/%3a)/the/path?hello;&%3cvar%3e=%3cvalue%3e");
     }
 }
