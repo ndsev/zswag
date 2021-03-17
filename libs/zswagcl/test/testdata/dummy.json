@@ -1,0 +1,32 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Dummy test config",
+    "description": "Dummy test config",
+    "version": "2021.01"
+  },
+  "servers": [
+    {
+      "url": "https://my.server.com/api"
+    }
+  ],
+  "paths": {
+    "/dummy": {
+      "get": {
+        "operationId": "dummy",
+        "parameters": [
+        ],
+        "responses": {
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "binary": {
+        "type": "string",
+        "format": "binary"
+      }
+    }
+  }
+}

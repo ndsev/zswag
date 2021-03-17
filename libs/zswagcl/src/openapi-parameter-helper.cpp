@@ -76,9 +76,9 @@ _Result visitValue(const _Variant& v,
     return result;
 }
 
-std::string join(const std::map<std::string, std::string>& map,
-                 const std::string& kvSeparator,
-                 const std::string& pairSeparator)
+std::string joinMap(const std::map<std::string, std::string>& map,
+                    const std::string& kvSeparator,
+                    const std::string& pairSeparator)
 {
     std::vector<std::string> tmp;
     tmp.resize(map.size());
@@ -141,19 +141,19 @@ std::string ParameterValue::pathStr(const OpenAPIConfig::Parameter& param) const
             switch (param.style) {
             case Style::Simple:
                 if (param.explode)
-                    return join(v, "=", ",");
+                    return joinMap(v, "=", ",");
                 else
-                    return join(v, ",", ",");
+                    return joinMap(v, ",", ",");
             case Style::Label:
                 if (param.explode)
-                    return "."s + join(v, "=", ".");
+                    return "."s + joinMap(v, "=", ".");
                 else
-                    return "."s + join(v, ",", ",");
+                    return "."s + joinMap(v, ",", ",");
             case Style::Matrix:
                 if (param.explode)
-                    return ";"s + join(v, "=", ";");
+                    return ";"s + joinMap(v, "=", ";");
                 else
-                    return ";"s + param.ident + "=" + join(v, ",", ",");
+                    return ";"s + param.ident + "=" + joinMap(v, ",", ",");
             default:
                 return {};
             }
@@ -171,7 +171,7 @@ std::vector<std::pair<std::string, std::string>> ParameterValue::queryPairs(cons
         [&](const std::string& v) -> std::optional<List> {
             switch (param.style) {
             case Style::Form:
-                return {{std::make_pair(param.ident, v)}};
+                return {{{param.ident, v}}};
             default:
                 return {};
             }
@@ -199,7 +199,7 @@ std::vector<std::pair<std::string, std::string>> ParameterValue::queryPairs(cons
             case Style::Form:
                 if (param.explode)
                     return List(v.begin(), v.end());
-                return {{std::make_pair(param.ident, join(v, ",", ","))}};
+                return {{std::make_pair(param.ident, joinMap(v, ",", ","))}};
             default:
                 return {};
             }

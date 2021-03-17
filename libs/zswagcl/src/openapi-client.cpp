@@ -8,7 +8,7 @@ namespace zswagcl
 
 template <class _Fun>
 std::string replaceTemplate(std::string str,
-                            _Fun fun)
+                            _Fun paramCb)
 {
     auto pos = std::string::size_type(0);
     while (pos != std::string::npos) {
@@ -21,7 +21,7 @@ std::string replaceTemplate(std::string str,
             break;
 
         auto len = end - begin;
-        auto replacement = fun(std::string_view(str).substr(begin + 1, len - 1));
+        auto replacement = paramCb(std::string_view(str).substr(begin + 1, len - 1));
 
         pos = begin + replacement.size();
         str.replace(begin, len + 1, std::move(replacement));
@@ -32,7 +32,7 @@ std::string replaceTemplate(std::string str,
 
 template <class _Fun>
 std::string resolvePath(const OpenAPIConfig::Path& path,
-                        const _Fun fun)
+                        const _Fun paramCb)
 {
     return replaceTemplate(path.path, [&](std::string_view ident) -> std::string {
         auto parameterIter = path.parameters.find(std::string(ident));
@@ -42,7 +42,7 @@ std::string resolvePath(const OpenAPIConfig::Path& path,
         const auto& parameter = parameterIter->second;
 
         ParameterValueHelper helper(parameter);
-        auto value = fun(parameter.ident, parameter.field, helper);
+        auto value = paramCb(parameter.ident, parameter.field, helper);
 
         return value.pathStr(parameter);
     });
@@ -50,14 +50,14 @@ std::string resolvePath(const OpenAPIConfig::Path& path,
 
 template <class _Fun>
 auto resolveQueryParameters(const OpenAPIConfig::Path& path,
-                            const _Fun fun)
+                            const _Fun paramCb)
 {
     std::vector<std::pair<std::string, std::string>> pairs;
 
     for (const auto& [key, parameter] : path.parameters) {
         if (parameter.location == OpenAPIConfig::Parameter::Location::Query) {
             ParameterValueHelper helper(parameter);
-            auto values = fun(parameter.ident, parameter.field, helper).queryPairs(parameter);
+            auto values = paramCb(parameter.ident, parameter.field, helper).queryPairs(parameter);
 
             std::copy(values.begin(), values.end(), std::back_inserter(pairs));
         }
@@ -80,7 +80,7 @@ OpenAPIClient::~OpenAPIClient()
 std::string OpenAPIClient::call(const std::string& methodIdent,
                                 const std::function<ParameterValue(const std::string&, /* parameter ident */
                                                                    const std::string&, /* zserio member path */
-                                                                   ParameterValueHelper&)>& fun)
+                                                                   ParameterValueHelper&)>& paramCb)
 {
     auto methodIter = config.methodPath.find(methodIdent);
     if (methodIter == config.methodPath.end())
@@ -89,9 +89,9 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     const auto& method = methodIter->second;
 
     httpcl::URIComponents uri(config.uri);
-    uri.appendPath(resolvePath(method, fun));
+    uri.appendPath(resolvePath(method, paramCb));
 
-    for (const auto [key, value] : resolveQueryParameters(method, fun))
+    for (auto&& [key, value] : resolveQueryParameters(method, paramCb))
         uri.addQuery(std::move(key), std::move(value));
 
     const auto& httpMethod = method.httpMethod;
@@ -108,7 +108,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
                 bodyParameter.format = OpenAPIConfig::Parameter::Format::Binary;
 
                 ParameterValueHelper bodyHelper(bodyParameter);
-                body = fun("", "*", bodyHelper).bodyStr();
+                body = paramCb("", ZSERIO_REQUEST_PART_WHOLE, bodyHelper).bodyStr();
             }
 
             if (httpMethod == "POST")
