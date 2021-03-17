@@ -1,0 +1,38 @@
+info:
+  contact:
+    email: TODO
+  description: REST API for calculator.Calculator
+  license:
+    name: TODO
+  title: Calculator
+  version: TODO
+openapi: 3.0.0
+paths:
+  /power/{base}/{exponent}:
+    get:
+      description: ''
+      operationId: power
+      parameters:
+        - in: path
+          name: base
+          required: true
+          x-zserio-request-part: base.value
+          schema:
+            type: string
+        - in: path
+          name: exponent
+          required: true
+          x-zserio-request-part: exponent.value
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+      x-openapi-router-controller: zswag.test.calc.server._service
+servers: []

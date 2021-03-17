@@ -1,4 +1,4 @@
 connexion
 requests
-zserio>=2.1.0
+zserio>=2.2.0
 pyyaml
