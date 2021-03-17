@@ -29,6 +29,13 @@ static auto pathStr(const Parameter& parameter, _Fun fun)
     return fun(helper).pathStr(parameter);
 }
 
+template <class _Fun>
+static auto queryPairs(const Parameter& parameter, _Fun fun)
+{
+    ParameterValueHelper helper(parameter);
+    return fun(helper).queryPairs(parameter);
+}
+
 /* Testdata */
 const auto value = 5;
 const auto list = std::vector<int>{3, 4, 5};
@@ -250,5 +257,85 @@ TEST_CASE("openapi path parameters - formats", "[zswagcl::open-api-format-helper
                 REQUIRE(r == std::string("\x0\x0\x0\x5", 4));
             }
         }
+    }
+}
+
+TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
+    SECTION("Style Form") {
+        auto style = Style::Form;
+
+        SECTION("Primitive Value") {
+            auto explode = GENERATE(false, true);
+            INFO("Explode: " << explode);
+
+            auto r = queryPairs(makeParameter("id", style, explode), [&](auto& helper) {
+                return helper.value(value);
+            });
+
+            REQUIRE(r.size() == 1);
+
+            const auto& [k, v] = r[0];
+            REQUIRE(k == "id");
+            REQUIRE(v == "5");
+        }
+
+        SECTION("Array") {
+            SECTION("Normal") {
+                auto r = queryPairs(makeParameter("id", style, false), [&](auto& helper) {
+                    return helper.array(list);
+                });
+
+                REQUIRE(r.size() == 1);
+
+                const auto& [k, v] = r[0];
+                REQUIRE(k == "id");
+                REQUIRE(v == "3,4,5");
+            }
+            SECTION("Explode") {
+                auto r = queryPairs(makeParameter("id", style, true), [&](auto& helper) {
+                    return helper.array(list);
+                });
+
+                REQUIRE(r.size() == 3);
+
+                int i = 3;
+                for (const auto& [k, v] : r) {
+                    REQUIRE(k == "id");
+                    REQUIRE(v == stx::to_string(i++));
+                }
+            }
+        }
+
+        SECTION("Object") {
+            SECTION("Normal") {
+                auto r = queryPairs(makeParameter("id", style, false), [&](auto& helper) {
+                    return helper.object(object);
+                });
+
+                REQUIRE(r.size() == 1);
+
+                const auto& [k, v] = r[0];
+                REQUIRE(k == "id");
+                REQUIRE(v == "firstName,Alex,role,admin");
+            }
+            SECTION("Explode") {
+                auto r = queryPairs(makeParameter("id", style, true), [&](auto& helper) {
+                    return helper.object(object);
+                });
+
+                REQUIRE(r.size() == 2);
+                {
+                    const auto& [k, v] = r[0];
+                    REQUIRE(k == "firstName");
+                    REQUIRE(v == "Alex");
+                }
+                {
+                    const auto& [k, v] = r[1];
+                    REQUIRE(k == "role");
+                    REQUIRE(v == "admin");
+                }
+            }
+        }
+
     }
 }

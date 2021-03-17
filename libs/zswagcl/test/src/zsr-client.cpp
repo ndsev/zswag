@@ -8,34 +8,21 @@
 #include "zsr/find.hpp"
 #include "zsr/variant.hpp"
 #include "zsr/reflection-main.hpp"
+#include "zsr/getset.hpp"
 
 using namespace zswagcl;
 
 static zsr::Service dummyService(nullptr);
 static zsr::ServiceMethod dummyServiceMethod(&dummyService);
 
-// TODO: Replace with stx::make when ready.
-template <class... _Fields>
-static auto makeRequest(std::string compound, _Fields ...fields)
+static auto makeRequest(std::string_view compound, zsr::VariantMap values)
 {
-    auto reqCompound = zsr::find<zsr::Compound>(zsr::packages().front(), compound);
-    INFO("Compound: " << compound);
-    REQUIRE(reqCompound);
+    auto request = zsr::make(zsr::packages().front(), compound, std::move(values));
 
-    auto request = reqCompound->alloc();
-
-    (void)([&](){
-        auto reqField = zsr::find<zsr::Field>(*reqCompound, fields.first);
-        INFO("Field: " << fields.first);
-        REQUIRE(reqField);
-
-        reqField->set(request, fields.second);
-    }(), ...);
-
-    zserio::BitBuffer buffer(reqCompound->bitSize(request));
+    zserio::BitBuffer buffer(request.meta()->bitSize(request));
     zserio::BitStreamWriter writer(buffer.getBuffer(),
                                    buffer.getByteSize());
-    reqCompound->write(request, writer);
+    request.meta()->write(request, writer);
 
     return std::make_tuple(request,
                            std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
@@ -96,10 +83,10 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         };
 
         /* Create request object */
-        auto [request, buffer] = makeRequest("Request",
-                                             std::make_pair("str", "hello"),
-                                             std::make_pair("strLen", 3),
-                                             std::make_pair("strArray", std::vector<std::string>{"a","b","c"}));
+        auto [request, buffer] = makeRequest("Request", {
+            {"str", "hello"},
+            {"strLen", 3},
+            {"strArray", std::vector<std::string>{"a", "b", "c"}}});
 
         /* Fire request */
         auto config = makeConfig(R"json(
@@ -175,14 +162,12 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         };
 
         /* Create request object */
-        auto [flat, _] = makeRequest("Flat",
-                                     std::make_pair("role", "admin"),
-                                     std::make_pair("firstName", "Alex"));
-        auto [request, buffer] = makeRequest("Request",
-                                             std::make_pair("str", "hello"),
-                                             std::make_pair("strLen", 3),
-                                             std::make_pair("strArray", std::vector<std::string>{"a","b","c"}),
-                                             std::make_pair("flat", flat));
+        auto [request, buffer] = makeRequest("Request", {
+            {"str", "hello"},
+            {"strLen", 3},
+            {"strArray", std::vector<std::string>{"a", "b", "c"}},
+            {"flat.role", "admin"},
+            {"flat.firstName", "Alex"}});
 
         /* Fire request */
         auto config = makeConfig(R"json(
@@ -238,9 +223,8 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         auto postCalled = false;
 
         /* Make request */
-        auto [request, buffer_] = makeRequest("Request",
-                                             std::make_pair("str", "hello"));
-        const auto& buffer = buffer_; /* llvm does not allow capturing bindings in lambdas. */
+        auto [request, buffer_] = makeRequest("Request", {{"str", "hello"}});
+        const auto &buffer = buffer_; /* llvm does not allow capturing bindings in lambdas. */
 
         /* Setup mock client */
         auto client = std::make_unique<httpcl::MockHttpClient>();
