@@ -1,6 +1,6 @@
 project(pyzswagcl)
 
-set(WHEEL_DEPLOY_DIRECTORY "${CMAKE_BINARY_DIR}")
+set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
 
 pybind11_add_module(pyzswagcl SHARED pyzswagcl.cpp)
 
