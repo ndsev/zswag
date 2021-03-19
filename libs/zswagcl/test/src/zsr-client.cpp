@@ -19,13 +19,13 @@ static auto makeRequest(std::string_view compound, zsr::VariantMap values)
 {
     auto request = zsr::make(zsr::packages().front(), compound, std::move(values));
 
-    zserio::BitBuffer buffer(request.meta()->bitSize(request));
-    zserio::BitStreamWriter writer(buffer.getBuffer(),
-                                   buffer.getByteSize());
+    zserio::BitStreamWriter writer;
     request.meta()->write(request, writer);
 
-    return std::make_tuple(request,
-                           std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
+    std::size_t size = 0u;
+    auto buffer = writer.getWriteBuffer(size);
+
+    return std::make_tuple(request, std::vector<uint8_t>(buffer, buffer + size));
 }
 
 /**
