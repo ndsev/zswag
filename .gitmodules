@@ -1,0 +1,27 @@
+[submodule "deps/keychain"]
+	path = deps/keychain
+	url = https://github.com/hrantzsch/keychain.git
+[submodule "deps/zserio"]
+	path = deps/zserio
+	url = https://github.com/ndsev/zserio.git
+[submodule "deps/pybind11"]
+	path = deps/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "deps/Catch2"]
+	path = deps/Catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "deps/cpp-httplib"]
+	path = deps/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "deps/stx"]
+	path = deps/stx
+	url = https://github.com/Klebert-Engineering/stx.git
+[submodule "deps/yaml-cpp"]
+	path = deps/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "deps/python-cmake-wheel"]
+	path = deps/python-cmake-wheel
+	url = https://github.com/klebert-engineering/python-cmake-wheel.git
+[submodule "deps/zsr"]
+	path = deps/zsr
+	url = https://github.com/Klebert-Engineering/zsr.git

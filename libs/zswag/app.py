@@ -8,9 +8,13 @@ import sys
 from types import ModuleType
 from typing import Type
 
-from .doc import get_doc_str, IdentType, md_filter_definition
-from zswag_client.spec import ZserioSwaggerSpec, ParamFormat, ParamLocation, ZSERIO_REQUEST_PART, ZSERIO_OBJECT_CONTENT_TYPE, ZSERIO_REQUEST_PART_WHOLE
+from pyzswagcl import \
+    parse_openapi_config, \
+    OpenApiConfigMethod, \
+    OpenApiConfigParamFormat, \
+    ZSERIO_OBJECT_CONTENT_TYPE
 
+from .doc import get_doc_str, IdentType, md_filter_definition
 
 # Name of variable that is added to controller
 CONTROLLER_SERVICE_INSTANCE = "_service"
@@ -107,7 +111,7 @@ class ZserioSwaggerApp(connexion.App):
         # Verify or generate yaml file
         if not os.path.isfile(yaml_path):
             self.generate_openapi_schema()
-        self.spec = ZserioSwaggerSpec(yaml_path)
+        self.spec = parse_openapi_config(yaml_path)
         self.verify_openapi_schema()
 
         # Re-route service impl methods
@@ -124,17 +128,17 @@ class ZserioSwaggerApp(connexion.App):
                 print(f"ERROR: {self.controller_path}.{method_name} must have single 'request' parameter!")
                 continue
 
-            method_spec = self.spec.method_spec(method_name)
-            param_spec = method_spec.params[0]
+            method_spec: OpenApiConfigMethod = self.spec[method_name]
 
-            def wsgi_method(fun=zserio_modem_function, param=param_spec, **kwargs):
-                param_name = param.name if param.location != ParamLocation.BODY else "body"
+            def wsgi_method(fun=zserio_modem_function, spec=method_spec, **kwargs):
+                assert method_spec.body_request_object
+                param_name = "body"
                 assert param_name in kwargs
                 param_value = kwargs[param_name]
-                if param.format == ParamFormat.BYTE:
-                    param_value = base64.b64decode(param_value)
-                else:
-                    assert param.format == ParamFormat.BINARY
+                # if param.format == ParamFormat.BYTE:
+                #     param_value = base64.b64decode(param_value)
+                # else:
+                #     assert param.format == ParamFormat.BINARY
                 return bytes(fun(param_value, None))
             setattr(self.service_instance, method_name, wsgi_method)
 
