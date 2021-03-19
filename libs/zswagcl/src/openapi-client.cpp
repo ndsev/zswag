@@ -3,6 +3,8 @@
 #include <cassert>
 #include <variant>
 
+#include "stx/format.h"
+
 namespace zswagcl
 {
 
@@ -37,7 +39,7 @@ std::string resolvePath(const OpenAPIConfig::Path& path,
     return replaceTemplate(path.path, [&](std::string_view ident) -> std::string {
         auto parameterIter = path.parameters.find(std::string(ident));
         if (parameterIter == path.parameters.end())
-            throw std::runtime_error(stx::replace_with("Could not find path parameter for name '?'", "?", ident));
+            throw std::runtime_error(stx::format("Could not find path parameter for name '{}' (path: '{}')", ident, path.path));
 
         const auto& parameter = parameterIter->second;
 
@@ -84,7 +86,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
 {
     auto methodIter = config.methodPath.find(methodIdent);
     if (methodIter == config.methodPath.end())
-        throw std::runtime_error("Could not find method for name");
+        throw std::runtime_error(stx::format("The method '{}' is not part of the used OpenAPI specification", methodIdent));
 
     const auto& method = methodIter->second;
 
@@ -120,7 +122,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
             if (httpMethod == "DELETE")
                 return client_->del(uri.build(), body, bodyType);
 
-            throw std::runtime_error("Unsupported HTTP type");
+            throw std::runtime_error(stx::format("Unsupported HTTP method '{}' (uri: {})", httpMethod, uri.build()));
         }
     }());
 
@@ -128,7 +130,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
         return std::move(result.content);
     }
 
-    throw std::runtime_error(stx::replace_with("HTTP status code ? (method: ?, path: ?, uri: ?)", "?",
-                                               result.status, httpMethod, uri.buildPath(), uri.build()));
+    throw std::runtime_error(stx::format("HTTP status code {} (method: {}, path: {}, uri: {})",
+                                         result.status, httpMethod, uri.buildPath(), uri.build()));
 }
 }

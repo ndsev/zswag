@@ -4,6 +4,7 @@
 #include <zsr/introspectable.hpp>
 
 #include <cassert>
+#include "stx/format.h"
 
 namespace zswagcl
 {
@@ -32,10 +33,10 @@ zsr::Variant queryFieldRecursive(zsr::Variant object, _Iter begin, _Iter end)
         if (auto fun = zsr::find<zsr::Function>(*meta, std::string(*begin)))
             return queryFieldRecursive(fun->call(*introspectable), begin + 1, end);
 
-        throw std::runtime_error(stx::replace_with("Could not find field/function for identifier '?'", "?", *begin));
+        throw std::runtime_error(stx::format("Could not find field/function for identifier '{}'", *begin));
     }
 
-    throw std::runtime_error("Returned variant is not an object");
+    throw std::runtime_error(stx::format("Returned root value '{}' is not an object", stx::join(begin, end, ".")));
 }
 
 struct VariantVisitor
