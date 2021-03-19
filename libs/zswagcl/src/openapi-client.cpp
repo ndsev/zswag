@@ -103,7 +103,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
         } else {
             std::string body, bodyType;
             if (method.bodyRequestObject) {
-                bodyType = "application/binary";
+                bodyType = ZSERIO_OBJECT_CONTENT_TYPE;
 
                 OpenAPIConfig::Parameter bodyParameter;
                 bodyParameter.ident = "body";

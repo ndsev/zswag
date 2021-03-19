@@ -133,6 +133,7 @@ static void parseMethodBody(const YAML::Node& methodNode,
             for (auto contentTypeNode : contentNode) {
                 if (contentTypeNode.first.as<std::string>() != ZSERIO_OBJECT_CONTENT_TYPE)
                     throw std::runtime_error("Unsupported body content type");
+                path.bodyRequestObject = true;
             }
         }
     }
