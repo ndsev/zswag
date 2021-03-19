@@ -16,6 +16,11 @@ struct Double
     float64 value;
 };
 
+struct Bool
+{
+    bool value;
+};
+
 struct BaseAndExponent
 {
     I32 base;
@@ -23,7 +28,17 @@ struct BaseAndExponent
     int32 unused1;
     string unused2;
     float32 unused3;
-    uint8 unused4[];
+    bool unused5[];
+};
+
+struct Integers
+{
+    int32 values[];
+};
+
+struct Bytes
+{
+    uint8 values[];
 };
 
 /*!
@@ -37,4 +52,12 @@ Check out these sweet docs.
 service Calculator
 {
     Double power(BaseAndExponent);
+
+    Double isum(Integers);
+
+    Double imul(Integers);
+
+    Double bsum(Bytes);
+
+    Double identity(Double);
 };

@@ -5,6 +5,7 @@
 #include "httpcl/uri.hpp"
 
 #include "yaml-cpp/yaml.h"
+#include "stx/format.h"
 #include <httplib.h>
 
 #include <sstream>
@@ -46,7 +47,7 @@ static auto parseParameterSchema(const YAML::Node& schemaNode)
         if (format == "binary")
             return OpenAPIConfig::Parameter::Binary;
 
-        throw std::runtime_error("Unsupported format");
+        throw std::runtime_error(stx::format("Unsupported format {}", format));
     }
 
     return OpenAPIConfig::Parameter::String;

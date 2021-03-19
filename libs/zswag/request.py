@@ -14,7 +14,11 @@ NoneType = type(None)
 
 # TODO: Booleans?
 # Table here: https://docs.python.org/3/library/struct.html#format-characters
-C_STRUCT_LITERAL_PER_TYPE_AND_SIZE = {
+C_STRUCT_LITERAL_PER_TYPE_AND_SIZE: Dict[Tuple[type, int], str] = {
+    (bool, 1): "!b",
+    (bool, 2): "!h",
+    (bool, 4): "!i",
+    (bool, 8): "!q",
     (int, 1): "!b",
     (int, 2): "!h",
     (int, 4): "!i",
@@ -59,6 +63,8 @@ def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict
                     setattr(result_instance, f"_{field_name}_", instance)
                     result_member_types.update(member_types)
                     continue
+            elif get_origin(arg_type) is list:
+                arg_type = [get_args(arg_type)[0]]
             result_member_types[field_name_prefix+field_name] = arg_type
     return result_instance, result_member_types
 
@@ -75,6 +81,33 @@ def str_to_bytes(s: str, fmt: OpenApiConfigParamFormat) -> bytes:
         return bytes(s, encoding="raw_unicode_escape")
 
 
+# Convert a single passed parameter value to it's correct type
+def parse_param_value(param: OpenApiConfigParam, target_type: Type, value: str) -> Any:
+    if param.format == OpenApiConfigParamFormat.STRING:
+        if target_type is bool:
+            return bool(int(value))
+        return target_type(value)
+    if param.format == OpenApiConfigParamFormat.HEX and target_type is int:
+        return int(value, 16)
+    value_as_bytes = str_to_bytes(value, param.format)
+    struct_literal_key = (target_type, len(value_as_bytes))
+    if struct_literal_key in C_STRUCT_LITERAL_PER_TYPE_AND_SIZE:
+        return target_type(struct.unpack(
+            C_STRUCT_LITERAL_PER_TYPE_AND_SIZE[struct_literal_key],
+            value_as_bytes)[0])
+    elif target_type is str:
+        return str(value_as_bytes, 'utf-8')
+    raise RuntimeError(f"Cannot convert {len(value_as_bytes)} to {target_type}")
+
+
+# Convert an array of passed parameter values to their correct type
+def parse_param_values(param: OpenApiConfigParam, target_type: Type, value: Union[str, List[str]]) -> List[Any]:
+    if target_type is int and type(value) is str:
+        return list(bytes(value, 'raw_unicode_escape'))
+    assert type(value) is list
+    return [parse_param_value(param, target_type, item) for item in value]
+
+
 # Get a blob for a zserio request type, a set of request parameter values
 # and an OpenAPI method path spec.
 def request_object_blob(*, req_t: Type, spec: OpenApiConfigMethod, **kwargs) -> bytes:
@@ -86,38 +119,24 @@ def request_object_blob(*, req_t: Type, spec: OpenApiConfigMethod, **kwargs) -> 
     param_name: str
     param: OpenApiConfigParam
     for param_name, param in spec.parameters.items():
-
         # Get raw string value
         value: str = param.default_value
         if param_name in kwargs:
             value = kwargs[param_name]
-
         # Convert string value to whole blob
         if param.field == ZSERIO_REQUEST_PART_WHOLE:
             return str_to_bytes(value, param.format)
-
         # First non-whole request parameter: Synthetic request object
         if not req:
             req, req_field_types = make_instance_and_typeinfo(req_t)
-
         # Convert string value to correct type
-        # TODO: Deal with array target type!
         target_type = req_field_types[param.field]
         converted_value: Any = None
-        if param.format == OpenApiConfigParamFormat.STRING:
-            converted_value = target_type(value)
+        if type(target_type) is list:
+            target_type = target_type[0]  # List element target type is first element of list
+            converted_value = parse_param_values(param, target_type, value)
         else:
-            value_as_bytes = str_to_bytes(value, param.format)
-            struct_literal_key = (target_type, len(value_as_bytes))
-            if struct_literal_key in C_STRUCT_LITERAL_PER_TYPE_AND_SIZE:
-                converted_value = struct.unpack(
-                    C_STRUCT_LITERAL_PER_TYPE_AND_SIZE[struct_literal_key],
-                    value_as_bytes)
-            elif target_type is str:
-                converted_value = str(value_as_bytes, 'utf-8')
-            else:
-                raise RuntimeError(f"Cannot convert {len(value_as_bytes)} to {target_type}")
-
+            converted_value = parse_param_value(param, target_type, value)
         # Apply value to request object field
         rsetattr(req, param.field, converted_value)
 

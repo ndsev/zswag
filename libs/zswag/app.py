@@ -137,12 +137,11 @@ class ZserioSwaggerApp(connexion.App):
 
             method_spec: OpenApiConfigMethod = self.spec[method_name]
 
-            def wsgi_method(fun=zserio_modem_function, spec=method_spec, **kwargs):
-                request_blob = None
-                if method_spec.body_request_object:
+            def wsgi_method(fun=zserio_modem_function, spec=method_spec, req_t=request_type, **kwargs):
+                if spec.body_request_object:
                     request_blob = kwargs["body"]
                 else:
-                    request_blob = request_object_blob(req_t=request_type, spec=spec, **kwargs)
+                    request_blob = request_object_blob(req_t=req_t, spec=spec, **kwargs)
                 return bytes(fun(request_blob, None))
             setattr(self.service_instance, method_name, wsgi_method)
 

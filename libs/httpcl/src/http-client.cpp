@@ -30,6 +30,8 @@ struct HttpLibHttpClient::Impl
     {
         auto client = std::make_unique<httplib::Client>(uri.buildHost().c_str());
         client->enable_server_certificate_verification(false);
+        client->set_connection_timeout(60000);
+        client->set_read_timeout(60000);
         settings.apply(uri.build(), *client);
 
         return client;
