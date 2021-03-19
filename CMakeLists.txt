@@ -61,7 +61,7 @@ if (NOT TARGET ZserioCppRuntime)
 endif ()
 
 if (NOT TARGET zsr)
-  add_subdirectory(deps/zserio-cpp-introspection)
+  add_subdirectory(deps/zsr)
 endif ()
 
 ##############
