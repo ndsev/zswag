@@ -126,7 +126,7 @@ struct OpenAPIConfig
          *
          * Ignored if HTTP-Method is GET.
          */
-        bool bodyRequestObject = true;
+        bool bodyRequestObject = false;
     };
 
     /**

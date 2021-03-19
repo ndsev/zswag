@@ -232,7 +232,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                               std::string_view body,
                               std::string_view type) {
             REQUIRE(uri == "https://my.server.com/api/post/hello");
-            REQUIRE(type == "application/binary");
+            REQUIRE(type == ZSERIO_OBJECT_CONTENT_TYPE);
             REQUIRE(std::equal(body.begin(), body.end(),
                                buffer.begin(), buffer.end()));
 
@@ -251,7 +251,14 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                             "in": "path",
                             "x-zserio-request-part": "str"
                         }
-                    ]
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "shema": { "type": "string" }
+                            }
+                        }
+                    }
                 }
             }
         )json");
