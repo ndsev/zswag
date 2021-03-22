@@ -8,9 +8,9 @@ info:
   version: TODO
 openapi: 3.0.0
 paths:
-  /power/{base}/{exponent}:
+  /power/{base}:
     get:
-      description: "Test simple x-zserio-request-part."
+      description: "Test x-zserio-request-part in path and query."
       operationId: power
       parameters:
         - in: path
@@ -20,7 +20,7 @@ paths:
           schema:
             format: string
             type: string
-        - in: path
+        - in: query
           name: exponent
           required: true
           x-zserio-request-part: exponent.value
@@ -63,7 +63,7 @@ paths:
       x-openapi-router-controller: zswag.test.calc.server._service
   /imul/{values}:
     get:
-      description: "Test passing of base64-encoded array in path."
+      description: "Test passing of base64-encoded long array in path."
       operationId: imul
       parameters:
         - in: path
@@ -88,7 +88,7 @@ paths:
       x-openapi-router-controller: zswag.test.calc.server._service
   /bsum/{values}:
     get:
-      description: "Test passing of url-encoded byte array in path."
+      description: "Test passing of base64url-encoded byte array in path."
       operationId: bsum
       parameters:
         - in: path
@@ -97,7 +97,9 @@ paths:
           x-zserio-request-part: values
           schema:
             format: base64url
-            type: string
+            type: array
+            items:
+              type: string
       responses:
         '200':
           content:

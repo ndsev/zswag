@@ -159,8 +159,13 @@ std::string base64url_encode(unsigned char const* bytes_to_encode,
                           unsigned int in_len)
 {
     auto str = encode(base64url_chars, bytes_to_encode, in_len);
-    while (str.back() == '=')
-        str.erase(str.size() - 1);
+    // Note: The spec would allow for truncating the padding. While
+    // saving some bandwidth, this also requires cooperation from the server
+    // to repair the padding before decoding, which is not a standard
+    // operation. So we can add this as an option in the future, but for
+    // now let's keep the padding.
+    // while (str.back() == '=')
+    //     str.erase(str.size() - 1);
     return str;
 }
 

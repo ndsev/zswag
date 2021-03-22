@@ -26,6 +26,7 @@ if (NOT TARGET wheel)
   set(Python3_FIND_STRATEGY LOCATION)
   set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
   include(python-wheel)
+  set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
 endif ()
 
 if (NOT TARGET yaml-cpp)
@@ -71,3 +72,13 @@ add_subdirectory(libs/httpcl)
 add_subdirectory(libs/zswagcl)
 add_subdirectory(libs/pyzswagcl)
 add_subdirectory(libs/zswag/test)
+
+##############
+# zswag server wheel
+
+add_custom_target(zswag-server-wheel
+  WORKING_DIRECTORY
+    ${CMAKE_CURRENT_LIST_DIR}
+  COMMAND
+    ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
+add_dependencies(wheel zswag-server-wheel)

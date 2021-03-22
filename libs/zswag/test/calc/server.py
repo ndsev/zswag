@@ -17,7 +17,7 @@ def imul(request):
 
 
 def bsum(request):
-    return sum(request.values)
+    return api.Double(sum(request.values))
 
 
 def identity(request):

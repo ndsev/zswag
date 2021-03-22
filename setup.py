@@ -1,4 +1,9 @@
 import setuptools
+import sys
+
+# Read first argument as version, pass rest on to setuptools
+VERSION = sys.argv[1]
+del sys.argv[1]
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -12,21 +17,26 @@ with open("requirements.txt", "r") as freq:
         else:
             required.append(line)
 
-packages = setuptools.find_packages("src")
-
 setuptools.setup(
     name="zswag",
-    version="0.6.0",
+    version=VERSION,
     url="https://github.com/klebert-engineering/zswag",
     author="Klebert Engineering",
     author_email="j.birkner@klebert-engineering.de",
 
-    description="Convenience functionality to create python modules from zserio services at warp speed.",
+    description="Server middleware for implementing zserio services at warp 10.",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
-    package_dir={'': 'src'},
-    packages=packages,
+    package_dir={'': 'libs'},
+    packages=['zswag', 'zswag.test.calc'],
+    include_package_data=True,
+    package_data={
+        "zswag": [
+            "test/calc/api.yaml",
+            "test/calc/calculator.zs"
+        ]
+    },
 
     install_requires=required,
     dependency_links=required_url,

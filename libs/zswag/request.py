@@ -101,10 +101,7 @@ def parse_param_value(param: OpenApiConfigParam, target_type: Type, value: str) 
 
 
 # Convert an array of passed parameter values to their correct type
-def parse_param_values(param: OpenApiConfigParam, target_type: Type, value: Union[str, List[str]]) -> List[Any]:
-    if target_type is int and type(value) is str:
-        return list(bytes(value, 'raw_unicode_escape'))
-    assert type(value) is list
+def parse_param_values(param: OpenApiConfigParam, target_type: Type, value: List[str]) -> List[Any]:
     return [parse_param_value(param, target_type, item) for item in value]
 
 
@@ -120,7 +117,7 @@ def request_object_blob(*, req_t: Type, spec: OpenApiConfigMethod, **kwargs) -> 
     param: OpenApiConfigParam
     for param_name, param in spec.parameters.items():
         # Get raw string value
-        value: str = param.default_value
+        value: Union[str, List[str]] = param.default_value
         if param_name in kwargs:
             value = kwargs[param_name]
         # Convert string value to whole blob
@@ -133,6 +130,7 @@ def request_object_blob(*, req_t: Type, spec: OpenApiConfigMethod, **kwargs) -> 
         target_type = req_field_types[param.field]
         converted_value: Any = None
         if type(target_type) is list:
+            assert type(value) is list
             target_type = target_type[0]  # List element target type is first element of list
             converted_value = parse_param_values(param, target_type, value)
         else:
