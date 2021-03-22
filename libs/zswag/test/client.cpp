@@ -26,7 +26,7 @@ int main (int argc, char* argv[]) {
 
     auto runTest = [&] (
         std::function<zsr::Introspectable(ZsrClient&)> const& fn,
-        double const& expect,
+        double expect,
         std::string const& aspect
     ) mutable -> void
     {
@@ -44,7 +44,8 @@ int main (int argc, char* argv[]) {
             if (response == expect)
                 std::cout << "  ... Success." << std::endl;
             else
-                throw std::runtime_error(stx::format("Expected {}, got {}!", expect, response));
+                // Note: Without the int cast, I get strange errors here on GCC.
+                throw std::runtime_error(stx::format("Expected {}, got {}!", (int)expect, (int)response));
         }
         catch(std::exception const& e) {
             ++failureCounter;
