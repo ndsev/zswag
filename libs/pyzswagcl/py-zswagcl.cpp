@@ -6,6 +6,7 @@
 
 #include "zswagcl/openapi-parser.hpp"
 #include "httpcl/http-settings.hpp"
+#include "py-openapi-client.h"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -86,7 +87,13 @@ PYBIND11_MODULE(pyzswagcl, m)
         return fetchOpenAPIConfig(url, httpClient);
     }, py::return_value_policy::move, "url"_a);
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Global Constants
     m.attr("ZSERIO_OBJECT_CONTENT_TYPE") = py::str(ZSERIO_OBJECT_CONTENT_TYPE);
     m.attr("ZSERIO_REQUEST_PART") = py::str(ZSERIO_REQUEST_PART);
     m.attr("ZSERIO_REQUEST_PART_WHOLE") = py::str(ZSERIO_REQUEST_PART_WHOLE);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // PyOpenApiClient
+    PyOpenApiClient::bind(m);
 }
