@@ -71,7 +71,6 @@ void PyOpenApiClient::bind(py::module_& m) {
 
 PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl, bool isLocalFile)
 {
-    std::cerr << "Ctor!!! " << openApiUrl << std::endl;
     auto httpClient = std::make_unique<HttpLibHttpClient>();
     OpenAPIConfig openApiConfig = [&](){
         if (isLocalFile) {
@@ -88,8 +87,8 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl, bool isLocalFile
 
 std::vector<uint8_t> PyOpenApiClient::callMethod(
         const std::string& methodName,
-        const std::vector<uint8_t>& requestData,
-        PyObject* context)
+        py::bytearray& requestData,
+        py::handle context)
 {
     if (!context) {
         throw std::runtime_error(stx::format(
@@ -99,21 +98,27 @@ std::vector<uint8_t> PyOpenApiClient::callMethod(
 
     auto response = client_->call(methodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper)
     {
-        if (field == ZSERIO_REQUEST_PART_WHOLE)
-            return helper.binary(requestData);
+        if (field == ZSERIO_REQUEST_PART_WHOLE) {
+            py::buffer_info info(py::buffer(requestData).request());
+            auto* data = reinterpret_cast<uint8_t*>(info.ptr);
+            auto length = static_cast<size_t>(info.size);
+            return helper.binary(std::vector<uint8_t>(data, data + length));
+        }
 
         auto parts = stx::split<std::vector<std::string>>(field, ".");
-        auto current = parts.begin();
-        auto value = context;
+        auto currentField = parts.begin();
+        auto value = context.ptr();
 
-        while (current != parts.end()) {
-            if (!PyObject_HasAttrString(value, current->c_str())) {
+        while (currentField != parts.end()) {
+            auto internalFieldName = stx::format("_{}_", *currentField);
+            if (!PyObject_HasAttrString(value, internalFieldName.c_str())) {
                 throw std::runtime_error(stx::format("Could not find request field {} in method {}.",
-                    stx::join(parts.begin(), current+1, "."),
+                    stx::join(parts.begin(), currentField + 1, "."),
                     methodName));
             }
-            value = PyObject_GetAttrString(value, current->c_str());
+            value = PyObject_GetAttrString(value, internalFieldName.c_str());
             assert(value);
+            ++currentField;
         }
 
         if (PySequence_Check(value)) {
