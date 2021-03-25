@@ -12,8 +12,11 @@ from pyzswagcl import \
     parse_openapi_config, \
     OpenApiConfigMethod, \
     OpenApiConfigParamFormat, \
-    ZSERIO_OBJECT_CONTENT_TYPE
+    ZSERIO_OBJECT_CONTENT_TYPE, \
+    ZSERIO_REQUEST_PART_WHOLE, \
+    ZSERIO_REQUEST_PART
 
+from .request import request_object_blob
 from .doc import get_doc_str, IdentType, md_filter_definition
 
 # Name of variable that is added to controller
@@ -118,7 +121,11 @@ class ZserioSwaggerApp(connexion.App):
         for method_name in self.service_instance._methodMap:
             user_function = getattr(self.controller, method_name)
             zserio_modem_function = getattr(self.service_instance, f"_{method_name}Method")
+            zserio_impl_function = getattr(self.service_instance, f"_{method_name}Impl")
+            request_type = zserio_impl_function.__func__.__annotations__["request"]
+            assert inspect.isclass(request_type)
             assert zserio_modem_function
+
             if not user_function or not inspect.isfunction(user_function):
                 print(f"WARNING: The controller {self.controller_path} does not implement {method_name}!")
                 continue
@@ -130,16 +137,12 @@ class ZserioSwaggerApp(connexion.App):
 
             method_spec: OpenApiConfigMethod = self.spec[method_name]
 
-            def wsgi_method(fun=zserio_modem_function, spec=method_spec, **kwargs):
-                assert method_spec.body_request_object
-                param_name = "body"
-                assert param_name in kwargs
-                param_value = kwargs[param_name]
-                # if param.format == ParamFormat.BYTE:
-                #     param_value = base64.b64decode(param_value)
-                # else:
-                #     assert param.format == ParamFormat.BINARY
-                return bytes(fun(param_value, None))
+            def wsgi_method(fun=zserio_modem_function, spec=method_spec, req_t=request_type, **kwargs):
+                if spec.body_request_object:
+                    request_blob = kwargs["body"]
+                else:
+                    request_blob = request_object_blob(req_t=req_t, spec=spec, **kwargs)
+                return bytes(fun(request_blob, None))
             setattr(self.service_instance, method_name, wsgi_method)
 
             def method_impl(request, ctx=None, fun=user_function):
@@ -159,7 +162,7 @@ class ZserioSwaggerApp(connexion.App):
 
     def verify_openapi_schema(self):
         for method_name in self.service_instance._methodMap:
-            assert self.spec.method_spec(method_name)
+            assert method_name in self.spec
 
     def generate_openapi_schema(self):
         print(f"NOTE: Writing OpenApi schema to {self.yaml_path}")

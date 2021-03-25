@@ -69,8 +69,8 @@ will automatically generate a client for the service under
 
 ```python
 from my.package import Service
-import zswag_client
-client = Service.Client(zswag_client.HttpClient(spec=f"http://localhost:5000/openapi.json"))
+from pyzswagcl import HttpClient
+client = Service.Client(HttpClient(spec=f"http://localhost:5000/openapi.json"))
 ```
 
 `zswag.HttpClient` provides the service client interface expected by zserio.
@@ -105,7 +105,7 @@ OpenAPI YAML file:
 * **Parameter Format**
 * **Server URL Base Path**
 
-#### Option: HTTP method
+#### Option 🌟1: HTTP method
 
 To change the **HTTP method**, simply place the desired method
 as the key under the method path, such as in the following example:
@@ -116,24 +116,8 @@ paths:
       ...
 ```
 
-#### Option: Base64 URL Parameter Format
+#### Option 🌟2: Zserio request blob in body
 
-To use the __Base64 URL parameter format__, use the snippet below in you method spec.
-```yaml
-parameters:
-- description: ''
-  in: query
-  name: requestData
-  required: true
-  x-zserio-request-part: "*"  # The parameter represents the whole zserio request object
-  schema:
-    format: byte
-    type: string
-```
-
-#### Option: Binary Body Parameter Format
-
-To use the Binary Body Parameter Format, use the snippet below in your method spec and remove the `requestData` parameter.
 ```yaml
 requestBody:
   content:
@@ -142,7 +126,74 @@ requestBody:
         type: string
 ```
 
-#### Option: Server URL Base Path
+#### Option 🌟3: Zserio request blob in URL parameter
+
+```yaml
+parameters:
+- description: ''
+  in: query|path
+  name: parameterName
+  required: true
+  x-zserio-request-part: "*"
+  schema:
+    format: string|byte|base64|base64url|hex|binary
+```
+
+About the `format` specifier value:
+* Both `string` and `binary` result in a raw URL-encoded string.
+* Both `byte` and `base64` result in a standard Base64-encoded value.
+  The `base64url` option indicates URL-safe Base64 format.
+* The `hex` encoding produces a hexadecimal encoding of the request blob.
+
+#### Option 🌟4: Zserio request part, single value
+
+```yaml
+parameters:
+- description: ''
+  in: query|path
+  name: parameterName
+  required: true
+  x-zserio-request-part: "field[.subfield]*"
+  schema:
+    format: string|byte|base64|base64url|hex|binary
+```
+
+In this case, `x-zserio-request-part` should point to an atomic built-in type,
+such as `uint8`, `float32`, `extern` etc. Note that `uint8[]` array fields receive
+special treatment: They are transferred as single-value blobs, not as arrays.
+
+The `format` value effect remains as explained above. A small
+difference exists for integer types: Their hexadecimal representation
+will be the natural numeric one, not the binary. 
+
+#### Option 🌟5: Zserio request part, array
+
+```yaml
+parameters:
+- description: ''
+  in: query|path
+  style: form|simple|label|matrix
+  explode: true|false
+  name: parameterName
+  required: true
+  x-zserio-request-part: "field[.subfield]*"
+  schema:
+    format: string|byte|base64|base64url|hex|binary
+```
+
+In this case, `x-zserio-request-part` should point to an array of
+atomic built-in types. The array will be encoded according
+to the `format`, `style` and `explode` specifiers.
+
+#### Option 🌟6: Zserio request part, dictionary
+
+In this case, `x-zserio-request-part` should point to a zserio struct.
+The OpenAPI schema options are the same as for arrays. All fields
+of the designated struct which have an atomic built-in type are exposed
+as key-value pairs.  The key-value-pairs will be encoded according
+to the `format`, `style` and `explode` specifiers.
+
+#### Option 🌟7: Server URL Base Path
 
 OpenAPI allows for a `servers` field in the spec that lists URL path prefixes
 under which the specified API may be reached. A `zswag_client.HttpClient`
@@ -182,4 +233,3 @@ immediately precedes the declaration:
 /** This method is documented. */
 ReturnType myMethod(ArgumentType);
 ```
- 

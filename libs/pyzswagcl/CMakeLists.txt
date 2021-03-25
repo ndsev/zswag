@@ -1,7 +1,5 @@
 project(pyzswagcl)
 
-set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
-
 pybind11_add_module(pyzswagcl SHARED pyzswagcl.cpp)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")

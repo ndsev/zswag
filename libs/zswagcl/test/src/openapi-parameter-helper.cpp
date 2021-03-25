@@ -241,7 +241,7 @@ TEST_CASE("openapi path parameters - formats", "[zswagcl::open-api-format-helper
                 });
 
                 INFO("Hex: " << stx::to_hex(r.begin(), r.end()));
-                REQUIRE(r == "AAAABQ");
+                REQUIRE(r == "AAAABQ==");
             }
         }
 
