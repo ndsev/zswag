@@ -14,9 +14,9 @@ namespace
 {
     Any valueFromPyObject(PyObject* value) {
         if (PyLong_Check(value)) {
-            auto i64 = PyLong_AsLongLong(value);
+            auto i64 = static_cast<int64_t>(PyLong_AsLongLong(value));
             if (i64 == -1 && PyErr_Occurred()) {
-                return PyLong_AsUnsignedLongLong(value);
+                return static_cast<uint64_t>(PyLong_AsUnsignedLongLong(value));
             }
             return i64;
         }
@@ -30,11 +30,11 @@ namespace
         }
 
         if (value == Py_True) {
-            return 1ll;
+            return static_cast<uint64_t>(1);
         }
 
         if (value == Py_False) {
-            return 0ll;
+            return static_cast<uint64_t>(0);
         }
 
         throw std::runtime_error(
