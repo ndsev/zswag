@@ -41,7 +41,7 @@ jobs:
     - name: Build
       working-directory: build
       run: |
-        cmake --build . && cmake --build . --target wheel
+        cmake --build .
     - name: Test
       working-directory: build
       run: |
