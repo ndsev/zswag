@@ -4,11 +4,7 @@ import zserio
 import struct
 import functools
 from typing import Type, Tuple, Any, Dict, Union, get_args, get_origin, List
-from pyzswagcl import \
-    OpenApiConfigMethod, \
-    OpenApiConfigParam, \
-    OpenApiConfigParamFormat, \
-    ZSERIO_REQUEST_PART_WHOLE
+from pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOLE
 
 NoneType = type(None)
 
@@ -70,24 +66,24 @@ def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict
 
 
 # Get a byte buffer from a string which is encoded in a given format
-def str_to_bytes(s: str, fmt: OpenApiConfigParamFormat) -> bytes:
-    if fmt == OpenApiConfigParamFormat.BASE64:
+def str_to_bytes(s: str, fmt: OAParamFormat) -> bytes:
+    if fmt == OAParamFormat.BASE64:
         return base64.b64decode(s)
-    elif fmt == OpenApiConfigParamFormat.BASE64URL:
+    elif fmt == OAParamFormat.BASE64URL:
         return base64.urlsafe_b64decode(s)
-    elif fmt == OpenApiConfigParamFormat.HEX:
+    elif fmt == OAParamFormat.HEX:
         return bytes.fromhex(s)
-    else:  # if fmt in (OpenApiConfigParamFormat.BINARY, OpenApiConfigParamFormat.STRING):
+    else:  # if fmt in (OAParamFormat.BINARY, OAParamFormat.STRING):
         return bytes(s, encoding="raw_unicode_escape")
 
 
 # Convert a single passed parameter value to it's correct type
-def parse_param_value(param: OpenApiConfigParam, target_type: Type, value: str) -> Any:
-    if param.format == OpenApiConfigParamFormat.STRING:
+def parse_param_value(param: OAParam, target_type: Type, value: str) -> Any:
+    if param.format == OAParamFormat.STRING:
         if target_type is bool:
             return bool(int(value))
         return target_type(value)
-    if param.format == OpenApiConfigParamFormat.HEX and target_type is int:
+    if param.format == OAParamFormat.HEX and target_type is int:
         return int(value, 16)
     value_as_bytes = str_to_bytes(value, param.format)
     struct_literal_key = (target_type, len(value_as_bytes))
@@ -101,20 +97,20 @@ def parse_param_value(param: OpenApiConfigParam, target_type: Type, value: str) 
 
 
 # Convert an array of passed parameter values to their correct type
-def parse_param_values(param: OpenApiConfigParam, target_type: Type, value: List[str]) -> List[Any]:
+def parse_param_values(param: OAParam, target_type: Type, value: List[str]) -> List[Any]:
     return [parse_param_value(param, target_type, item) for item in value]
 
 
 # Get a blob for a zserio request type, a set of request parameter values
 # and an OpenAPI method path spec.
-def request_object_blob(*, req_t: Type, spec: OpenApiConfigMethod, **kwargs) -> bytes:
+def request_object_blob(*, req_t: Type, spec: OAMethod, **kwargs) -> bytes:
     # Lazy instantiation of request object and type info
     req: Union[req_t, None] = None
     req_field_types: Dict = {}
 
     # Apply parameters
     param_name: str
-    param: OpenApiConfigParam
+    param: OAParam
     for param_name, param in spec.parameters.items():
         # Get raw string value
         value: Union[str, List[str]] = param.default_value
@@ -142,4 +138,4 @@ def request_object_blob(*, req_t: Type, spec: OpenApiConfigMethod, **kwargs) -> 
     assert req
     serializer = zserio.BitStreamWriter()
     req.write(serializer)
-    return serializer.getByteArray()
+    return serializer.byte_array

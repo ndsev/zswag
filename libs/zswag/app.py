@@ -10,8 +10,8 @@ from typing import Type
 
 from pyzswagcl import \
     parse_openapi_config, \
-    OpenApiConfigMethod, \
-    OpenApiConfigParamFormat, \
+    OAMethod, \
+    OAParamFormat, \
     ZSERIO_OBJECT_CONTENT_TYPE, \
     ZSERIO_REQUEST_PART_WHOLE, \
     ZSERIO_REQUEST_PART
@@ -25,7 +25,7 @@ CONTROLLER_SERVICE_INSTANCE = "_service"
 
 class MethodInfo:
     """
-    (Private) Return value of ZserioSwaggerApp._method_info()
+    (Private) Return value of Server._method_info()
     """
     def __init__(self, *, name, docstring="", returntype="", argtype="", returndoc="", argdoc=""):
         self.name = name
@@ -36,10 +36,10 @@ class MethodInfo:
         self.argdoc = argdoc
 
 
-class ZserioSwaggerApp(connexion.App):
+class OAServer(connexion.App):
 
     def __init__(self, *,
-                 controller: ModuleType,
+                 controller_module,
                  service_type: Type[zserio.ServiceInterface],
                  zs_pkg_path: str = None,
                  yaml_path: str = None):
@@ -63,20 +63,21 @@ class ZserioSwaggerApp(connexion.App):
             In file my.app.__init__:
 
                 from zserio_gen.my.service import Service
-                from zswag import ZserioSwaggerApp
+                from zswag import Server
+                import
 
-                app = ZserioSwaggerApp(my.app.controller, Service)
+                app = Server(my.app.controller, Service)
 
             In file my.app.controller:
 
-                # NOTE: Injected by ZserioSwaggerApp, invisible to developer!
+                # NOTE: Injected by Server, invisible to developer!
                 #  In swagger yaml, the path specs reference `my.app.controller._service.myApi`
                 _service = Service()
                 _service.myApi = lambda request: _service._myApiMethod(request)
                 _service._myApiImpl = my.app.controller.myApiImpl
 
                 # Written by user
-                def myApi(request):
+                def my_api(request):
                     return "response"
 
         General call structure:
@@ -104,8 +105,8 @@ class ZserioSwaggerApp(connexion.App):
         assert inspect.isclass(self.service_type)
 
         # Initialise zserio service working instance
-        self.controller_path = controller.__name__
-        self.controller = controller
+        self.controller_path = controller_module.__name__
+        self.controller = controller_module
         self.service_instance_path = self.controller_path+f".{CONTROLLER_SERVICE_INSTANCE}"
         if not hasattr(self.controller, CONTROLLER_SERVICE_INSTANCE):
             setattr(self.controller, CONTROLLER_SERVICE_INSTANCE, self.service_type())
@@ -118,10 +119,10 @@ class ZserioSwaggerApp(connexion.App):
         self.verify_openapi_schema()
 
         # Re-route service impl methods
-        for method_name in self.service_instance._methodMap:
+        for method_name in self.service_instance.METHOD_NAMES:
             user_function = getattr(self.controller, method_name)
-            zserio_modem_function = getattr(self.service_instance, f"_{method_name}Method")
-            zserio_impl_function = getattr(self.service_instance, f"_{method_name}Impl")
+            zserio_modem_function = getattr(self.service_instance, f"_{method_name}_method")
+            zserio_impl_function = getattr(self.service_instance, f"_{method_name}_impl")
             request_type = zserio_impl_function.__func__.__annotations__["request"]
             assert inspect.isclass(request_type)
             assert zserio_modem_function
@@ -135,7 +136,7 @@ class ZserioSwaggerApp(connexion.App):
                 print(f"ERROR: {self.controller_path}.{method_name} must have single 'request' parameter!")
                 continue
 
-            method_spec: OpenApiConfigMethod = self.spec[method_name]
+            method_spec: OAMethod = self.spec[method_name]
 
             def wsgi_method(fun=zserio_modem_function, spec=method_spec, req_t=request_type, **kwargs):
                 if spec.body_request_object:
@@ -147,10 +148,10 @@ class ZserioSwaggerApp(connexion.App):
 
             def method_impl(request, ctx=None, fun=user_function):
                 return fun(request)
-            setattr(self.service_instance, f"_{method_name}Impl", method_impl)
+            setattr(self.service_instance, f"_{method_name}_impl", method_impl)
 
         # Initialise connexion app
-        super(ZserioSwaggerApp, self).__init__(
+        super(OAServer, self).__init__(
             self.controller_path,
             specification_dir=yaml_parent_path)
 
@@ -161,7 +162,7 @@ class ZserioSwaggerApp(connexion.App):
             pythonic_params=False)
 
     def verify_openapi_schema(self):
-        for method_name in self.service_instance._methodMap:
+        for method_name in self.service_instance.METHOD_NAMES:
             assert method_name in self.spec
 
     def generate_openapi_schema(self):
@@ -217,7 +218,7 @@ class ZserioSwaggerApp(connexion.App):
                         },
                         "x-openapi-router-controller": self.service_instance_path
                     },
-                } for method_info in (self._method_info(method_name) for method_name in self.service_instance._methodMap)
+                } for method_info in (self._method_info(method_name) for method_name in self.service_instance.METHOD_NAMES)
             }
         }
         with open(self.yaml_path, "w") as yaml_file:

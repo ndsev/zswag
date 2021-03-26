@@ -60,10 +60,14 @@ namespace
 }
 
 void PyOpenApiClient::bind(py::module_& m) {
-    auto serviceClient = py::class_<PyOpenApiClient>(m, "Client")
+    auto serviceClient = py::class_<PyOpenApiClient>(m, "OAClient")
         .def(py::init<std::string, bool>(), "url"_a, "is_local_file"_a = false)
+        // zserio <= 2.2.0
         .def("callMethod", &PyOpenApiClient::callMethod,
-             "methodName"_a, "requestData"_a, "context"_a);
+             "methodName"_a, "requestData"_a, "context"_a)
+        // zserio >= 2.3.0
+        .def("call_method", &PyOpenApiClient::callMethod,
+             "method_name"_a, "request_data"_a, "context"_a);
 
     py::object serviceClientBase = py::module::import("zserio").attr("ServiceInterface");
     serviceClient.attr("__bases__") = py::make_tuple(serviceClientBase) + serviceClient.attr("__bases__");
