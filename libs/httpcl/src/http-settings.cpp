@@ -271,14 +271,13 @@ std::string HTTPSettings::storePassword(const std::string& service,
     auto randServiceId = []() {
         std::string id(12, '.');
         std::generate(id.begin(), id.end(), []() {
-            return "0123456789abcdef"[rand() % 15];
+            return "0123456789abcdef"[rand() % 16];
         });
-
         return id;
     };
 
     auto newService = service.empty()
-        ? "nds.live password "s + randServiceId()
+        ? "service password "s + randServiceId()
         : service;
 
     auto result = std::async(std::launch::async, [=]() {
@@ -309,7 +308,7 @@ bool HTTPSettings::deletePassword(const std::string& service,
                                  user,
                                  error);
 
-        return !!error;
+        return error;
     });
 
     if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)

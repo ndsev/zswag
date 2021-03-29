@@ -2,34 +2,78 @@
 
 [![CI](https://github.com/Klebert-Engineering/zswag/actions/workflows/cmake.yml/badge.svg)](https://github.com/Klebert-Engineering/zswag/actions/workflows/cmake.yml)
 
-Convenience functionality to create python modules from zserio services at warp speed.
-Translate/verify Zserio services to/with OpenAPI/Swagger and serve them in Flask/Connexion WSGI apps.
+Zswag is a collection of libraries for using/hosting zserio services through OpenAPI.
 
-## Installation
+## Components
 
-Just run
+![Component Overview](doc/zswag-architecture.png)
 
+The zswag repository provides two main libraries which deliver
+generic OpenAPI clients (Python, C++) for zserio services as well as a
+generic OpenApi server (Python):
+
+* `zswagcl` is a C++ Library which exposes zserio OpenApi service client `ZsrClient`
+  as well as the more generic `OpenApiClient` and `OpenApiConfig` classes
+  which are reused in Python.
+* `zswag` is a Python Library which provides both a zserio Python service client
+  (`OAClient`) as well as a zserio-OpenApi server layer based on Flask/Connexion
+  (`OAServer`).
+* `pyzswagcl` is a binding library which exposes the C++-based OpenApi
+  pasrsing/request functionality to Python. Please consider it "internal".
+* `httpcl` is a wrapper around the [cpp-httplib](https://github.com/yhirose/cpp-httplib),
+  and http request configuration and secret injection abilities.
+  
+## Setup
+
+### For Python Users
+
+Simply run `pip install zswag`. **Note: This currently only works with
+64-bit Python 3.8. Also, make sure that your `pip --version` is greater
+than 19.3.**
+
+### For C++ Users
+
+Using CMake, you can ...
+
+* ... run tests.
+* ... build the zswag wheels for Python != 3.8.
+* ... integrate the C++ client into a C++ project.
+
+The basic setup follows the usual CMake configure/build steps:
 ```bash
-pip3 install zswag
+mkdir build && cd build
+cmake ..
+cmake --build .
 ```
 
-Alternatively, clone this repository, and run
+**Note:** The Python environment used for configuration will be used
+to build the resulting wheels. After building, you will find the Python
+wheels under `build/bin/wheel`.
 
+**To run tests**, just execute CTest at the top of the build directory:
 ```bash
-pip3 install -e .
+cd build && ctest --verbose
 ```
 
-## Running the remote calculator test example
+## Using `zswag.OAClient`
 
-```bash
-PYTHONPATH=$PWD/test
-python3 -m calc server &
-python3 -m calc client
+If you have a service called `my.package.Service`, then zserio
+will automatically generate a client for the service under
+`my.package.Service.Client`. This client can be instantiated alas ...
+
+```python
+from my.package.api import Service
+from zswag import OAClient
+client = Service.Client(OAClient(f"http://localhost:5000/openapi.json"))
 ```
 
-## Creating a Swagger service from zserio
+`zswag.OAClient` provides the service client interface expected by zserio after version 2.3.
+It reads HTTP specifics for the service from an OpenAPI YAML or JSON spec
+that must be located under the given path or URL.
 
-`ZserioSwaggerApp` gives you the power to marry a user-written app controller
+## Using `zswag.OAServer`
+
+The `OAServer` component gives you the power to marry a user-written app controller
 with a zserio-generated app server class (argument parser/response serialiser)
 and a fitting Swagger OpenAPI spec.
 
@@ -43,8 +87,8 @@ import my.app.controller
 zserio.generate("myapp/service.zs", "myapp")
 from myapp.service import Service
 
-# The OpenApi argument `yaml_path=...` is optional
-app = zswag.ZserioSwaggerApp(my.app.controller, Service)
+# The OAServer argument `yaml_path` is optional
+app = zswag.OAServer(my.app.controller, Service)
 ```
 
 Here, the API endpoints are routed to `my/app/controller.py`,
@@ -52,31 +96,22 @@ which might look as follows:
 
 ```py
 # Written by you
-def myApi(request):
+def my_api(request):
     return "response"
 
-# Injected by ZserioSwaggerApp
+# Automatically injected by ZserioOpenApiApp
 # _service = Service()
 # _service.myApi = lambda request: _service._myApiMethod(request)
 # _service._myApiImpl = my.app.controller.myApi
 ```
 
-## Using the client
+## Using `zswagcl::ZsrClient`
 
-If you have a service called `my.package.Service`, then zserio
-will automatically generate a client for the service under
-`my.package.Service.Client`. This client can be instantiated alas ...
+🚧 This section is work-in-progress. 🚧
 
-```python
-from my.package import Service
-from pyzswagcl import HttpClient
-client = Service.Client(HttpClient(spec=f"http://localhost:5000/openapi.json"))
-```
+## Authentication via Headers and Cookies
 
-`zswag.HttpClient` provides the service client interface expected by zserio.
-It reads HTTP specifics for the service from an OpenAPI YAML or JSON spec
-that must be located under the given path or URL. 
-For more options with the `HttpClient` constructor check out it's doc-string.
+🚧 This section is work-in-progress. 🚧
 
 ## Swagger UI 
 
@@ -94,11 +129,11 @@ API docs of your service under `[/prefix]/ui`.
   all the methods specified in your zserio service are also reflected in
   the OpenAPI-spec.
 
-### OpenAPI Spec Options
+### Working with OpenAPI Spec Options
 
 #### Options Overview
 
-`ZserioSwaggerApp` and `zswag_client.HttpClient` currently
+`Server` and `zswag_client.HttpClient` currently
 offer several degrees of freedom regarding HTTP-specifics in the
 OpenAPI YAML file:
 * **HTTP Method**
@@ -208,7 +243,7 @@ and port, but prefix the `/path/to/my/api` string.
 
 ### Documentation extraction
 
-When the OpenAPI/Swagger YAML is auto-generated, `ZserioSwaggerApp`
+When the OpenAPI/Swagger YAML is auto-generated, `Server`
 tries to populate the service/method/argument/result descriptions
 with doc-strings which are extracted from the zserio sources.
 
@@ -233,3 +268,4 @@ immediately precedes the declaration:
 /** This method is documented. */
 ReturnType myMethod(ArgumentType);
 ```
+
