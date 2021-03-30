@@ -13,8 +13,8 @@ host, port = sys.argv[2].split(':') if len(sys.argv) > 2 and ':' in sys.argv[2] 
 if mode == "client":
     client.run(host, port)
 elif mode == "server":
-    app = zswag.ZserioSwaggerApp(
-        controller=server,
+    app = zswag.OAServer(
+        controller_module=server,
         service_type=calculator.Calculator.Service,
         yaml_path=working_dir+"/api.yaml",
         zs_pkg_path=working_dir)

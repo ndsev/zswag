@@ -4,7 +4,7 @@ enable_testing()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 0.7.0)
+set(ZSWAG_VERSION 0.7.0rc1)
 
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -27,6 +27,10 @@ if (NOT TARGET wheel)
   set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
   include(python-wheel)
   set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
+
+  # Add wheel target to `all` such that the ctest integration tests work
+  add_custom_target(wheel-all ALL)
+  add_dependencies(wheel-all wheel)
 endif ()
 
 if (NOT TARGET yaml-cpp)

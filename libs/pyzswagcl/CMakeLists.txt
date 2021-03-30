@@ -1,6 +1,10 @@
 project(pyzswagcl)
 
-pybind11_add_module(pyzswagcl SHARED pyzswagcl.cpp)
+pybind11_add_module(pyzswagcl
+  SHARED
+  py-zswagcl.cpp
+  py-openapi-client.cpp
+  py-openapi-client.h)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   target_compile_options(pyzswagcl PUBLIC /permissive-)
@@ -8,7 +12,8 @@ endif()
 
 target_link_libraries(pyzswagcl
   PRIVATE
-    zswagcl)
+    zswagcl
+    httpcl)
 
 target_compile_features(pyzswagcl
   INTERFACE
@@ -18,4 +23,4 @@ add_wheel(pyzswagcl
   VERSION "${ZSWAG_VERSION}"
   DESCRIPTION "Python bindings for the zswag client library."
   TARGET_DEPENDENCIES
-    zswagcl zsr)
+    zswagcl zsr httpcl)

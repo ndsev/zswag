@@ -21,6 +21,11 @@ struct Bool
     bool value;
 };
 
+struct String
+{
+    string value;
+};
+
 struct BaseAndExponent
 {
     I32 base;
@@ -41,6 +46,21 @@ struct Bytes
     uint8 values[];
 };
 
+struct Strings
+{
+    string values[];
+};
+
+struct Doubles
+{
+    float64 values[];
+};
+
+struct Bools
+{
+    bool values[];
+};
+
 /*!
 
 ### Calculator Service
@@ -55,9 +75,15 @@ service Calculator
 
     Double isum(Integers);
 
-    Double imul(Integers);
-
     Double bsum(Bytes);
 
+    Double imul(Integers);
+
+    Double fmul(Doubles);
+
+    Bool bmul(Bools);
+
     Double identity(Double);
+
+    String concat(Strings);
 };

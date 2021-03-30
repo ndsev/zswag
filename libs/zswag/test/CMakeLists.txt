@@ -20,4 +20,5 @@ add_test(
       bash "test_integration.bash"
         -w "${WHEEL_DEPLOY_DIRECTORY}"
         -b "python -m zswag.test.calc server localhost:16161"
-        -f "$<TARGET_FILE:${PROJECT_NAME}> http://localhost:16161/openapi.json")
+        -f "$<TARGET_FILE:${PROJECT_NAME}> http://localhost:16161/openapi.json"
+        -f "python -m zswag.test.calc client localhost:16161")

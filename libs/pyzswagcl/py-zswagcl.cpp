@@ -6,6 +6,7 @@
 
 #include "zswagcl/openapi-parser.hpp"
 #include "httpcl/http-settings.hpp"
+#include "py-openapi-client.h"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -22,7 +23,7 @@ PYBIND11_MODULE(pyzswagcl, m)
     ///////////////////////////////////////////////////////////////////////////
     // ParameterLocation
 
-    py::enum_<OpenAPIConfig::Parameter::Location>(m, "OpenApiConfigParamLocation", py::arithmetic())
+    py::enum_<OpenAPIConfig::Parameter::Location>(m, "OAParamLocation", py::arithmetic())
             .value("PATH", OpenAPIConfig::Parameter::Location::Path)
             .value("QUERY", OpenAPIConfig::Parameter::Location::Query)
             ;
@@ -30,7 +31,7 @@ PYBIND11_MODULE(pyzswagcl, m)
     ///////////////////////////////////////////////////////////////////////////
     // ParameterFormat
 
-    py::enum_<OpenAPIConfig::Parameter::Format>(m, "OpenApiConfigParamFormat", py::arithmetic())
+    py::enum_<OpenAPIConfig::Parameter::Format>(m, "OAParamFormat", py::arithmetic())
             .value("STRING", OpenAPIConfig::Parameter::Format::String)
             .value("HEX", OpenAPIConfig::Parameter::Format::Hex)
             .value("BASE64", OpenAPIConfig::Parameter::Format::Base64)
@@ -41,7 +42,7 @@ PYBIND11_MODULE(pyzswagcl, m)
     ///////////////////////////////////////////////////////////////////////////
     // Parameter
 
-    py::class_<OpenAPIConfig::Parameter>(m, "OpenApiConfigParam")
+    py::class_<OpenAPIConfig::Parameter>(m, "OAParam")
             .def_readonly("location", &OpenAPIConfig::Parameter::location)
             .def_readonly("field", &OpenAPIConfig::Parameter::field)
             .def_readonly("default_value", &OpenAPIConfig::Parameter::defaultValue)
@@ -51,7 +52,7 @@ PYBIND11_MODULE(pyzswagcl, m)
     ///////////////////////////////////////////////////////////////////////////
     // Path
 
-    py::class_<OpenAPIConfig::Path>(m, "OpenApiConfigMethod")
+    py::class_<OpenAPIConfig::Path>(m, "OAMethod")
             .def_readonly("path", &OpenAPIConfig::Path::path)
             .def_readonly("http_method", &OpenAPIConfig::Path::httpMethod)
             .def_readonly("parameters", &OpenAPIConfig::Path::parameters)
@@ -60,7 +61,7 @@ PYBIND11_MODULE(pyzswagcl, m)
 
     ///////////////////////////////////////////////////////////////////////////
     // HTTPService::Config
-    py::class_<OpenAPIConfig>(m, "OpenAPIConfig")
+    py::class_<OpenAPIConfig>(m, "OAConfig")
             .def("__contains__", [](const OpenAPIConfig& self, std::string const& methodName) {
                 return self.methodPath.find(methodName) != self.methodPath.end();
             }, py::is_operator(), "method_name"_a)
@@ -86,7 +87,13 @@ PYBIND11_MODULE(pyzswagcl, m)
         return fetchOpenAPIConfig(url, httpClient);
     }, py::return_value_policy::move, "url"_a);
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Global Constants
     m.attr("ZSERIO_OBJECT_CONTENT_TYPE") = py::str(ZSERIO_OBJECT_CONTENT_TYPE);
     m.attr("ZSERIO_REQUEST_PART") = py::str(ZSERIO_REQUEST_PART);
     m.attr("ZSERIO_REQUEST_PART_WHOLE") = py::str(ZSERIO_REQUEST_PART_WHOLE);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // PyOpenApiClient
+    PyOpenApiClient::bind(m);
 }

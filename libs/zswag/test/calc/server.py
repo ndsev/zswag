@@ -12,13 +12,25 @@ def isum(request: api.Integers):
     return api.Double(sum(request.values))
 
 
-def imul(request):
-    return api.Double(reduce(int.__mul__, request.values))
-
-
 def bsum(request):
     return api.Double(sum(request.values))
 
 
+def imul(request):
+    return api.Double(reduce(int.__mul__, request.values))
+
+
+def fmul(request):
+    return api.Double(reduce(float.__mul__, request.values))
+
+
+def bmul(request):
+    return api.Bool(reduce(bool.__and__, request.values))
+
+
 def identity(request):
     return request
+
+
+def concat(request):
+    return api.String(reduce(str.__add__, request.values))

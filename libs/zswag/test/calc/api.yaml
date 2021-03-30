@@ -10,7 +10,6 @@ openapi: 3.0.0
 paths:
   /power/{base}:
     get:
-      description: "Test x-zserio-request-part in path and query."
       operationId: power
       parameters:
         - in: path
@@ -29,16 +28,15 @@ paths:
             type: string
       responses:
         '200':
+          description: ''
           content:
             application/octet-stream:
               schema:
                 type: string
-          description: ''
       summary: ''
       x-openapi-router-controller: zswag.test.calc.server._service
   /isum:
     get:
-      description: "Test simple passing of hex-encoded 'form' array in query."
       operationId: isum
       parameters:
         - in: query
@@ -53,17 +51,39 @@ paths:
               type: string
       responses:
         '200':
+          description: ''
           content:
             application/octet-stream:
               schema:
                 format: binary
                 type: string
+      summary: ''
+      x-openapi-router-controller: zswag.test.calc.server._service
+  /bsum/{values}:
+    get:
+      operationId: bsum
+      parameters:
+        - in: path
+          name: values
+          required: true
+          x-zserio-request-part: values
+          schema:
+            format: base64url
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
           description: ''
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
       summary: ''
       x-openapi-router-controller: zswag.test.calc.server._service
   /imul/{values}:
     get:
-      description: "Test passing of base64-encoded long array in path."
       operationId: imul
       parameters:
         - in: path
@@ -78,41 +98,63 @@ paths:
               type: string
       responses:
         '200':
+          description: ''
           content:
             application/octet-stream:
               schema:
                 format: binary
                 type: string
-          description: ''
       summary: ''
       x-openapi-router-controller: zswag.test.calc.server._service
-  /bsum/{values}:
+  /fmul:
     get:
-      description: "Test passing of base64url-encoded byte array in path."
-      operationId: bsum
+      operationId: fmul
       parameters:
-        - in: path
+        - in: query
           name: values
           required: true
+          explode: false
           x-zserio-request-part: values
           schema:
-            format: base64url
+            format: string
             type: array
             items:
               type: string
       responses:
         '200':
+          description: ''
           content:
             application/octet-stream:
               schema:
                 format: binary
                 type: string
+      summary: ''
+      x-openapi-router-controller: zswag.test.calc.server._service
+  /bmul:
+    get:
+      operationId: bmul
+      parameters:
+        - in: query
+          name: values
+          required: true
+          x-zserio-request-part: values
+          schema:
+            format: string
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
           description: ''
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
       summary: ''
       x-openapi-router-controller: zswag.test.calc.server._service
   /identity:
     post:
-      description: "Test passing argument in body."
       operationId: identity
       requestBody:
         content:
@@ -121,12 +163,35 @@ paths:
               type: string
       responses:
         '200':
+          description: ''
           content:
             application/octet-stream:
               schema:
                 format: binary
                 type: string
+      summary: ''
+      x-openapi-router-controller: zswag.test.calc.server._service
+  /concat:
+    get:
+      operationId: concat
+      parameters:
+        - in: query
+          name: values
+          required: true
+          x-zserio-request-part: values
+          schema:
+            format: base64
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
           description: ''
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
       summary: ''
       x-openapi-router-controller: zswag.test.calc.server._service
 

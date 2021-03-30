@@ -14,9 +14,6 @@ ZsrClient::ZsrClient(zswagcl::OpenAPIConfig config,
     : client_(std::move(config), std::move(client))
 {}
 
-ZsrClient::~ZsrClient()
-{}
-
 template <class _Iter>
 zsr::Variant queryFieldRecursive(zsr::Variant object, _Iter begin, _Iter end)
 {
