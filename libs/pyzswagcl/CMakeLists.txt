@@ -19,8 +19,17 @@ target_compile_features(pyzswagcl
   INTERFACE
     cxx_std_17)
 
+if (MSVC)
+  # Required because cpp-httplib speaks https via OpenSSL
+  set (DEPLOY_FILES
+    "${OPENSSL_INCLUDE_DIR}/../libcrypto-1_1-x64.dll"
+    "${OPENSSL_INCLUDE_DIR}/../libssl-1_1-x64.dll")
+endif()
+
 add_wheel(pyzswagcl
   VERSION "${ZSWAG_VERSION}"
   DESCRIPTION "Python bindings for the zswag client library."
   TARGET_DEPENDENCIES
-    zswagcl zsr httpcl)
+    zswagcl zsr httpcl
+  DEPLOY_FILES
+    ${DEPLOY_FILES})
