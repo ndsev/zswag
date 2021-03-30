@@ -24,7 +24,10 @@ using Result = HttpLibHttpClient::Result;
 
 struct HttpLibHttpClient::Impl
 {
+    Impl(std::map<std::string, std::string> headers) : headers(std::move(headers)) {}
+
     httpcl::HTTPSettings settings;
+    std::map<std::string, std::string> headers;
 
     auto makeClient(const URIComponents& uri)
     {
@@ -32,18 +35,20 @@ struct HttpLibHttpClient::Impl
         client->enable_server_certificate_verification(false);
         client->set_connection_timeout(60000);
         client->set_read_timeout(60000);
+        client->set_default_headers({headers.begin(), headers.end()});
         settings.apply(uri.build(), *client);
 
         return client;
     }
 };
 
-HttpLibHttpClient::HttpLibHttpClient()
-    : impl_(std::make_unique<Impl>())
+HttpLibHttpClient::HttpLibHttpClient(std::map<std::string, std::string> const& headers)
+    : impl_(std::make_unique<Impl>(headers))
 {}
 
-HttpLibHttpClient::~HttpLibHttpClient()
-{}
+HttpLibHttpClient::~HttpLibHttpClient() {
+    /* Nontrivial due to impl unique-ptr. */
+}
 
 Result HttpLibHttpClient::get(const std::string& uriStr)
 {

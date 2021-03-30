@@ -7,7 +7,7 @@ venv=$(mktemp -d)
 echo "→ Setting up a virtual environment in $venv ..."
 python3 -m venv "$venv"
 source "$venv/$activate_path"
-pip install -U pip
+python -m pip install -U pip
 
 trap 'echo "→ Killing $(jobs -p)"; kill $(jobs -p); echo "→ Removing $venv"; rm -rf "$venv"' EXIT
 

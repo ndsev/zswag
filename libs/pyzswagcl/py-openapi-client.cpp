@@ -61,7 +61,7 @@ namespace
 
 void PyOpenApiClient::bind(py::module_& m) {
     auto serviceClient = py::class_<PyOpenApiClient>(m, "OAClient")
-        .def(py::init<std::string, bool>(), "url"_a, "is_local_file"_a = false)
+        .def(py::init<std::string, bool, Headers>(), "url"_a, "is_local_file"_a = false, "headers"_a = Headers())
         // zserio <= 2.2.0
         .def("callMethod", &PyOpenApiClient::callMethod,
              "methodName"_a, "requestData"_a, "context"_a)
@@ -73,9 +73,11 @@ void PyOpenApiClient::bind(py::module_& m) {
     serviceClient.attr("__bases__") = py::make_tuple(serviceClientBase) + serviceClient.attr("__bases__");
 }
 
-PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl, bool isLocalFile)
+PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
+                                 bool isLocalFile,
+                                 Headers const& headers)
 {
-    auto httpClient = std::make_unique<HttpLibHttpClient>();
+    auto httpClient = std::make_unique<HttpLibHttpClient>(headers);
     OpenAPIConfig openApiConfig = [&](){
         if (isLocalFile) {
             std::ifstream fs;

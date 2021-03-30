@@ -116,7 +116,7 @@ void HTTPSettings::load()
 {
     settings.clear();
 
-    auto cookieJar = std::getenv("AFW_HTTP_SETTINGS_FILE");
+    auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
     if (!cookieJar)
         return;
 
