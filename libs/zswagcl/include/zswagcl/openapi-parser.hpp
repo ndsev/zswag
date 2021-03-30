@@ -1,4 +1,3 @@
-// Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
 #pragma once
 
 #include <istream>

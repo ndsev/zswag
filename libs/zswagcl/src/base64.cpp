@@ -1,5 +1,4 @@
-// Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
-/* 
+/*
    base64.cpp and base64.h
 
    Copyright (C) 2004-2008 René Nyffenegger
@@ -26,7 +25,7 @@
 
 */
 
-/* This source version has been altered by NDS. */
+/* This source version has been altered by Klebert-Engineering. */
 
 #include "base64.hpp"
 #include <cstdlib>

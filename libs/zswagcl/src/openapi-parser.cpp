@@ -1,4 +1,3 @@
-// Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
 #include "openapi-parser.hpp"
 
 #include "httpcl/http-settings.hpp"
