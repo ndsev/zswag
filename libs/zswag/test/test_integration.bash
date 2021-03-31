@@ -1,20 +1,7 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
-
-# On windows, there is no python3 executable
-if [[ "$OSTYPE" == "msys" ]]; then
-    function python3 {
-        python "$@"
-    }
-
-    function pip3 {
-        pip "$@"
-    }
-    activate_path="Scripts/activate"
-else
-    activate_path="bin/activate"
-fi
+my_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+. "$my_dir/../../../deps/python-cmake-wheel/python.bash"
 
 venv=$(mktemp -d)
 echo "→ Setting up a virtual environment in $venv ..."

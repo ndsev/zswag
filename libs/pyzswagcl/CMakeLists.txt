@@ -20,6 +20,8 @@ target_compile_features(pyzswagcl
     cxx_std_17)
 
 add_wheel(pyzswagcl
+  AUTHOR "Klebert Engineering"
+  URL "https://github.com/klebert-engineering/zswag"
   VERSION "${ZSWAG_VERSION}"
   DESCRIPTION "Python bindings for the zswag client library."
   TARGET_DEPENDENCIES

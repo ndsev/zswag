@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "NDS OpenAPI Testdata Template",
-    "description": "NDS OpenAPI Testdata Template",
+    "title": "OpenAPI Testdata Template",
+    "description": "OpenAPI Testdata Template",
     "version": "2021.01"
   },
   "servers": [

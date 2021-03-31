@@ -3,16 +3,19 @@ name: CI
 on: [pull_request]
 
 jobs:
-  build-manylinux-py38:
+  build-manylinux:
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
     runs-on: ubuntu-latest
-    container: ghcr.io/klebert-engineering/manylinux-cpp17-py3.8:2021.2
+    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}:2021.2
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
       - name: Configure
         run: |
-          python3.8 -m venv venv && . ./venv/bin/activate
+          python3 -m venv venv && . ./venv/bin/activate
           pip install -U setuptools wheel pip
           mkdir build && cd build && cmake ..
       - name: Build
@@ -31,14 +34,14 @@ jobs:
       - name: Deploy
         uses: actions/upload-artifact@v2
         with:
-          name: zswag-py3.8-ubuntu-latest
+          name: zswag-py${{ matrix.python-version }}-ubuntu-latest
           path: build/bin/wheel/*.whl
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
-        python-version: [3.8]
+        python-version: [3.8, 3.9]
     steps:
     - uses: actions/checkout@v2
       with:

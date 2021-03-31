@@ -1,5 +1,3 @@
-// Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
-
 #include "http-settings.hpp"
 
 #include <keychain/keychain.h>
@@ -14,7 +12,7 @@ using namespace httpcl;
 using namespace std::string_literals;
 
 static const std::chrono::minutes KEYCHAIN_TIMEOUT{1};
-static const char* KEYCHAIN_PACKAGE{"org.nds.live"};
+static const char* KEYCHAIN_PACKAGE = "lib.openapi.zserio.client";
 
 namespace YAML
 {
