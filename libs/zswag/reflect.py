@@ -31,10 +31,20 @@ def rsetattr(obj, attr, val):
     return setattr(rgetattr(obj, pre) if pre else obj, post, val)
 
 
+# Recursive getattr function, adopted from SO:
+#  https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-subobjects-chained-properties
 def rgetattr(obj, attr, *args):
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
     return functools.reduce(_getattr, [obj] + attr.split('.'))
+
+
+# Get the request type for a zserio service method.
+def service_method_request_type(service_instance: Any, method_name: str) -> Type:
+    zserio_impl_function = getattr(service_instance, f"_{method_name}_impl")
+    result = zserio_impl_function.__func__.__annotations__["request"]
+    assert inspect.isclass(result)
+    return result
 
 
 # Returns a class instance and a dictionary which reveals

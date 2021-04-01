@@ -34,3 +34,5 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+exit 0

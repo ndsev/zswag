@@ -26,4 +26,12 @@ if (NOT APPLE)
           -b "python -m zswag.test.calc server localhost:16161"
           -f "$<TARGET_FILE:${PROJECT_NAME}> http://localhost:16161/openapi.json"
           -f "python -m zswag.test.calc client localhost:16161")
+
+  add_test(
+    NAME
+      zswag-openapi-generator
+    WORKING_DIRECTORY
+      "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMAND
+      bash "test_openapi_generator.bash")
 endif()
