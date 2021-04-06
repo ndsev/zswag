@@ -1,5 +1,3 @@
-// Copyright (c) Navigation Data Standard e.V. - See LICENSE file.
-
 #include "zswagcl/zsr-client.hpp"
 #include "stx/format.h"
 

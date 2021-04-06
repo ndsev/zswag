@@ -20,6 +20,9 @@ PYBIND11_MODULE(pyzswagcl, m)
     py::bind_map<std::map<std::string, OpenAPIConfig::Parameter>>(m, "ParameterMap");
     py::implicitly_convertible<py::dict, std::map<std::string, OpenAPIConfig::Parameter>>();
 
+    py::bind_map<PyOpenApiClient::Headers>(m, "HeaderMap");
+    py::implicitly_convertible<py::dict, PyOpenApiClient::Headers>();
+
     ///////////////////////////////////////////////////////////////////////////
     // ParameterLocation
 

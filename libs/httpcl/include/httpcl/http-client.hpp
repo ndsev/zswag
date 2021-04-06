@@ -4,6 +4,7 @@
 #include <string_view>
 #include <memory>
 #include <functional>
+#include <map>
 
 namespace httpcl
 {
@@ -36,8 +37,8 @@ public:
 class HttpLibHttpClient : public IHttpClient
 {
 public:
-    HttpLibHttpClient();
-    ~HttpLibHttpClient();
+    explicit HttpLibHttpClient(std::map<std::string, std::string> const& headers={});
+    ~HttpLibHttpClient() override;
 
     Result get(const std::string& uri) override;
     Result post(const std::string& uri,
