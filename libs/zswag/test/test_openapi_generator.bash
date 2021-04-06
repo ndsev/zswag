@@ -22,10 +22,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+test_zs_path=$(python -m zswag.test.calc path)
+
 python -m zswag.gen \
   --service calculator.calculator.Calculator.Service \
-  --path "$my_dir/calc" \
+  --path "$test_zs_path" \
+  --zs "$test_zs_path" \
   --config get,path,flat \
-  --zs "$my_dir/calc" \
   --output "$my_dir/.test.yaml"
 cmp -l "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_1.yaml"

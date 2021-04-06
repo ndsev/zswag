@@ -9,7 +9,7 @@ python3 -m venv "$venv"
 source "$venv/$activate_path"
 python -m pip install -U pip
 
-trap 'echo "→ Killing $(jobs -p)"; kill $(jobs -p); echo "→ Removing $venv"; ' EXIT # rm -rf "$venv"
+trap 'echo "→ Killing $(jobs -p)"; kill $(jobs -p); echo "→ Removing $venv"; rm -rf "$venv"' EXIT
 
 while [[ $# -gt 0 ]]; do
   case $1 in
