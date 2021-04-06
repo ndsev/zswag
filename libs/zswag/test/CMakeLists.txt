@@ -33,5 +33,6 @@ if (NOT APPLE)
     WORKING_DIRECTORY
       "${CMAKE_CURRENT_SOURCE_DIR}"
     COMMAND
-      bash "test_openapi_generator.bash")
+      bash "test_openapi_generator.bash"
+      -w "${WHEEL_DEPLOY_DIRECTORY}")
 endif()

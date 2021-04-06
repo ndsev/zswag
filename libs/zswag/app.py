@@ -112,7 +112,7 @@ class OAServer(connexion.App):
                                 __import__(self.service_type.__module__.split('.')[0]).__file__
                             ))))
                         }" \\
-                        --config get,path,flat \\
+                        --config get,query,flat \\
                         --output "{to_slashes(yaml_path)}"
                         
                     Optional:

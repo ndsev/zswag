@@ -1,0 +1,244 @@
+info:
+  contact:
+    email: TODO
+  description: '### Calculator Service
+
+
+    Check out these sweet docs.'
+  license:
+    name: TODO
+  title: Calculator
+  version: TODO
+openapi: 3.0.0
+paths:
+  /bmul/{values}:
+    post:
+      description: ''
+      operationId: bmul
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /bsum/{values}:
+    post:
+      description: ''
+      operationId: bsum
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /concat/{values}:
+    post:
+      description: ''
+      operationId: concat
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /fmul/{values}:
+    post:
+      description: ''
+      operationId: fmul
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /identity/{value}:
+    post:
+      description: ''
+      operationId: identity
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: value
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: value
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /imul/{values}:
+    post:
+      description: ''
+      operationId: imul
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /isum/{values}:
+    post:
+      description: ''
+      operationId: isum
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /power/{base-value}/{exponent-value}/{unused1}/{unused2}/{unused3}/{unused5}:
+    post:
+      description: ''
+      operationId: power
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: base-value
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: base.value
+      - description: Member of Unknown.
+        in: path
+        name: exponent-value
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: exponent.value
+      - description: Member of Unknown.
+        in: path
+        name: unused1
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: unused1
+      - description: Member of Unknown.
+        in: path
+        name: unused2
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: unused2
+      - description: Member of Unknown.
+        in: path
+        name: unused3
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: unused3
+      - description: Member of Unknown.
+        in: path
+        name: unused5
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: unused5
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+servers: []

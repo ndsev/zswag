@@ -176,7 +176,9 @@ class OpenApiSchemaGenerator:
                 }
             }
         elif flatten:
-            _, field_type_info = make_instance_and_typeinfo(service_method_request_type(self.service_instance, method_name))
+            _, field_type_info = make_instance_and_typeinfo(
+                service_method_request_type(
+                    self.service_instance, method_name))
             param_loc_str = "query"
             if param_loc is OAParamLocation.PATH:
                 param_loc_str = "path"
@@ -189,6 +191,9 @@ class OpenApiSchemaGenerator:
                         "name": field_name.replace('.', '-'),
                         "description": f"Member of {result.argtype}.",
                         "required": True,
+                        **(
+                            {"allowEmptyValue": True} if param_loc is OAParamLocation.QUERY else {}
+                        ),
                         ZSERIO_REQUEST_PART: field_name,
                         "schema": {
                             "format": "string",
@@ -284,7 +289,7 @@ if __name__ == "__main__":
                         Zserio source directory from which documentation
                         should be extracted.
                         """))
-    parser.add_argument("-o", "--output", nargs=1, type=FileType("w"), default=sys.stdout,
+    parser.add_argument("-o", "--output", nargs=1, type=FileType("w"), default=[sys.stdout],
                         help="""
                         Output file path. If not specified, the output will be written to stdout.
                         """)
