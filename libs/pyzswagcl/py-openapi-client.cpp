@@ -80,8 +80,7 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
     auto httpClient = std::make_unique<HttpLibHttpClient>(headers);
     OpenAPIConfig openApiConfig = [&](){
         if (isLocalFile) {
-            std::ifstream fs;
-            fs.open(openApiUrl);
+            std::ifstream fs(openApiUrl);
             return parseOpenAPIConfig(fs);
         }
         else
