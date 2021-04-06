@@ -10,15 +10,24 @@ from pyzswagcl import \
     parse_openapi_config, \
     OAMethod
 
-from .reflect import request_object_blob, service_method_request_type
+from .reflect import request_object_blob, service_method_request_type, to_snake
 
 # Name of variable that is added to controller
 # to hold the service instance.
 CONTROLLER_SERVICE_INSTANCE = "_service"
 
 
+# Utility function for slash conversion in format strings
 def to_slashes(s: str):
     return s.replace("\\", "/")
+
+
+# Raised if the controller passed to OAServer is missing a function
+class IncompleteSchemaError(RuntimeError):
+    def __init__(self, schema_path: str, fn_name: str):
+        super(IncompleteSchemaError, self).__init__(f"Missing operation `{fn_name}` in {schema_path}!")
+        self.schema_path = schema_path
+        self.fn_name = fn_name
 
 
 class OAServer(connexion.App):
@@ -116,10 +125,10 @@ class OAServer(connexion.App):
                         --output "{to_slashes(yaml_path)}"
                         
                     Optional:
-                        --zs "<original zserio source path for docs extraction>"
+                        --docs "<original zserio source path for docs extraction>"
                         
                     The --config argument is a comma-separated list of tags
-                    and options for per-method configuration, please run
+                    to specify OpenAPI options. For more info, please run
                     
                         python -m zswag.gen --help
             """))
@@ -130,18 +139,19 @@ class OAServer(connexion.App):
 
         # Re-route service impl methods
         for method_name in self.service_instance.METHOD_NAMES:
-            user_function = getattr(self.controller, method_name)
-            zserio_modem_function = getattr(self.service_instance, f"_{method_name}_method")
+            method_snake_name = to_snake(method_name)
+            user_function = getattr(self.controller, method_snake_name)
+            zserio_modem_function = getattr(self.service_instance, f"_{method_snake_name}_method")
             request_type = service_method_request_type(self.service_instance, method_name)
             assert zserio_modem_function
 
             if not user_function or not inspect.isfunction(user_function):
-                print(f"WARNING: The controller {self.controller_path} does not implement {method_name}!")
+                print(f"WARNING: The controller {self.controller_path} does not implement {method_snake_name}!")
                 continue
 
-            print(f"Found {self.controller_path}.{method_name}.")
+            print(f"Found {self.controller_path}.{method_snake_name}.")
             if len(inspect.signature(user_function).parameters) != 1:
-                print(f"ERROR: {self.controller_path}.{method_name} must have single 'request' parameter!")
+                print(f"ERROR: {self.controller_path}.{method_snake_name} must have single 'request' parameter!")
                 continue
 
             method_spec: OAMethod = self.spec[method_name]
@@ -156,7 +166,7 @@ class OAServer(connexion.App):
 
             def method_impl(request, ctx=None, fun=user_function):
                 return fun(request)
-            setattr(self.service_instance, f"_{method_name}_impl", method_impl)
+            setattr(self.service_instance, f"_{method_snake_name}_impl", method_impl)
 
         # Load spec and inject openapi-router-controller
         print(f"Loading spec from {yaml_path} ...")
@@ -179,5 +189,6 @@ class OAServer(connexion.App):
 
     def verify_openapi_schema(self):
         for method_name in self.service_instance.METHOD_NAMES:
-            assert method_name in self.spec
+            if method_name not in self.spec:
+                raise IncompleteSchemaError(self.yaml_path, method_name)
 

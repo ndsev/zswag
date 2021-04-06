@@ -8,23 +8,23 @@ def power(request: api.BaseAndExponent):
     return response
 
 
-def isum(request: api.Integers):
+def int_sum(request: api.Integers):
     return api.Double(sum(request.values))
 
 
-def bsum(request):
+def byte_sum(request):
     return api.Double(sum(request.values))
 
 
-def imul(request):
+def int_mul(request):
     return api.Double(reduce(int.__mul__, request.values))
 
 
-def fmul(request):
+def float_mul(request):
     return api.Double(reduce(float.__mul__, request.values))
 
 
-def bmul(request):
+def bit_mul(request):
     return api.Bool(reduce(bool.__and__, request.values))
 
 

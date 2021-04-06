@@ -36,7 +36,7 @@ paths:
       summary: ''
   /isum:
     get:
-      operationId: isum
+      operationId: intSum
       parameters:
         - in: query
           name: values
@@ -59,7 +59,7 @@ paths:
       summary: ''
   /bsum/{values}:
     get:
-      operationId: bsum
+      operationId: byteSum
       parameters:
         - in: path
           name: values
@@ -81,7 +81,7 @@ paths:
       summary: ''
   /imul/{values}:
     get:
-      operationId: imul
+      operationId: intMul
       parameters:
         - in: path
           name: values
@@ -104,7 +104,7 @@ paths:
       summary: ''
   /fmul:
     get:
-      operationId: fmul
+      operationId: floatMul
       parameters:
         - in: query
           name: values
@@ -127,7 +127,7 @@ paths:
       summary: ''
   /bmul:
     get:
-      operationId: bmul
+      operationId: bitMul
       parameters:
         - in: query
           name: values

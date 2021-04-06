@@ -5,6 +5,7 @@ import struct
 import functools
 from typing import Type, Tuple, Any, Dict, Union, get_args, get_origin, List
 from pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOLE
+from re import compile as re
 
 NoneType = type(None)
 
@@ -41,10 +42,17 @@ def rgetattr(obj, attr, *args):
 
 # Get the request type for a zserio service method.
 def service_method_request_type(service_instance: Any, method_name: str) -> Type:
-    zserio_impl_function = getattr(service_instance, f"_{method_name}_impl")
+    zserio_impl_function = getattr(service_instance, f"_{to_snake(method_name)}_impl")
     result = zserio_impl_function.__func__.__annotations__["request"]
     assert inspect.isclass(result)
     return result
+
+
+# Adopted from zserio PythonSymbolConverter
+def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"))):
+    for p in patterns:
+        s = p.sub(r"\1_\2", s)
+    return s.lower()
 
 
 # Returns a class instance and a dictionary which reveals

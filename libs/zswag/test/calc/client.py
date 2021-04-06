@@ -36,37 +36,37 @@ def run(host, port):
     run_test(
         "Pass hex-encoded array in query",
         api.Integers([100, -200, 400]),
-        api.Calculator.Client.isum_method,
+        api.Calculator.Client.int_sum_method,
         300.)
 
     run_test(
         "Pass base64url-encoded byte array in path",
         api.Bytes([8, 16, 32, 64]),
-        api.Calculator.Client.bsum_method,
+        api.Calculator.Client.byte_sum_method,
         120.)
 
     run_test(
         "Pass base64-encoded long array in path",
         api.Integers([1, 2, 3, 4]),
-        api.Calculator.Client.imul_method,
+        api.Calculator.Client.int_mul_method,
         24.)
 
     run_test(
         "Pass float array in query.",
         api.Doubles([34.5, 2.]),
-        api.Calculator.Client.fmul_method,
+        api.Calculator.Client.float_mul_method,
         69.)
 
     run_test(
         "Pass bool array in query (expect false).",
         api.Bools([True, False]),
-        api.Calculator.Client.bmul_method,
+        api.Calculator.Client.bit_mul_method,
         False)
 
     run_test(
         "Pass bool array in query (expect true).",
         api.Bools([True, True]),
-        api.Calculator.Client.bmul_method,
+        api.Calculator.Client.bit_mul_method,
         True)
 
     run_test(

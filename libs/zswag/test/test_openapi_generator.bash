@@ -27,7 +27,8 @@ test_zs_path=$(python -m zswag.test.calc path)
 python -m zswag.gen \
   --service calculator.calculator.Calculator.Service \
   --path "$test_zs_path" \
-  --zs "$test_zs_path" \
-  --config get,path,flat \
+  --docs "$test_zs_path" \
+  --config get,path,flat bitMul:post,body \
+  --config identity:put \
   --output "$my_dir/.test.yaml"
-cmp -l "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_1.yaml"
+diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_1.yaml"

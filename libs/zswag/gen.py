@@ -13,12 +13,16 @@ from pyzswagcl import \
 from .reflect import make_instance_and_typeinfo, service_method_request_type, rgetattr
 from .doc import get_doc_str, IdentType, md_filter_definition
 
-HTTP_METHOD_TAGS = ("get","put","post","patch","delete")
+HTTP_METHOD_TAGS = ("get", "put", "post", "patch", "delete")
 PARAM_LOCATION_QUERY_TAG = "query"
 PARAM_LOCATION_BODY_TAG = "body"
 PARAM_LOCATION_PATH_TAG = "path"
 PARAM_LOCATION_TAGS = (PARAM_LOCATION_QUERY_TAG, PARAM_LOCATION_PATH_TAG, PARAM_LOCATION_BODY_TAG)
 FLATTEN_TAG = "flat"
+
+
+def argdoc(s: str):
+    return "\n"+inspect.cleandoc(s)+"\n\n"
 
 
 class MethodSchemaInfo:
@@ -54,14 +58,12 @@ class OpenApiSchemaGenerator:
         ), ".".join(service_name_parts[1:]))
         self.service_instance = self.service_type()
         self.config: Dict[str, Tuple[str, Optional[OAParamLocation], bool]] = dict()
-        self.config["*"] = ("post", None, False)
+        self.config["*"] = default_entry = ("post", None, False)
         self.output = output
         self.zs_pkg_path = zs
         if config:
             for entry in config:
-                entry_http_method = "post"
-                entry_param_loc: Optional[OAParamLocation] = None
-                entry_flatten = False
+                entry_http_method, entry_param_loc, entry_flatten = default_entry
                 method_name = "*"
                 parts = entry.split(":")
                 if len(parts) > 1:
@@ -79,7 +81,10 @@ class OpenApiSchemaGenerator:
                         assert entry_http_method != "get"
                     elif tag == FLATTEN_TAG:
                         entry_flatten = True
-                self.config[method_name] = (entry_http_method, entry_param_loc, entry_flatten)
+                entry = (entry_http_method, entry_param_loc, entry_flatten)
+                if method_name == "*":
+                    default_entry = entry
+                self.config[method_name] = entry
 
     def config_for_method(self, method_name: str) -> Tuple[str, OAParamLocation, bool]:
         if method_name in self.config:
@@ -161,8 +166,8 @@ class OpenApiSchemaGenerator:
                     fallback=[f"### struct {result.argtype}"])[0])
 
         # Generate parameter passing scheme
-        http_method, param_loc, flatten = self.config_for_method(method_name)
-        if param_loc is None and http_method.lower() != "get":
+        result.http_method, param_loc, flatten = self.config_for_method(method_name)
+        if param_loc is None and result.http_method.lower() != "get":
             result.parameters = {
                 "requestBody": {
                     "description": result.argdoc,
@@ -245,59 +250,72 @@ if __name__ == "__main__":
                         nargs=1,
                         required=True,
                         metavar="service-identifier",
-                        help=inspect.cleandoc("""
-                        Service class Python identifier. Example:
-                            -s my.package.ServiceClass.Service
+                        help=argdoc("""
+                        Service class Python identifier. Remember that
+                        your service identifier is preceded by an `api`
+                        python module, and succeeded by `.Service`.
+                        
+                        Example:
+                            -s my.package.api.ServiceClass.Service
                         """))
     parser.add_argument("-p", "--path",
                         nargs=1,
                         metavar="pythonpath-entry",
                         required=False,
-                        help=inspect.cleandoc("""
+                        help=argdoc("""
                         Path to *parent* directory of zserio Python package.
-                        Only needed if zserio Python package is not in Python
-                        environment. Example:
+                        Only needed if zserio Python package is not in the
+                        Python environment.
+                        
+                        Example:
                             -p path/to/python/package/parent
                         """))
     parser.add_argument("-c", "--config",
                         nargs="+",
                         metavar="openapi-tag-expression",
-                        help=inspect.cleandoc("""
-                            Configuration tags for a specific or all methods.
-                            The argument syntax follows this pattern:
-                                
-                                [(service-method-name):](comma-separated-tags)
-                                
-                            Note: The -c argument may be applied multiple times.
-                            The `comma-separated-tags` must be a list of tags
-                            which indicate OpenApi method generator preferences:
+                        help=argdoc("""
+                        Configuration tags for a specific or all methods.
+                        The argument syntax follows this pattern:
                             
-                            get|put|post|patch|delete : HTTP method tags
-                                      query|path|body : Parameter location tags
-                                                 flat : Flatten request object
-                                                        
-                            Note:
-                                * The http method defaults to `post`.
-                                * The parameter location defaults to `query` for
-                                  `get`, `body` otherwise.
-                                * The `flat` tag is only meaningful in conjunction
-                                  with `query` or `body`.
+                            [(service-method-name):](comma-separated-tags)
+                            
+                        Note: The -c argument may be applied multiple times.
+                        The `comma-separated-tags` must be a list of tags
+                        which indicate OpenApi method generator preferences:
+                        
+                        get|put|post|patch|delete : HTTP method tags
+                                  query|path|body : Parameter location tags
+                                             flat : Flatten request object
+                                                    
+                        Note:
+                            * The http method defaults to `post`.
+                            * The parameter location defaults to `query` for
+                              `get`, `body` otherwise.
+                            * The `flat` tag is only meaningful in conjunction
+                              with `query` or `path`.
+                            * An unspecific tag list (no service-method-name)
+                              affects the defaults only for following, not
+                              preceding specialized tag assignments.
+                              
+                        Example:
+                            -c post getLayerByTileId:get,flat,path
                         """),
                         action="append")
-    parser.add_argument("-z", "--zs", nargs=1, metavar="Zserio source directory",
-                        required=False, help=inspect.cleandoc("""
+    parser.add_argument("-d", "--docs", nargs=1, metavar="zserio-sources",
+                        required=False, help=argdoc("""
                         Zserio source directory from which documentation
                         should be extracted.
                         """))
     parser.add_argument("-o", "--output", nargs=1, type=FileType("w"), default=[sys.stdout],
-                        help="""
-                        Output file path. If not specified, the output will be written to stdout.
-                        """)
+                        help=argdoc("""
+                        Output file path. If not specified, the output will be
+                        written to stdout.
+                        """))
 
     args = parser.parse_args(sys.argv[1:])
     OpenApiSchemaGenerator(
         service=args.service[0],
         path=args.path[0] if args.path else None,
         config=[arg for args in args.config for arg in args],
-        zs=args.zs[0] if args.zs else None,
+        zs=args.docs[0] if args.docs else None,
         output=args.output[0]).generate()

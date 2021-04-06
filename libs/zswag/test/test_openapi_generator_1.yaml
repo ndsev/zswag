@@ -11,21 +11,16 @@ info:
   version: TODO
 openapi: 3.0.0
 paths:
-  /bmul/{values}:
+  /bitMul:
     post:
       description: ''
-      operationId: bmul
-      parameters:
-      - description: Member of Unknown.
-        in: path
-        name: values
-        required: true
-        schema:
-          format: string
-          items:
-            type: string
-          type: array
-        x-zserio-request-part: values
+      operationId: bitMul
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+        description: ''
       responses:
         '200':
           content:
@@ -35,10 +30,10 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /bsum/{values}:
-    post:
+  /byteSum/{values}:
+    get:
       description: ''
-      operationId: bsum
+      operationId: byteSum
       parameters:
       - description: Member of Unknown.
         in: path
@@ -60,7 +55,7 @@ paths:
           description: ''
       summary: ''
   /concat/{values}:
-    post:
+    get:
       description: ''
       operationId: concat
       parameters:
@@ -83,10 +78,10 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /fmul/{values}:
-    post:
+  /floatMul/{values}:
+    get:
       description: ''
-      operationId: fmul
+      operationId: floatMul
       parameters:
       - description: Member of Unknown.
         in: path
@@ -108,7 +103,7 @@ paths:
           description: ''
       summary: ''
   /identity/{value}:
-    post:
+    put:
       description: ''
       operationId: identity
       parameters:
@@ -129,10 +124,10 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /imul/{values}:
-    post:
+  /intMul/{values}:
+    get:
       description: ''
-      operationId: imul
+      operationId: intMul
       parameters:
       - description: Member of Unknown.
         in: path
@@ -153,10 +148,10 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /isum/{values}:
-    post:
+  /intSum/{values}:
+    get:
       description: ''
-      operationId: isum
+      operationId: intSum
       parameters:
       - description: Member of Unknown.
         in: path
@@ -178,7 +173,7 @@ paths:
           description: ''
       summary: ''
   /power/{base-value}/{exponent-value}/{unused1}/{unused2}/{unused3}/{unused5}:
-    post:
+    get:
       description: ''
       operationId: power
       parameters:
