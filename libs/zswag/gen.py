@@ -10,7 +10,11 @@ from pyzswagcl import \
     ZSERIO_REQUEST_PART_WHOLE, \
     ZSERIO_REQUEST_PART
 
-from .reflect import make_instance_and_typeinfo, service_method_request_type, rgetattr
+from .reflect import \
+    make_instance_and_typeinfo, \
+    service_method_request_type, \
+    rgetattr, \
+    UnsupportedArrayParameterError
 from .doc import get_doc_str, IdentType, md_filter_definition
 
 HTTP_METHOD_TAGS = ("get", "put", "post", "patch", "delete")
@@ -19,6 +23,7 @@ PARAM_LOCATION_BODY_TAG = "body"
 PARAM_LOCATION_PATH_TAG = "path"
 PARAM_LOCATION_TAGS = (PARAM_LOCATION_QUERY_TAG, PARAM_LOCATION_PATH_TAG, PARAM_LOCATION_BODY_TAG)
 FLATTEN_TAG = "flat"
+BLOB_TAG = "blob"
 
 
 def argdoc(s: str):
@@ -81,6 +86,8 @@ class OpenApiSchemaGenerator:
                         assert entry_http_method != "get"
                     elif tag == FLATTEN_TAG:
                         entry_flatten = True
+                    elif tag == BLOB_TAG:
+                        entry_flatten = False
                 entry = (entry_http_method, entry_param_loc, entry_flatten)
                 if method_name == "*":
                     default_entry = entry
@@ -180,53 +187,18 @@ class OpenApiSchemaGenerator:
                     }
                 }
             }
-        elif flatten:
-            _, field_type_info = make_instance_and_typeinfo(
-                service_method_request_type(
-                    self.service_instance, method_name))
-            param_loc_str = "query"
-            if param_loc is OAParamLocation.PATH:
-                param_loc_str = "path"
-                for field_name in field_type_info:
-                    result.path += f"/{{{field_name.replace('.', '-')}}}"
-            result.parameters = {
-                "parameters": [
-                    {
-                        "in": param_loc_str,
-                        "name": field_name.replace('.', '-'),
-                        "description": f"Member of {result.argtype}.",
-                        "required": True,
-                        **(
-                            {"allowEmptyValue": True} if param_loc is OAParamLocation.QUERY else {}
-                        ),
-                        ZSERIO_REQUEST_PART: field_name,
-                        "schema": {
-                            "format": "string",
-                            **(
-                                {
-                                    "type": "array",
-                                    "format": "string",
-                                    "items": {
-                                        "type": "string"
-                                    }
-                                }
-                                if type(field_type) is list else
-                                {
-                                    "type": "string",
-                                    "format": "string",
-                                }
-                            )
-                        }
-                    }
-                    for field_name, field_type in field_type_info.items()
-                ]
-            }
-        else:
-            param_loc_str = "query"
-            if param_loc is OAParamLocation.PATH:
-                param_loc_str = "path"
-                result.argdoc += "/{requestData}"
-            result.parameters = [{
+            return result
+
+        if flatten:
+            if self.generate_method_info_parameters_flat(result, param_loc):
+                return result
+
+        param_loc_str = "query"
+        if param_loc is OAParamLocation.PATH:
+            param_loc_str = "path"
+            result.path += "/{requestData}"
+        result.parameters = {
+            "parameters": [{
                 "in": param_loc_str,
                 "name": "requestData",
                 "description": result.argdoc,
@@ -237,8 +209,58 @@ class OpenApiSchemaGenerator:
                     "format": "byte"
                 }
             }]
-
+        }
         return result
+
+    def generate_method_info_parameters_flat(self,
+                                             result: MethodSchemaInfo,
+                                             param_loc: Optional[OAParamLocation]) -> bool:
+        try:
+            _, field_type_info = make_instance_and_typeinfo(
+                service_method_request_type(
+                    self.service_instance, result.name))
+        except UnsupportedArrayParameterError as e:
+            print(UnsupportedArrayParameterError(e.member_name, e.member_type, result.name))
+            return False
+
+        param_loc_str = "query"
+        if param_loc is OAParamLocation.PATH:
+            param_loc_str = "path"
+            for field_name in field_type_info:
+                result.path += f"/{{{field_name.replace('.', '-')}}}"
+        result.parameters = {
+            "parameters": [
+                {
+                    "in": param_loc_str,
+                    "name": field_name.replace('.', '-'),
+                    "description": f"Member of {result.argtype}.",
+                    "required": True,
+                    **(
+                        {"allowEmptyValue": True} if param_loc is OAParamLocation.QUERY else {}
+                    ),
+                    ZSERIO_REQUEST_PART: field_name,
+                    "schema": {
+                        "format": "string",
+                        **(
+                            {
+                                "type": "array",
+                                "format": "string",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                            if type(field_type) is list else
+                            {
+                                "type": "string",
+                                "format": "string",
+                            }
+                        )
+                    }
+                }
+                for field_name, field_type in field_type_info.items()
+            ]
+        }
+        return True
 
 
 if __name__ == "__main__":
@@ -285,7 +307,8 @@ if __name__ == "__main__":
                         
                         get|put|post|patch|delete : HTTP method tags
                                   query|path|body : Parameter location tags
-                                             flat : Flatten request object
+                                        flat|blob : Flatten request object,
+                                                    or pass it as whole blob.
                                                     
                         Note:
                             * The http method defaults to `post`.
