@@ -73,15 +73,15 @@ service Calculator
 {
     Double power(BaseAndExponent);
 
-    Double isum(Integers);
+    Double intSum(Integers);
 
-    Double bsum(Bytes);
+    Double byteSum(Bytes);
 
-    Double imul(Integers);
+    Double intMul(Integers);
 
-    Double fmul(Doubles);
+    Double floatMul(Doubles);
 
-    Bool bmul(Bools);
+    Bool bitMul(Bools);
 
     Double identity(Double);
 

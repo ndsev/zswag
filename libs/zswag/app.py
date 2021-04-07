@@ -1,39 +1,33 @@
 import connexion
 import os
-import yaml
 import inspect
 import zserio
-import base64
 import sys
-from types import ModuleType
+import yaml
 from typing import Type
 
 from pyzswagcl import \
     parse_openapi_config, \
-    OAMethod, \
-    OAParamFormat, \
-    ZSERIO_OBJECT_CONTENT_TYPE, \
-    ZSERIO_REQUEST_PART_WHOLE, \
-    ZSERIO_REQUEST_PART
+    OAMethod
 
-from .request import request_object_blob
-from .doc import get_doc_str, IdentType, md_filter_definition
+from .reflect import request_object_blob, service_method_request_type, to_snake
 
 # Name of variable that is added to controller
+# to hold the service instance.
 CONTROLLER_SERVICE_INSTANCE = "_service"
 
 
-class MethodInfo:
-    """
-    (Private) Return value of Server._method_info()
-    """
-    def __init__(self, *, name, docstring="", returntype="", argtype="", returndoc="", argdoc=""):
-        self.name = name
-        self.docstring = docstring
-        self.returntype = returntype
-        self.argtype = argtype
-        self.returndoc = returndoc
-        self.argdoc = argdoc
+# Utility function for slash conversion in format strings
+def to_slashes(s: str):
+    return s.replace("\\", "/")
+
+
+# Raised if the controller passed to OAServer is missing a function
+class IncompleteSchemaError(RuntimeError):
+    def __init__(self, schema_path: str, fn_name: str):
+        super(IncompleteSchemaError, self).__init__(f"Missing operation `{fn_name}` in {schema_path}!")
+        self.schema_path = schema_path
+        self.fn_name = fn_name
 
 
 class OAServer(connexion.App):
@@ -114,26 +108,50 @@ class OAServer(connexion.App):
 
         # Verify or generate yaml file
         if not os.path.isfile(yaml_path):
-            self.generate_openapi_schema()
+            print("\n" + inspect.cleandoc(f"""
+                ERROR: File does not exist: {yaml_path}
+                ----------------------------{"-"*len(yaml_path)}
+                
+                You can generate the file by running ...
+                    
+                    python -m zswag.gen \\
+                        --service {self.service_type.__module__}.{self.service_type.__qualname__} \\
+                        --path "{
+                            to_slashes(os.path.abspath(os.path.dirname(os.path.dirname(
+                                __import__(self.service_type.__module__.split('.')[0]).__file__
+                            ))))
+                        }" \\
+                        --config get,query,flat \\
+                        --output "{to_slashes(yaml_path)}"
+                        
+                    Optional:
+                        --docs "<original zserio source path for docs extraction>"
+                        
+                    The --config argument is a comma-separated list of tags
+                    to specify OpenAPI options. For more info, please run
+                    
+                        python -m zswag.gen --help
+            """))
+            exit(1)
+
         self.spec = parse_openapi_config(yaml_path)
         self.verify_openapi_schema()
 
         # Re-route service impl methods
         for method_name in self.service_instance.METHOD_NAMES:
-            user_function = getattr(self.controller, method_name)
-            zserio_modem_function = getattr(self.service_instance, f"_{method_name}_method")
-            zserio_impl_function = getattr(self.service_instance, f"_{method_name}_impl")
-            request_type = zserio_impl_function.__func__.__annotations__["request"]
-            assert inspect.isclass(request_type)
+            method_snake_name = to_snake(method_name)
+            user_function = getattr(self.controller, method_snake_name)
+            zserio_modem_function = getattr(self.service_instance, f"_{method_snake_name}_method")
+            request_type = service_method_request_type(self.service_instance, method_name)
             assert zserio_modem_function
 
             if not user_function or not inspect.isfunction(user_function):
-                print(f"WARNING: The controller {self.controller_path} does not implement {method_name}!")
+                print(f"WARNING: The controller {self.controller_path} does not implement {method_snake_name}!")
                 continue
 
-            print(f"Found {self.controller_path}.{method_name}.")
+            print(f"Found {self.controller_path}.{method_snake_name}.")
             if len(inspect.signature(user_function).parameters) != 1:
-                print(f"ERROR: {self.controller_path}.{method_name} must have single 'request' parameter!")
+                print(f"ERROR: {self.controller_path}.{method_snake_name} must have single 'request' parameter!")
                 continue
 
             method_spec: OAMethod = self.spec[method_name]
@@ -148,7 +166,15 @@ class OAServer(connexion.App):
 
             def method_impl(request, ctx=None, fun=user_function):
                 return fun(request)
-            setattr(self.service_instance, f"_{method_name}_impl", method_impl)
+            setattr(self.service_instance, f"_{method_snake_name}_impl", method_impl)
+
+        # Load spec and inject openapi-router-controller
+        print(f"Loading spec from {yaml_path} ...")
+        with open(yaml_path, 'r') as swagger_file:
+            openapi = yaml.load(swagger_file, Loader=yaml.FullLoader)
+        for _, path_spec in openapi["paths"].items():
+            for _, method_spec in path_spec.items():
+                method_spec["x-openapi-router-controller"] = self.service_instance_path
 
         # Initialise connexion app
         super(OAServer, self).__init__(
@@ -157,94 +183,12 @@ class OAServer(connexion.App):
 
         # Add the API according to the verified yaml spec.
         self.add_api(
-            yaml_basename,
+            openapi,
             arguments={"title": f"REST API for {service_type.__name__}"},
             pythonic_params=False)
 
     def verify_openapi_schema(self):
         for method_name in self.service_instance.METHOD_NAMES:
-            assert method_name in self.spec
+            if method_name not in self.spec:
+                raise IncompleteSchemaError(self.yaml_path, method_name)
 
-    def generate_openapi_schema(self):
-        print(f"NOTE: Writing OpenApi schema to {self.yaml_path}")
-        service_name_parts = self.service_instance.SERVICE_FULL_NAME.split(".")
-        schema = {
-            "openapi": "3.0.0",
-            "info": {
-                "title": ".".join(service_name_parts[1:]),
-                "description": md_filter_definition(get_doc_str(
-                    ident_type=IdentType.SERVICE,
-                    pkg_path=self.zs_pkg_path,
-                    ident=self.service_instance.SERVICE_FULL_NAME,
-                    fallback=[f"REST API for {self.service_instance.SERVICE_FULL_NAME}"]
-                )[0]),
-                "contact": {
-                    "email": "TODO"
-                },
-                "license": {
-                    "name": "TODO"
-                },
-                "version": "TODO",
-            },
-            "servers": [],
-            "paths": {
-                f"/{method_info.name}": {
-                    "post": {
-                        "summary": method_info.docstring,
-                        "description": method_info.docstring,
-                        "operationId": method_info.name,
-                        "requestBody": {
-                            "description": method_info.argdoc,
-                            "content": {
-                                ZSERIO_OBJECT_CONTENT_TYPE: {
-                                    "schema": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        },
-                        "responses": {
-                            "200": {
-                                "description": method_info.returndoc,
-                                "content": {
-                                    "application/octet-stream": {
-                                        "schema": {
-                                            "type": "string",
-                                            "format": "binary"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "x-openapi-router-controller": self.service_instance_path
-                    },
-                } for method_info in (self._method_info(method_name) for method_name in self.service_instance.METHOD_NAMES)
-            }
-        }
-        with open(self.yaml_path, "w") as yaml_file:
-            yaml.dump(schema, yaml_file, default_flow_style=False)
-
-    def _method_info(self, method_name: str) -> MethodInfo:
-        result = MethodInfo(name=method_name)
-        if not self.zs_pkg_path:
-            return result
-        doc_strings = get_doc_str(
-            ident_type=IdentType.RPC,
-            pkg_path=self.zs_pkg_path,
-            ident=f"{self.service_instance.SERVICE_FULL_NAME}.{method_name}")
-        if not doc_strings:
-            return result
-        result.docstring = doc_strings[0]
-        result.returntype = doc_strings[1]
-        result.argtype = doc_strings[2]
-        result.returndoc = md_filter_definition(get_doc_str(
-            ident_type=IdentType.STRUCT,
-            pkg_path=self.zs_pkg_path,
-            ident=result.returntype,
-            fallback=[f"### struct {result.returntype}"])[0])
-        result.argdoc = md_filter_definition(get_doc_str(
-            ident_type=IdentType.STRUCT,
-            pkg_path=self.zs_pkg_path,
-            ident=result.argtype,
-            fallback=[f"### struct {result.argtype}"])[0])
-        return result

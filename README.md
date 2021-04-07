@@ -180,6 +180,9 @@ About the `format` specifier value:
   The `base64url` option indicates URL-safe Base64 format.
 * The `hex` encoding produces a hexadecimal encoding of the request blob.
 
+**Note:** When a value is passed with `in=path`, it **must not be empty**.
+This holds true for strings and bytes, but also for arrays (see below).
+
 #### Option 🌟4: Zserio request part, single value
 
 ```yaml

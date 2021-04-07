@@ -1,0 +1,239 @@
+info:
+  contact:
+    email: TODO
+  description: '### Calculator Service
+
+
+    Check out these sweet docs.'
+  license:
+    name: TODO
+  title: Calculator
+  version: TODO
+openapi: 3.0.0
+paths:
+  /bitMul:
+    post:
+      description: ''
+      operationId: bitMul
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+        description: ''
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /byteSum/{values}:
+    get:
+      description: ''
+      operationId: byteSum
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /concat/{values}:
+    get:
+      description: ''
+      operationId: concat
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /floatMul/{values}:
+    get:
+      description: ''
+      operationId: floatMul
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /identity/{value}:
+    put:
+      description: ''
+      operationId: identity
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: value
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: value
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /intMul/{values}:
+    get:
+      description: ''
+      operationId: intMul
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /intSum/{values}:
+    get:
+      description: ''
+      operationId: intSum
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: values
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: values
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /power/{base-value}/{exponent-value}/{unused1}/{unused2}/{unused3}/{unused5}:
+    get:
+      description: ''
+      operationId: power
+      parameters:
+      - description: Member of Unknown.
+        in: path
+        name: base-value
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: base.value
+      - description: Member of Unknown.
+        in: path
+        name: exponent-value
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: exponent.value
+      - description: Member of Unknown.
+        in: path
+        name: unused1
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: unused1
+      - description: Member of Unknown.
+        in: path
+        name: unused2
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: unused2
+      - description: Member of Unknown.
+        in: path
+        name: unused3
+        required: true
+        schema:
+          format: string
+          type: string
+        x-zserio-request-part: unused3
+      - description: Member of Unknown.
+        in: path
+        name: unused5
+        required: true
+        schema:
+          format: string
+          items:
+            type: string
+          type: array
+        x-zserio-request-part: unused5
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+servers: []

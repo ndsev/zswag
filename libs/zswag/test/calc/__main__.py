@@ -1,6 +1,5 @@
 import zswag
 import sys
-from os.path import dirname, abspath
 
 from zswag.test.calc import working_dir
 import zswag.test.calc.client as client
@@ -19,5 +18,7 @@ elif mode == "server":
         yaml_path=working_dir+"/api.yaml",
         zs_pkg_path=working_dir)
     app.run(host=host, port=port)
+elif mode == "path":
+    print(working_dir)
 else:
     print("Usage: python3 -m calc {server|client} [host:port]")

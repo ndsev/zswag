@@ -9,7 +9,7 @@ python3 -m venv "$venv"
 source "$venv/$activate_path"
 python -m pip install -U pip
 
-trap 'echo "→ Killing $(jobs -p)"; kill $(jobs -p); echo "→ Removing $venv"; rm -rf "$venv"' EXIT
+trap 'echo "→ Removing $venv"; rm -rf "$venv"' EXIT
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -19,20 +19,16 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
-    -b|--background)
-      echo "→ Launching $2 ..."
-      $2 &
-      sleep 2
-      shift
-      shift
-      ;;
-    -f|--foreground)
-      echo "→ Starting $2 ..."
-      $2
-      shift
-      shift
-      ;;
   esac
 done
 
-exit 0
+test_zs_path=$(python -m zswag.test.calc path)
+
+python -m zswag.gen \
+  --service calculator.calculator.Calculator.Service \
+  --path "$test_zs_path" \
+  --docs "$test_zs_path" \
+  --config get,path,flat bitMul:post,body \
+  --config identity:put \
+  --output "$my_dir/.test.yaml"
+diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_1.yaml"

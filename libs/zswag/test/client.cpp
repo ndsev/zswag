@@ -56,7 +56,7 @@ int main (int argc, char* argv[]) {
     }, 8., "Pass fields in path and query");
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.isum")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.intSum")->call(
             zsrClient,
             zsr::make(zsr::packages(), "calculator.Integers", {
                 {"values", std::vector{100, -200, 400}}
@@ -64,7 +64,7 @@ int main (int argc, char* argv[]) {
     }, 300., "Pass hex-encoded array in query");
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bsum")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.byteSum")->call(
             zsrClient,
             zsr::make(zsr::packages(), "calculator.Bytes", {
                     {"values", std::vector<uint8_t>{8, 16, 32, 64}}
@@ -72,7 +72,7 @@ int main (int argc, char* argv[]) {
     }, 120., "Pass base64url-encoded byte array in path");
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.imul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.intMul")->call(
             zsrClient,
             zsr::make(zsr::packages(), "calculator.Integers", {
                 {"values", std::vector{1, 2, 3, 4}}
@@ -80,7 +80,7 @@ int main (int argc, char* argv[]) {
     }, 24., "Pass base64-encoded long array in path");
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.fmul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.floatMul")->call(
             zsrClient,
             zsr::make(zsr::packages(), "calculator.Doubles", {
                     {"values", std::vector<double>{34.5, 2.}}
@@ -88,7 +88,7 @@ int main (int argc, char* argv[]) {
     }, 69., "Pass float array in query.");
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bmul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bitMul")->call(
             zsrClient,
             zsr::make(zsr::packages(), "calculator.Bools", {
                 {"values", std::vector<bool>{true, false}}
@@ -96,7 +96,7 @@ int main (int argc, char* argv[]) {
     }, false, "Pass bool array in query (expect false).");
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bmul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bitMul")->call(
             zsrClient,
             zsr::make(zsr::packages(), "calculator.Bools", {
                     {"values", std::vector<bool>{true, true}}

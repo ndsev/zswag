@@ -34,10 +34,9 @@ paths:
               schema:
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
   /isum:
     get:
-      operationId: isum
+      operationId: intSum
       parameters:
         - in: query
           name: values
@@ -58,10 +57,9 @@ paths:
                 format: binary
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
   /bsum/{values}:
     get:
-      operationId: bsum
+      operationId: byteSum
       parameters:
         - in: path
           name: values
@@ -81,10 +79,9 @@ paths:
                 format: binary
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
   /imul/{values}:
     get:
-      operationId: imul
+      operationId: intMul
       parameters:
         - in: path
           name: values
@@ -105,10 +102,9 @@ paths:
                 format: binary
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
   /fmul:
     get:
-      operationId: fmul
+      operationId: floatMul
       parameters:
         - in: query
           name: values
@@ -129,10 +125,9 @@ paths:
                 format: binary
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
   /bmul:
     get:
-      operationId: bmul
+      operationId: bitMul
       parameters:
         - in: query
           name: values
@@ -152,7 +147,6 @@ paths:
                 format: binary
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
   /identity:
     post:
       operationId: identity
@@ -170,7 +164,6 @@ paths:
                 format: binary
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
   /concat:
     get:
       operationId: concat
@@ -193,6 +186,5 @@ paths:
                 format: binary
                 type: string
       summary: ''
-      x-openapi-router-controller: zswag.test.calc.server._service
 
 servers: []

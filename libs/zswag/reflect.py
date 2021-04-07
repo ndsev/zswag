@@ -3,10 +3,31 @@ import base64
 import zserio
 import struct
 import functools
-from typing import Type, Tuple, Any, Dict, Union, get_args, get_origin, List
+from typing import Type, Tuple, Any, Dict, Union, Optional, get_args, get_origin, List
 from pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOLE
+from re import compile as re
 
-NoneType = type(None)
+NONE_T = type(None)
+BUILTIN_T = (bool, int, float, str)
+
+
+class UnsupportedArrayParameterError(RuntimeError):
+    def __init__(self, member_name: str, member_type: str, method_name: str = ""):
+        super(UnsupportedArrayParameterError, self).__init__("\n" + inspect.cleandoc(f"""
+        WARNING: Generating method `{method_name or 'unknown'}`:
+        ----------------------------{"-"*len(method_name or 'unknown')}--
+        
+            The request must be passed as a blob, since the array
+            member `{member_name}` has compound
+            type `{member_type}`.
+            
+            Please add the following argument to zswag.gen:
+                
+                -c {method_name}:blob
+        """))
+        self.member_name = member_name
+        self.member_type = member_type
+
 
 # TODO: Booleans?
 # Table here: https://docs.python.org/3/library/struct.html#format-characters
@@ -31,10 +52,43 @@ def rsetattr(obj, attr, val):
     return setattr(rgetattr(obj, pre) if pre else obj, post, val)
 
 
+# Recursive getattr function, adopted from SO:
+#  https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-subobjects-chained-properties
 def rgetattr(obj, attr, *args):
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
     return functools.reduce(_getattr, [obj] + attr.split('.'))
+
+
+# Get the request type for a zserio service method.
+def service_method_request_type(service_instance: Any, method_name: str) -> Type:
+    zserio_impl_function = getattr(service_instance, f"_{to_snake(method_name)}_impl")
+    result = zserio_impl_function.__func__.__annotations__["request"]
+    assert inspect.isclass(result)
+    return result
+
+
+# Adopted from zserio PythonSymbolConverter
+def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"))):
+    for p in patterns:
+        s = p.sub(r"\1_\2", s)
+    return s.lower()
+
+
+# Zserio compound object init params are typed as Union[Nested, None].
+# We determine whether Nested is a zserio struct type or an atomic builtin
+# type (int, float etc.) and return either (None, builtin_type) or
+# (zserio_struct_type, None). Otherwise return (None, None).
+def unpack_zserio_arg_type(t: Type) -> Tuple[Optional[Type], Optional[Type]]:
+    if get_origin(t) is Union:
+        union_args = get_args(t)
+        if len(union_args) == 2 and union_args[1] is NONE_T:
+            result = union_args[0]
+            if result in BUILTIN_T:
+                return None, result
+            if inspect.isclass(result):
+                return result, None
+    return None, None
 
 
 # Returns a class instance and a dictionary which reveals
@@ -48,20 +102,24 @@ def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict
     # must always exist. We infer the nested object types from the constructor-
     # params: Nested object init params are typed as Union[Nested, None]. We then
     # instantiate the child object's type and assign it to the parent member.
-    for arg_name, arg_type in result_instance.__init__.__func__.__annotations__.items():
-        if arg_name.endswith("_"):
-            field_name: str = arg_name.strip('_')
-            if get_origin(arg_type) is Union:
-                union_args = get_args(arg_type)
-                if len(union_args) == 2 and inspect.isclass(union_args[0]) and union_args[1] is NoneType:
+    if hasattr(result_instance.__init__, "__func__"):
+        for arg_name, arg_type in result_instance.__init__.__func__.__annotations__.items():
+            if arg_name.endswith("_"):
+                field_name: str = arg_name.strip('_')
+                compound_type, atomic_type = unpack_zserio_arg_type(arg_type)
+                if compound_type:
                     instance, member_types = make_instance_and_typeinfo(
-                        union_args[0], field_name_prefix+field_name+".")
+                        compound_type, field_name_prefix+field_name+".")
                     setattr(result_instance, f"_{field_name}_", instance)
                     result_member_types.update(member_types)
                     continue
-            elif get_origin(arg_type) is list:
-                arg_type = [get_args(arg_type)[0]]
-            result_member_types[field_name_prefix+field_name] = arg_type
+                elif atomic_type:
+                    arg_type = atomic_type
+                elif get_origin(arg_type) is list:
+                    arg_type = [get_args(arg_type)[0]]
+                    if arg_type[0] not in BUILTIN_T:
+                        raise UnsupportedArrayParameterError(field_name_prefix+field_name, arg_type[0].__name__)
+                result_member_types[field_name_prefix+field_name] = arg_type
     return result_instance, result_member_types
 
 
