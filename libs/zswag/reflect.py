@@ -8,7 +8,7 @@ from pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOL
 from re import compile as re
 
 NONE_T = type(None)
-BUILTIN_T = (bool, int, float, str)
+SCALAR_T = (bool, int, float, str)
 
 
 class UnsupportedArrayParameterError(RuntimeError):
@@ -29,7 +29,6 @@ class UnsupportedArrayParameterError(RuntimeError):
         self.member_type = member_type
 
 
-# TODO: Booleans?
 # Table here: https://docs.python.org/3/library/struct.html#format-characters
 C_STRUCT_LITERAL_PER_TYPE_AND_SIZE: Dict[Tuple[type, int], str] = {
     (bool, 1): "!b",
@@ -76,15 +75,15 @@ def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"
 
 
 # Zserio compound object init params are typed as Union[Nested, None].
-# We determine whether Nested is a zserio struct type or an atomic builtin
-# type (int, float etc.) and return either (None, builtin_type) or
+# We determine whether Nested is a zserio struct type or a scalar builtin
+# type (int, float etc.) and return either (None, scalar_type) or
 # (zserio_struct_type, None). Otherwise return (None, None).
 def unpack_zserio_arg_type(t: Type) -> Tuple[Optional[Type], Optional[Type]]:
     if get_origin(t) is Union:
         union_args = get_args(t)
         if len(union_args) == 2 and union_args[1] is NONE_T:
             result = union_args[0]
-            if result in BUILTIN_T:
+            if result in SCALAR_T:
                 return None, result
             if inspect.isclass(result):
                 return result, None
@@ -92,7 +91,7 @@ def unpack_zserio_arg_type(t: Type) -> Tuple[Optional[Type], Optional[Type]]:
 
 
 # Returns a class instance and a dictionary which reveals
-# recursive type information for array/built-in-typed zserio struct members.
+# recursive type information for scalar-(array-)typed zserio struct members.
 def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict[str, Any]]:
     result_instance: t = t()
     result_member_types: Dict[str, Any] = {}
@@ -106,18 +105,18 @@ def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict
         for arg_name, arg_type in result_instance.__init__.__func__.__annotations__.items():
             if arg_name.endswith("_"):
                 field_name: str = arg_name.strip('_')
-                compound_type, atomic_type = unpack_zserio_arg_type(arg_type)
+                compound_type, scalar_type = unpack_zserio_arg_type(arg_type)
                 if compound_type:
                     instance, member_types = make_instance_and_typeinfo(
                         compound_type, field_name_prefix+field_name+".")
                     setattr(result_instance, f"_{field_name}_", instance)
                     result_member_types.update(member_types)
                     continue
-                elif atomic_type:
-                    arg_type = atomic_type
+                elif scalar_type:
+                    arg_type = scalar_type
                 elif get_origin(arg_type) is list:
                     arg_type = [get_args(arg_type)[0]]
-                    if arg_type[0] not in BUILTIN_T:
+                    if arg_type[0] not in SCALAR_T:
                         raise UnsupportedArrayParameterError(field_name_prefix+field_name, arg_type[0].__name__)
                 result_member_types[field_name_prefix+field_name] = arg_type
     return result_instance, result_member_types
@@ -163,7 +162,7 @@ def parse_param_values(param: OAParam, target_type: Type, value: List[str]) -> L
 # and an OpenAPI method path spec.
 def request_object_blob(*, req_t: Type, spec: OAMethod, **kwargs) -> bytes:
     # Lazy instantiation of request object and type info
-    req: Union[req_t, None] = None
+    req: Optional[req_t] = None
     req_field_types: Dict = {}
 
     # Apply parameters

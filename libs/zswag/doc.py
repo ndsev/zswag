@@ -32,7 +32,6 @@ SERVICE_PATTERN = r"""
 """
 
 
-
 class IdentType(Enum):
     """
     Use these enum entries with `get_doc_str()`.

@@ -1,11 +1,12 @@
 import setuptools
 import sys
+import codecs
 
 # Read first argument as version, pass rest on to setuptools
 VERSION = sys.argv[1]
 del sys.argv[1]
 
-with open("README.md", "r") as fh:
+with codecs.open("README.md", "r", "utf-8") as fh:
     long_description = fh.read()
 
 required_url = []

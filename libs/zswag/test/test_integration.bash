@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
     -b|--background)
       echo "→ Launching $2 ..."
       $2 &
-      sleep 2
+      sleep 5
       shift
       shift
       ;;
