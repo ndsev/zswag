@@ -53,9 +53,13 @@ def rsetattr(obj, attr, val):
 
 # Recursive getattr function, adopted from SO:
 #  https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-subobjects-chained-properties
-def rgetattr(obj, attr, *args):
+def rgetattr(obj, attr):
     def _getattr(obj, attr):
-        return getattr(obj, attr, *args)
+        if not hasattr(obj, attr):
+            raise RuntimeError(
+                f"\nERROR: `{attr}` does not exist not in {obj.__name__}; choices are ..." +
+                "".join("  \n* "+choice for choice in dir(obj) if not choice.startswith("__")))
+        return getattr(obj, attr)
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 

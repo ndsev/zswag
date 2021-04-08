@@ -1,6 +1,8 @@
 # Zswag
 
 [![CI](https://github.com/Klebert-Engineering/zswag/actions/workflows/cmake.yml/badge.svg)](https://github.com/Klebert-Engineering/zswag/actions/workflows/cmake.yml)
+[![Release](https://img.shields.io/github/release/Klebert-Engineering/zswag)](https://GitHub.com/Klebert-Engineering/zswag/releases/)
+[![License](https://img.shields.io/github/license/klebert-engineering/zswag)](https://github.com/Klebert-Engineering/zswag/blob/master/LICENSE)
 
 zswag is a set of libraries for using/hosting zserio services through OpenAPI.
 
@@ -10,13 +12,14 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Setup](#setup)
     + [For Python Users](#for-python-users)
     + [For C++ Users](#for-c-users)
-  * [Server Component (Python)](#server-component-python)
+  * [OpenAPI Generator CLI](#openapi-generator-cli)
+    + [Generator Usage Example](#generator-usage-example)
+    + [Documentation extraction](#documentation-extraction)
+  * [Server Component (Python)](#server-component)
   * [Using the Python Client](#using-the-python-client)
   * [C++ Client](#c-client)
-  * [OpenAPI Generator CLI](#openapi-generator-cli)
-    + [Documentation extraction](#documentation-extraction)
   * [HTTP Proxies and Authentication](#http-proxies-and-authentication)
-  * [UI](#ui)
+  * [Swagger User Interface](#swagger-user-interface)
   * [OpenAPI Options Interoperability](#openapi-options-interoperability)
     + [HTTP method](#http-method)
     + [Request Body](#request-body)
@@ -38,15 +41,15 @@ The following UML diagram provides a more in-depth overview:
 
 Here are some brief descriptions of the main components:
 
-* `zswagcl` is a C++ Library which exposes the zserio OpenApi service client `ZsrClient`
+* `zswagcl` is a C++ Library which exposes the zserio OpenAPI service client `ZsrClient`
   as well as the more generic `OpenApiClient` and `OpenApiConfig` classes
   which are reused in Python.
 * `zswag` is a Python Library which provides both a zserio Python service client
-  (`OAClient`) as well as a zserio-OpenApi server layer based on Flask/Connexion
-  (`OAServer`). It also contains the command-line tool `zswag.gen` to generate
-  valid OpenAPI specs from zserio Python service classes.
+  (`OAClient`) as well as a zserio-OpenAPI server layer based on Flask/Connexion
+  (`OAServer`). It also contains the command-line tool `zswag.gen`, which can be
+  used to generate an OpenAPI specification from a zserio Python service class.
 * `pyzswagcl` is a binding library which exposes the C++-based OpenApi
-  pasrsing/request functionality to Python. Please consider it "internal".
+  parsing/request functionality to Python. Please consider it "internal".
 * `httpcl` is a wrapper around the [cpp-httplib](https://github.com/yhirose/cpp-httplib),
   and http request configuration and secret injection abilities.
   
@@ -54,10 +57,11 @@ Here are some brief descriptions of the main components:
 
 ### For Python Users
 
-Simply run `pip install zswag`. **Note: This currently only works with
-64-bit Python 3.8 or 3.9. Also, make sure that your `pip --version` is greater
-than 19.3.**
+Simply run `pip install zswag`. **Note: This only works with ...**
 
+* 64-bit Python 3.8.x, `pip --version` >= 19.3
+* 64-bit Python 3.9.x, `pip --version` >= 19.3
+ 
 ### For C++ Users
 
 Using CMake, you can ...
@@ -82,207 +86,6 @@ wheels under `build/bin/wheel`.
 cd build && ctest --verbose
 ```
 
-## Server Component (Python)
-
-The `OAServer` component gives you the power to marry a zserio-generated app
-server class with a user-written app controller and a fitting OpenAPI specification.
-It is based on [Flask](https://flask.palletsprojects.com/en/1.1.x/) and
-[Connexion](https://connexion.readthedocs.io/en/latest/).
-
-### Integration Example
-
-Let's consider the following zserio service saved under `myapp/service.zs`:
-
-```
-package service;
-
-struct Request {
-  int32 value;
-};
-
-struct Response {
-  int32 value;
-};
-
-service MyService {
-  Response my_api(Request);
-};
-```
-
-**Note:** `myapp` must be available as a module (it must be
-possible to `import myapp`). We recommend to run the zserio Python generator
-invocation inside the `myapp` module's `__init__.py`:
-
-```py
-import zserio
-from os.path import dirname, abspath
-
-working_dir = dirname(abspath(__file__))
-zserio.generate(
-  zs_dir=working_dir,
-  main_zs_file="service.zs",
-  gen_dir=working_dir)
-```
-
-A server script like `myapp/server.py` might then look as follows:
-
-```py
-import zswag
-import myapp.controller as controller
-from myapp import working_dir
-
-# This import only works after zserio generation.
-import service.api as service
-
-app = zswag.OAServer(
-  controller_module=controller,
-  service_type=service.MyService.Service,
-  yaml_path=working_dir+"/api.yaml",
-  zs_pkg_path=working_dir)
-
-if __name__ == "__main__":
-    app.run()
-```
-
-The server script above references two important components:
-* An **OpenAPI file** (`myapp/api.yaml`): Upon startup, `OAServer`
-  will output an error message if this file does not exist. The
-  error message already contains the correct command to
-  invoke the [OpenAPI Generator CLI](#openapi-generator-cli)
-  to generate `myapp/api.yaml`.
-* A **controller module** (`myapp/controller.py`): This file provides
-  the actual implementations for your service endpoints.
-  
-For the current example, `controller.py` might look as follows:
-
-```py
-import service.api as service
-
-# Written by you
-def my_api(request: service.Request):
-    return service.Response(request.value * 42)
-```
-
-## Using the Python Client
-
-The generic Python client talks to any zserio service that is running
-via HTTP/REST, and provides an OpenAPI specification of it's interface.
-
-### Integration Example
-
-As an example, consider a Python module called `myapp` which has the
-same `myapp/__init__.py` and `myapp/service.zs` zserio definition as
-[previously mentioned](#server-component-python). We consider
-that the server is providing its OpenAPI spec under `localhost:5000/openapi.json`.
-
-In this setting, a client `myapp/client.py` might look as follows:
-
-```python
-from zswag import OAClient
-import service.api as service
-
-openapi_url = f"http://localhost:5000/openapi.json"
-
-# The client reads per-method HTTP details from the OpenAPI URL.
-# You can also pass a local file by setting the `is_local_file` argument
-# of the OAClient constructor.
-client = service.MyService.Client(OAClient(openapi_url))
-
-# This will trigger an HTTP request under the hood.
-client.my_api(service.Request(1))
-```
-
-As you can see, an instance of `OAClient` is passed into the constructor
-for zserio to use as the service client's transport implementation.
-
-**Note:** While connecting, the client will also pass ...
-1. [Authentication headers/cookies](#http-proxies-and-authentication).
-2. Additional HTTP headers passed into the `OAClient` constructor as a
-   dictionary like `{HTTP-Header-Name: Value}`
-
-## C++ Client
-
-The generic C++ client talks to any zserio service that is running
-via HTTP/REST, and provides an OpenAPI specification of it's interface.
-The C++ client is based on the [ZSR zserio C++ reflection](https://github.com/klebert-engineering/zsr)
-extension.
-
-### Integration Example
-
-As an example, we consider the `myapp` directory which contains a `service.zs`
-zserio definition as [previously mentioned](#server-component-python).
-
-We assume that zswag is added to `myapp` as a [Git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
-under `myapp/zswag`.
-
-Next to `myapp/service.zs`, we place a `myapp/CMakeLists.txt` which describes our project:
-
-```cmake
-project(myapp)
-
-# This is how C++ will know about the zswag lib
-# and its dependencies, such as zserio.
-add_subdirectory(zswag)
-
-# This command is provided by ZSR to easily create
-# a CMake C++ reflection library from zserio code.
-add_zserio_module(${PROJECT_NAME}-cpp
-  ROOT "${CMAKE_CURRENT_SOURCE_DIR}"
-  ENTRY service.zs
-  TOP_LEVEL_PKG service
-  SUBDIR_DEPTH 0)
-
-# We create a myapp client executable which links to
-# the generated zserio C++ library, the zswag client
-# library and the ZSR reflection runtime.
-add_executable(${PROJECT_NAME} client.cpp)
-target_link_libraries(${PROJECT_NAME}
-    ${PROJECT_NAME}-cpp-reflection zswagcl zsr)
-```
-
-The `add_executable` command above references the file `myapp/client.cpp`,
-which contains the code to actually use the zswag C++ client. Again, the
-code assumes that the server provides their OpenAPI definitions under
-`localhost:5000/openapi.json`:
-
-```cpp
-#include "zswagcl/zsr-client.hpp"
-#include <iostream>
-#include <zsr/types.hpp>
-#include <zsr/find.hpp>
-#include <zsr/getset.hpp>
-
-using namespace zswagcl;
-using namespace httpcl;
-
-int main (int argc, char* argv[])
-{
-    // Instantiate the client
-    auto openApiUrl = "http://localhost:5000/openapi.json";
-    auto httpClient = std::make_unique<HttpLibHttpClient>();
-    auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
-    auto zsrClient = ZsrClient(openApiConfig, std::move(httpClient));
-    
-    // Invoke the REST endpoint
-    auto response = zsr::find<zsr::ServiceMethod>("service.MyService.my_api")->call(
-        zsrClient,
-        zsr::make(zsr::packages(), "service.Request", {{"value", 2}})
-    ).get<zsr::Introspectable>().value();
-    
-    // Print the response
-    std::cout << "Got "
-              << zsr::get(response, "value").get<int>().value()
-              << std::endl;
-}
-```
-
-Unlike the Python client, the C++ OpenAPI client (`ZsrClient`) is passed directly to
-the endpoint method invocation, not to an intermediate zserio Client object.
-
-**Note:** While connecting, `ZsrClient` will also pass ...
-1. [Authentication headers/cookies](#http-proxies-and-authentication).
-2. Additional HTTP headers passed into the `OAClient` constructor
-   as key-value-pairs in an `std::map<string, string>`.
 
 ## OpenAPI Generator CLI
 
@@ -291,33 +94,43 @@ you can run `python -m zswag.gen`, a CLI to generate OpenAPI YAML files.
 The CLI offers the following options
 
 ```
-usage: Zserio OpenApi YAML Generator [-h] -s service-identifier
-                                     [-p pythonpath-entry]
-                                     [-c openapi-tag-expression [openapi-tag-exp
-ression ...]]
-                                     [-d zserio-sources] [-o OUTPUT]
+Usage: Zserio OpenApi YAML Generator
+  -s service-identifier -i zserio-or-python-path
+  [-p top-level-package]
+  [-c tags [tags ...]]
+  [-o output]
 
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help
+  
+        Show this help message and exit.
+        
   -s service-identifier, --service service-identifier
 
-        Service class Python identifier. Remember that
-        your service identifier is preceded by an `api`
-        python module, and succeeded by `.Service`.
+        Fully qualified zserio service identifier.
 
         Example:
-            -s my.package.api.ServiceClass.Service
+            -s my.package.ServiceClass
 
-  -p pythonpath-entry, --path pythonpath-entry
+  -i zserio-or-python-path, --input zserio-or-python-path
 
-        Path to *parent* directory of zserio Python package.
-        Only needed if zserio Python package is not in the
-        Python environment.
+        Can be either ...
+        (A) Path to a zserio .zs file.
+        (B) Path to parent dir of a zserio Python package.
 
-        Example:
-            -p path/to/python/package/parent
+        Examples:
+            -i path/to/schema/main.zs         (A)
+            -i path/to/python/package/parent  (B)
 
-  -c openapi-tag-expression, --config openapi-tag-expression
+  -p top-level-package, --package top-level-package
+
+        When -i specifies a zs file (Option A), indicate
+        that a top-level zserio package name should be used.
+
+        Examples:
+            -p zserio_pkg_name
+
+  -c tags [tags ...], --config tags [tags ...]
 
         Configuration tags for a specific or all methods.
         The argument syntax follows this pattern:
@@ -346,22 +159,53 @@ optional arguments:
         Example:
             -c post getLayerByTileId:get,flat,path
 
-  -d zserio-sources, --docs zserio-sources
-
-        Zserio source directory from which documentation
-        should be extracted.
-
-  -o OUTPUT, --output OUTPUT
+  -o output, --output output
 
         Output file path. If not specified, the output will be
         written to stdout.
 ```
 
-### Documentation extraction
+### Generator Usage example
 
-When invoking `zswag.gen` with `-d zserio-source-dir` an attempt
-will be made to populate the service/method/argument/result
-descriptions with doc-strings which are extracted from the zserio
+Let's consider the following zserio service saved under `myapp/services.zs`:
+
+```
+package services;
+
+struct Request {
+  int32 value;
+};
+
+struct Response {
+  int32 value;
+};
+
+service MyService {
+  Response my_api(Request);
+};
+```
+
+An OpenAPI file `api.yaml` for `MyService` can now be
+created with the following `zswag.gen` invocation:
+
+```bash
+cd myapp
+python -m zswag.gen -s services.MyService -i services.zs -o api.yaml
+```
+
+You can further customize the generation using `-c` configuration
+arguments. For example, `-c get,flat,path` will recursively "flatten"
+the zserio request object into it's compound scalar fields using
+[x-zserio-request-part](#url-scalar-parameter) for all methods.
+If you want to change OpenAPI parameters only for one particular
+method, you can prefix the tag config argument with the method
+name (`-c methodName:tags...`).
+
+### Documentation Extraction
+
+When invoking `zswag.gen` with `-i zserio-file` an attempt
+will be made to populate the service/method/request/response
+descriptions with doc-strings that are extracted from the zserio
 sources.
 
 For structs and services, the documentation is expected to be
@@ -375,8 +219,8 @@ I choose to __highlight__ this word.
 
 struct MyStruct {
     ...
-}
-``` 
+};
+```
 
 For service methods, a single-line doc-string is parsed which
 immediately precedes the declaration:
@@ -386,12 +230,216 @@ immediately precedes the declaration:
 ReturnType myMethod(ArgumentType);
 ```
 
+## Server Component
+
+The `OAServer` component gives you the power to marry a zserio-generated app
+server class with a user-written app controller and a fitting OpenAPI specification.
+It is based on [Flask](https://flask.palletsprojects.com/en/1.1.x/) and
+[Connexion](https://connexion.readthedocs.io/en/latest/).
+
+### Integration Example
+
+We consider the same `myapp` directory with a `services.zs` zserio file
+as already used in the [OpenAPI Generator Example](#generator-usage-example).
+
+**Note:**
+
+* `myapp` must be available as a module (it must be
+possible to `import myapp`). 
+* We recommend to run the zserio Python generator invocation
+  inside the `myapp` module's `__init__.py`, like this:
+
+```py
+import zserio
+from os.path import dirname, abspath
+
+working_dir = dirname(abspath(__file__))
+zserio.generate(
+  zs_dir=working_dir,
+  main_zs_file="services.zs",
+  gen_dir=working_dir)
+```
+
+A server script like `myapp/server.py` might then look as follows:
+
+```py
+import zswag
+import myapp.controller as controller
+from myapp import working_dir
+
+# This import only works after zserio generation.
+import services.api as services
+
+app = zswag.OAServer(
+  controller_module=controller,
+  service_type=services.MyService.Service,
+  yaml_path=working_dir+"/api.yaml",
+  zs_pkg_path=working_dir)
+
+if __name__ == "__main__":
+    app.run()
+```
+
+The server script above references two important components:
+* An **OpenAPI file** (`myapp/api.yaml`): Upon startup, `OAServer`
+  will output an error message if this file does not exist. The
+  error message already contains the correct command to
+  invoke the [OpenAPI Generator CLI](#openapi-generator-cli)
+  to generate `myapp/api.yaml`.
+* A **controller module** (`myapp/controller.py`): This file provides
+  the actual implementations for your service endpoints.
+  
+For the current example, `controller.py` might look as follows:
+
+```py
+import services.api as services
+
+# Written by you
+def my_api(request: services.Request):
+    return services.Response(request.value * 42)
+```
+
+## Using the Python Client
+
+The generic Python client talks to any zserio service that is running
+via HTTP/REST, and provides an OpenAPI specification of it's interface.
+
+### Integration Example
+
+As an example, consider a Python module called `myapp` which has the
+same `myapp/__init__.py` and `myapp/services.zs` zserio definition as
+[previously mentioned](#generator-usage-example). We consider
+that the server is providing its OpenAPI spec under `localhost:5000/openapi.json`.
+
+In this setting, a client `myapp/client.py` might look as follows:
+
+```python
+from zswag import OAClient
+import services.api as services
+
+openapi_url = f"http://localhost:5000/openapi.json"
+
+# The client reads per-method HTTP details from the OpenAPI URL.
+# You can also pass a local file by setting the `is_local_file` argument
+# of the OAClient constructor.
+client = services.MyService.Client(OAClient(openapi_url))
+
+# This will trigger an HTTP request under the hood.
+client.my_api(services.Request(1))
+```
+
+As you can see, an instance of `OAClient` is passed into the constructor
+for zserio to use as the service client's transport implementation.
+
+**Note:** While connecting, the client will also pass ...
+1. [Authentication headers/cookies](#http-proxies-and-authentication).
+2. Additional HTTP headers passed into the `OAClient` constructor as a
+   dictionary like `{HTTP-Header-Name: Value}`
+
+## C++ Client
+
+The generic C++ client talks to any zserio service that is running
+via HTTP/REST, and provides an OpenAPI specification of it's interface.
+The C++ client is based on the [ZSR zserio C++ reflection](https://github.com/klebert-engineering/zsr)
+extension.
+
+### Integration Example
+
+As an example, we consider the `myapp` directory which contains a `services.zs`
+zserio definition as [previously mentioned](#generator-usage-example).
+
+We assume that zswag is added to `myapp` as a [Git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
+under `myapp/zswag`.
+
+Next to `myapp/services.zs`, we place a `myapp/CMakeLists.txt` which describes our project:
+
+```cmake
+project(myapp)
+
+# This is how C++ will know about the zswag lib
+# and its dependencies, such as zserio.
+add_subdirectory(zswag)
+
+# This command is provided by ZSR to easily create
+# a CMake C++ reflection library from zserio code.
+add_zserio_module(${PROJECT_NAME}-cpp
+  ROOT "${CMAKE_CURRENT_SOURCE_DIR}"
+  ENTRY services.zs
+  TOP_LEVEL_PKG service
+  SUBDIR_DEPTH 0)
+
+# We create a myapp client executable which links to
+# the generated zserio C++ library, the zswag client
+# library and the ZSR reflection runtime.
+add_executable(${PROJECT_NAME} client.cpp)
+target_link_libraries(${PROJECT_NAME}
+    ${PROJECT_NAME}-cpp-reflection zswagcl zsr)
+```
+
+The `add_executable` command above references the file `myapp/client.cpp`,
+which contains the code to actually use the zswag C++ client.
+
+```cpp
+#include "zswagcl/zsr-client.hpp"
+#include <iostream>
+#include <zsr/types.hpp>
+#include <zsr/find.hpp>
+#include <zsr/getset.hpp>
+
+using namespace zswagcl;
+using namespace httpcl;
+
+int main (int argc, char* argv[])
+{
+    // Assume that the server provides its OpenAPI definition here
+    auto openApiUrl = "http://localhost:5000/openapi.json";
+    
+    // Create an HTTP client to be used by our OpenAPI client
+    auto httpClient = std::make_unique<HttpLibHttpClient>();
+    
+    // Fetch the OpenAPI configuration using the HTTP client
+    auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
+    
+    // Create a Zserio reflection-based OpenAPI client that
+    // uses the OpenAPI configuration we just retrieved.
+    auto zsrClient = ZsrClient(openApiConfig, std::move(httpClient));
+        
+    // Use reflection to find the service method that we want to call.
+    auto serviceMethod = zsr::find<zsr::ServiceMethod>("services.MyService.my_api");
+    
+    // Use reflection to create the request object
+    auto request = zsr::make(zsr::packages(), "services.Request", {{"value", 2}});
+
+    // Invoke the REST endpoint
+    auto response = serviceMethod->call(zsrClient, request);
+    
+    // Unpack the response variant as an introspectable struct 
+    auto unpackedResponseValue = response.get<zsr::Introspectable>().value();
+    
+    // Use reflection to read the response's value member
+    auto responseValue = zsr::get(response, "value").get<int>().value();
+    
+    // Print the response
+    std::cout << "Got " << responseValue << std::endl;
+}
+```
+
+Unlike the Python client, the C++ OpenAPI client (`ZsrClient`) is passed directly to
+the endpoint method invocation, not to an intermediate zserio Client object.
+
+**Note:** While connecting, `HttpLibHttpClient` will also pass ...
+1. [Authentication headers/cookies](#http-proxies-and-authentication).
+2. Additional HTTP headers passed into the `HttpLibHttpClient` constructor
+   as key-value-pairs in an `std::map<string, string>`.
+
 ## HTTP Proxies and Authentication
 
-Both the Python and C++ clients read a YAML file stored under
-a file given by the `HTTP_SETTINGS_FILE` environment variable.
-This YAML file is a list of HTTP-related configs that are applied to HTTP 
-requests based on a regular expression which matches the requested URL.
+Both the Python `OAClient` and C++ `HttpLibHttpClient` read a YAML file
+stored under a path which is given by the `HTTP_SETTINGS_FILE` environment
+variable. The YAML file contains a list of HTTP-related configs that are
+applied to HTTP requests based on a regular expression which is matched
+against the requested URL.
+
 For example, the following entry would match all requests due to the `.*`
 url-match-pattern:
 
@@ -419,8 +467,7 @@ on each platform:
 * [macOS `add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html)
 * [Windows `cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/)
 
-
-## UI 
+## Swagger User Interface 
 
 If you have installed `pip install "connexion[swagger-ui]"`, you can view
 API docs of your service under `[/prefix]/ui`.
@@ -438,6 +485,9 @@ The following sections detail which components support which aspects
 of OpenAPI. The difference in compliance is mostly due to limited
 development scopes. If you are missing a particular OpenAPI feature for
 a particular component, feel free to create an issue!
+
+**Note:** For all options that are not supported by `zswag.gen`, you
+will need to manually edit the OpenAPI YAML.
 
 ### HTTP method
 
@@ -460,7 +510,7 @@ paths:
 
 A server can instruct clients to transmit their zserio request object in the
 request body when using HTTP `post`, `put`, `patch` or `delete`.
-This is done by settings the OpenAPI `requestBody/content` to
+This is done by setting the OpenAPI `requestBody/content` to
 `application/x-zserio-object`:
 
 ```yaml
@@ -595,8 +645,8 @@ tool support is very limited.
 ### Server URL Base Path
 
 OpenAPI allows for a `servers` field in the spec that lists URL path prefixes
-under which the specified API may be reached. A `zswag_client.HttpClient`
-instance looks into this list and determines the URL base path it uses from
+under which the specified API may be reached. The OpenAPI clients
+looks into this list to determine a URL base path from
 the first entry in this list. A sample entry might look as follows:
 
 ```
@@ -611,4 +661,4 @@ and port, but prefix the `/path/to/my/api` string.
 
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
-| `servers`  | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers`  | ✔️ | ✔️ | ✔️ | ❌️ |

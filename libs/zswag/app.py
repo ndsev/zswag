@@ -91,7 +91,6 @@ class OAServer(connexion.App):
             print(f"Using yaml path {yaml_path}")
         self.yaml_path = yaml_path
         yaml_parent_path = os.path.dirname(yaml_path)
-        yaml_basename = os.path.basename(yaml_path)
         self.zs_pkg_path = zs_pkg_path
 
         # Initialise zserio service
@@ -115,17 +114,14 @@ class OAServer(connexion.App):
                 You can generate the file by running ...
                     
                     python -m zswag.gen \\
-                        --service {self.service_type.__module__}.{self.service_type.__qualname__} \\
-                        --path "{
+                        --service {self.service_instance.SERVICE_FULL_NAME} \\
+                        --input "{
                             to_slashes(os.path.abspath(os.path.dirname(os.path.dirname(
                                 __import__(self.service_type.__module__.split('.')[0]).__file__
                             ))))
                         }" \\
                         --config get,query,flat \\
                         --output "{to_slashes(yaml_path)}"
-                        
-                    Optional:
-                        --docs "<original zserio source path for docs extraction>"
                         
                     The --config argument is a comma-separated list of tags
                     to specify OpenAPI options. For more info, please run
