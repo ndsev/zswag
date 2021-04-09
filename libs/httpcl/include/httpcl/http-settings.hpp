@@ -10,7 +10,7 @@ namespace httpcl
 {
 
 /**
- * Loads AFW_HTTP_SETTINGS_FILE.
+ * Loads HTTP_SETTINGS_FILE.
  * Allows returning settings for a specific URL.
  */
 struct HTTPSettings

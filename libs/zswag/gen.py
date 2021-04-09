@@ -1,9 +1,15 @@
+import os
+
 import yaml
 import sys
 import inspect
+import tempfile
+import importlib
 from typing import Optional, Dict, Tuple, List, IO
 from argparse import ArgumentParser, FileType, RawTextHelpFormatter
+from subprocess import CalledProcessError
 
+import zserio
 from pyzswagcl import \
     OAParamLocation, \
     ZSERIO_OBJECT_CONTENT_TYPE, \
@@ -30,6 +36,10 @@ def argdoc(s: str):
     return "\n"+inspect.cleandoc(s)+"\n\n"
 
 
+def less_indent_formatter(prog):
+    return RawTextHelpFormatter(prog, max_help_position=8, width=80)
+
+
 class MethodSchemaInfo:
     """
     (Private) Return value of Server._method_info()
@@ -50,22 +60,36 @@ class OpenApiSchemaGenerator:
 
     def __init__(self, *,
                  service: str,
-                 path: Optional[str] = None,
+                 path: str,
+                 package: Optional[str] = None,
                  config: Optional[List[str]] = None,
-                 zs: Optional[str] = None,
                  output: IO):
         self.service_name = service
-        if path:
+        self.zs_pkg_path = None
+        service_name_parts = service.split(".") + ["Service"]
+        python_module = None
+        if os.path.isdir(path):
             sys.path.append(path)
-        service_name_parts = service.split(".")
-        self.service_type = rgetattr(__import__(
-            f"{service_name_parts[0]}.api"
-        ), ".".join(service_name_parts[1:]))
+            python_module = importlib.import_module(f"{service_name_parts[0]}.api")
+        elif os.path.isfile(path):
+            self.zs_pkg_path = os.path.abspath(os.path.dirname(path))
+            try:
+                python_module = zserio.generate(
+                    zs_dir=self.zs_pkg_path,
+                    main_zs_file=os.path.basename(path),
+                    top_level_package=package,
+                    gen_dir=tempfile.mkdtemp("zswag.gen"))
+            except CalledProcessError as e:
+                print(f"Failed to parse zserio sources:\n{e.stderr}")
+                exit(1)
+        if not python_module:
+            print(f"ERROR: Could not import {service_name_parts[0]}.api!")
+            exit(1)
+        self.service_type = rgetattr(python_module, ".".join(service_name_parts[1:]))
         self.service_instance = self.service_type()
         self.config: Dict[str, Tuple[str, Optional[OAParamLocation], bool]] = dict()
         self.config["*"] = default_entry = ("post", None, False)
         self.output = output
-        self.zs_pkg_path = zs
         if config:
             for entry in config:
                 entry_http_method, entry_param_loc, entry_flatten = default_entry
@@ -83,7 +107,9 @@ class OpenApiSchemaGenerator:
                         entry_param_loc = OAParamLocation.QUERY
                     elif tag == PARAM_LOCATION_BODY_TAG:
                         entry_param_loc = None
-                        assert entry_http_method != "get"
+                        if entry_http_method == "get":
+                            print(f"WARNING: Changing HTTP method from get to post due to `body` tag.")
+                            entry_http_method = "post"
                     elif tag == FLATTEN_TAG:
                         entry_flatten = True
                     elif tag == BLOB_TAG:
@@ -112,7 +138,7 @@ class OpenApiSchemaGenerator:
                     fallback=[f"REST API for {self.service_instance.SERVICE_FULL_NAME}"]
                 )[0]),
                 "contact": {
-                    "email": "TODO"
+                    "email": "TODO@TODO.TODO"
                 },
                 "license": {
                     "name": "TODO"
@@ -267,35 +293,34 @@ if __name__ == "__main__":
 
     parser = ArgumentParser(
         "Zserio OpenApi YAML Generator",
-        formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-s", "--service",
-                        nargs=1,
-                        required=True,
-                        metavar="service-identifier",
-                        help=argdoc("""
-                        Service class Python identifier. Remember that
-                        your service identifier is preceded by an `api`
-                        python module, and succeeded by `.Service`.
+        formatter_class=less_indent_formatter)
+    parser.add_argument("-s", "--service", nargs=1, required=True,
+                        metavar="service-identifier", help=argdoc("""
+                        Fully qualified zserio service identifier.
                         
                         Example:
-                            -s my.package.api.ServiceClass.Service
+                            -s my.package.ServiceClass
                         """))
-    parser.add_argument("-p", "--path",
-                        nargs=1,
-                        metavar="pythonpath-entry",
-                        required=False,
-                        help=argdoc("""
-                        Path to *parent* directory of zserio Python package.
-                        Only needed if zserio Python package is not in the
-                        Python environment.
+    parser.add_argument("-i", "--input", nargs=1, metavar="zserio-or-python-path",
+                        required=True, help=argdoc("""
+                        Can be either ...
+                        (A) Path to a zserio .zs file.
+                        (B) Path to parent dir of a zserio Python package.
                         
-                        Example:
-                            -p path/to/python/package/parent
+                        Examples:
+                            -i path/to/schema/main.zs         (A)
+                            -i path/to/python/package/parent  (B) 
                         """))
-    parser.add_argument("-c", "--config",
-                        nargs="+",
-                        metavar="openapi-tag-expression",
-                        help=argdoc("""
+    parser.add_argument("-p", "--package", nargs=1, metavar="top-level-package",
+                        required=False, help=argdoc("""
+                        When -i specifies a zs file (Option A), indicate
+                        that a top-level zserio package name should be used.
+                        
+                        Examples:
+                            -p zserio_pkg_name
+                        """))
+    parser.add_argument("-c", "--config", nargs="+", metavar="tags",
+                        action="append", help=argdoc("""
                         Configuration tags for a specific or all methods.
                         The argument syntax follows this pattern:
                             
@@ -322,15 +347,9 @@ if __name__ == "__main__":
                               
                         Example:
                             -c post getLayerByTileId:get,flat,path
-                        """),
-                        action="append")
-    parser.add_argument("-d", "--docs", nargs=1, metavar="zserio-sources",
-                        required=False, help=argdoc("""
-                        Zserio source directory from which documentation
-                        should be extracted.
                         """))
     parser.add_argument("-o", "--output", nargs=1, type=FileType("w"), default=[sys.stdout],
-                        help=argdoc("""
+                        metavar="output", help=argdoc("""
                         Output file path. If not specified, the output will be
                         written to stdout.
                         """))
@@ -338,7 +357,7 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     OpenApiSchemaGenerator(
         service=args.service[0],
-        path=args.path[0] if args.path else None,
-        config=[arg for args in args.config for arg in args],
-        zs=args.docs[0] if args.docs else None,
+        path=args.input[0] if args.input else None,
+        package=args.package[0] if args.package else None,
+        config=[arg for args in args.config for arg in args] if args.config else [],
         output=args.output[0]).generate()

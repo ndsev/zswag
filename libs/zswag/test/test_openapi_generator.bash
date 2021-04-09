@@ -22,12 +22,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-test_zs_path=$(python -m zswag.test.calc path)
-
 python -m zswag.gen \
-  --service calculator.calculator.Calculator.Service \
-  --path "$test_zs_path" \
-  --docs "$test_zs_path" \
+  --service calculator.Calculator \
+  --input "$my_dir/calc/calculator.zs" \
   --config get,path,flat bitMul:post,body \
   --config identity:put \
   --output "$my_dir/.test.yaml"
