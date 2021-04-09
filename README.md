@@ -474,24 +474,20 @@ API docs of your service under `[/prefix]/ui`.
 
 ## OpenAPI Options Interoperability
 
-The Server, Clients and Generator currently  offer several degrees of freedom
-regarding HTTP-specifics in the OpenAPI YAML file:
-
-* **HTTP Method**
-* **Parameter Format**
-* **Server URL Base Path**
-
-The following sections detail which components support which aspects
-of OpenAPI. The difference in compliance is mostly due to limited
-development scopes. If you are missing a particular OpenAPI feature for
-a particular component, feel free to create an issue!
+The Server, Clients and Generator offer various degrees of freedom
+regarding the OpenAPI YAML file. The following sections detail which
+components support which aspects of OpenAPI. The difference in compliance
+is mostly due to limited development scopes. If you are missing a particular
+OpenAPI feature for a particular component, feel free to create an issue!
 
 **Note:** For all options that are not supported by `zswag.gen`, you
-will need to manually edit the OpenAPI YAML.
+will need to manually edit the OpenAPI YAML file to achieve the desired
+configuration. You will also need to edit the file manually to fill in
+meta-info (provider name, service version, etc.).
 
 ### HTTP method
 
-To change the **HTTP method**, simply place the desired method
+To change the **HTTP method**, the desired method name is placed 
 as the key under the method path, such as in the following example:
 ```yaml
 paths:
@@ -548,7 +544,7 @@ parameters:
 ```
 
 About the `format` specifier value:
-* Both `string` and `binary` result in a raw URL-encoded string.
+* Both `string` and `binary` result in a raw URL-encoded string buffer.
 * Both `byte` and `base64` result in a standard Base64-encoded value.
   The `base64url` option indicates URL-safe Base64 format.
 * The `hex` encoding produces a hexadecimal encoding of the request blob.
