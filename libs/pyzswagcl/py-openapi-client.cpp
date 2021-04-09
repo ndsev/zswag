@@ -92,7 +92,7 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
 
 std::vector<uint8_t> PyOpenApiClient::callMethod(
         const std::string& methodName,
-        py::bytearray& requestData,
+        py::bytes& requestData,
         py::handle context)
 {
     if (!context) {
@@ -104,10 +104,8 @@ std::vector<uint8_t> PyOpenApiClient::callMethod(
     auto response = client_->call(methodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper)
     {
         if (field == ZSERIO_REQUEST_PART_WHOLE) {
-            py::buffer_info info(py::buffer(requestData).request());
-            auto* data = reinterpret_cast<uint8_t*>(info.ptr);
-            auto length = static_cast<size_t>(info.size);
-            return helper.binary(std::vector<uint8_t>(data, data + length));
+            std::string dataBytes = requestData;
+            return helper.binary({dataBytes.begin(), dataBytes.end()});
         }
 
         auto parts = stx::split<std::vector<std::string>>(field, ".");

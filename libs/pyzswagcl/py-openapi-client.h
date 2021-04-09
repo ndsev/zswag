@@ -20,7 +20,7 @@ public:
 
     std::vector<uint8_t> callMethod(
         const std::string& methodName,
-        py::bytearray& requestData,
+        py::bytes& requestData,
         py::handle context);
 
 private:
