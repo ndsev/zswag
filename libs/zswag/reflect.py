@@ -58,7 +58,7 @@ def rgetattr(obj, attr):
         if not hasattr(obj, attr):
             raise RuntimeError(
                 f"\nERROR: `{attr}` does not exist not in {obj.__name__}; choices are ..." +
-                "".join("  \n* "+choice for choice in dir(obj) if not choice.startswith("__")))
+                "".join("\n  * "+choice for choice in dir(obj) if not choice.startswith("__")))
         return getattr(obj, attr)
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
