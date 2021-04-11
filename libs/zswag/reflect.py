@@ -30,7 +30,7 @@ class UnsupportedArrayParameterError(RuntimeError):
 
 
 # Table here: https://docs.python.org/3/library/struct.html#format-characters
-C_STRUCT_LITERAL_PER_TYPE_AND_SIZE: Dict[Tuple[type, int], str] = {
+C_STRUCT_LITERAL_PER_TYPE_AND_SIZE: Dict[Tuple[Any, int], str] = {
     (bool, 1): "!b",
     (bool, 2): "!h",
     (bool, 4): "!i",

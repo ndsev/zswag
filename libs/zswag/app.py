@@ -134,7 +134,7 @@ class OAServer(connexion.App):
         self.verify_openapi_schema()
 
         # Re-route service impl methods
-        for method_name in self.service_instance.METHOD_NAMES:
+        for method_name in self.service_instance._METHOD_NAMES:
             method_snake_name = to_snake(method_name)
             user_function = getattr(self.controller, method_snake_name)
             zserio_modem_function = getattr(self.service_instance, f"_{method_snake_name}_method")
@@ -184,7 +184,7 @@ class OAServer(connexion.App):
             pythonic_params=False)
 
     def verify_openapi_schema(self):
-        for method_name in self.service_instance.METHOD_NAMES:
+        for method_name in self.service_instance._METHOD_NAMES:
             if method_name not in self.spec:
                 raise IncompleteSchemaError(self.yaml_path, method_name)
 

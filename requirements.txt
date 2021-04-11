@@ -1,5 +1,5 @@
 connexion
 requests
-zserio==2.3.0rc1
+zserio==2.3.0
 pyyaml
 pyzswagcl
