@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.14)
+
+if (NOT PROJECT_NAME)
+  set (ZSWAG_ENABLE_TESTING ON)
+endif()
+
 project(zswag)
 enable_testing()
 

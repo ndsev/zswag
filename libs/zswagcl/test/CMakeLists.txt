@@ -24,6 +24,8 @@ target_compile_definitions(zswagcl-test
   PRIVATE
     -DTESTDATA="${CMAKE_CURRENT_LIST_DIR}/testdata/")
 
-include(CTest)
-add_test(NAME zswagcl-test
-  COMMAND "$<TARGET_FILE:zswagcl-test>")
+
+if (ZSWAG_ENABLE_TESTING)
+  add_test(NAME zswagcl-test
+    COMMAND "$<TARGET_FILE:zswagcl-test>")
+endif()
