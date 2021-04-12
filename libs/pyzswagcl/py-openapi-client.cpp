@@ -92,11 +92,8 @@ std::vector<uint8_t> PyOpenApiClient::callMethod(
         py::object request,
         py::object unused)
 {
-
     if (!request) {
-        throw std::runtime_error(stx::format(
-            "Unset requestData argument for call to {}! Please pass the request also as context.",
-            methodName));
+        throw std::runtime_error("The request argument is None!");
     }
 
     auto response = client_->call(methodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper)
