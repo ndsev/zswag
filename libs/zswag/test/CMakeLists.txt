@@ -14,7 +14,7 @@ target_link_libraries(${PROJECT_NAME}
 # The integration tests are flaky on macOS in Github CI,
 # and running them on macOS is not required. So we save
 # ourselves some build minutes and workflow headache.
-if (NOT APPLE)
+if (ZSWAG_ENABLE_TESTING AND NOT APPLE)
   add_test(
       NAME
         zswag-server-integration

@@ -10,6 +10,7 @@ target_link_libraries(httpcl-test
     zsr
     Catch2::Catch2)
 
-include(CTest)
-add_test(NAME httpcl-test
-  COMMAND "$<TARGET_FILE:httpcl-test>")
+if (ZSWAG_ENABLE_TESTING)
+  add_test(NAME httpcl-test
+    COMMAND "$<TARGET_FILE:httpcl-test>")
+endif()
