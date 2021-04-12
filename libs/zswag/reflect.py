@@ -3,7 +3,8 @@ import base64
 import zserio
 import struct
 import functools
-from typing import Type, Tuple, Any, Dict, Union, Optional, get_args, get_origin, List
+import importlib
+from typing import Type, Tuple, Any, Dict, Union, Optional, get_args, get_origin, List, get_type_hints
 from pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOLE
 from re import compile as re
 
@@ -66,7 +67,7 @@ def rgetattr(obj, attr):
 # Get the request type for a zserio service method.
 def service_method_request_type(service_instance: Any, method_name: str) -> Type:
     zserio_impl_function = getattr(service_instance, f"_{to_snake(method_name)}_impl")
-    result = zserio_impl_function.__func__.__annotations__["request"]
+    result = get_type_hints(zserio_impl_function)["request"]
     assert inspect.isclass(result)
     return result
 
@@ -82,13 +83,18 @@ def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"
 # We determine whether Nested is a zserio struct type or a scalar builtin
 # type (int, float etc.) and return either (None, scalar_type) or
 # (zserio_struct_type, None). Otherwise return (None, None).
-def unpack_zserio_arg_type(t: Type) -> Tuple[Optional[Type], Optional[Type]]:
+def unpack_zserio_arg_type(t: Type, debug_field_name: str) -> Tuple[Optional[Type], Optional[Type]]:
     if get_origin(t) is Union:
         union_args = get_args(t)
         if len(union_args) == 2 and union_args[1] is NONE_T:
             result = union_args[0]
             if result in SCALAR_T:
                 return None, result
+            if get_origin(result) is list:
+                arg_type = [get_args(result)[0]]
+                if arg_type[0] not in SCALAR_T:
+                    raise UnsupportedArrayParameterError(debug_field_name, arg_type[0].__name__)
+                return None, arg_type
             if inspect.isclass(result):
                 return result, None
     return None, None
@@ -106,10 +112,10 @@ def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict
     # params: Nested object init params are typed as Union[Nested, None]. We then
     # instantiate the child object's type and assign it to the parent member.
     if hasattr(result_instance.__init__, "__func__"):
-        for arg_name, arg_type in result_instance.__init__.__func__.__annotations__.items():
+        for arg_name, arg_type in get_type_hints(result_instance.__init__).items():
             if arg_name.endswith("_"):
                 field_name: str = arg_name.strip('_')
-                compound_type, scalar_type = unpack_zserio_arg_type(arg_type)
+                compound_type, scalar_type = unpack_zserio_arg_type(arg_type, field_name_prefix+field_name)
                 if compound_type:
                     instance, member_types = make_instance_and_typeinfo(
                         compound_type, field_name_prefix+field_name+".")
@@ -118,10 +124,6 @@ def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict
                     continue
                 elif scalar_type:
                     arg_type = scalar_type
-                elif get_origin(arg_type) is list:
-                    arg_type = [get_args(arg_type)[0]]
-                    if arg_type[0] not in SCALAR_T:
-                        raise UnsupportedArrayParameterError(field_name_prefix+field_name, arg_type[0].__name__)
                 result_member_types[field_name_prefix+field_name] = arg_type
     return result_instance, result_member_types
 

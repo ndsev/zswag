@@ -20,8 +20,8 @@ public:
 
     std::vector<uint8_t> callMethod(
         const std::string& methodName,
-        py::bytearray& requestData,
-        py::handle context);
+        py::object request,
+        py::object unused);
 
 private:
     std::unique_ptr<zswagcl::OpenAPIClient> client_;

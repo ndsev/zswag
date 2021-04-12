@@ -18,7 +18,7 @@ def run(host, port):
             print(f"[py-test-client]   -> Instantiating client.", flush=True)
             client = api.Calculator.Client(OAClient(f"http://{host}:{port}/openapi.json"))
             print(f"[py-test-client]   -> Running request.", flush=True)
-            resp = fn(client, request, request)
+            resp = fn(client, request)
             if resp.value == expect:
                 print(f"[py-test-client]   -> Success.", flush=True)
             else:

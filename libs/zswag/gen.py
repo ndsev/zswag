@@ -126,7 +126,7 @@ class OpenApiSchemaGenerator:
             return self.config["*"]
 
     def generate(self):
-        service_name_parts = self.service_instance._SERVICE_FULL_NAME.split(".")
+        service_name_parts = self.service_instance.service_full_name.split(".")
         schema = {
             "openapi": "3.0.0",
             "info": {
@@ -134,8 +134,8 @@ class OpenApiSchemaGenerator:
                 "description": md_filter_definition(get_doc_str(
                     ident_type=IdentType.SERVICE,
                     pkg_path=self.zs_pkg_path,
-                    ident=self.service_instance._SERVICE_FULL_NAME,
-                    fallback=[f"REST API for {self.service_instance._SERVICE_FULL_NAME}"]
+                    ident=self.service_instance.service_full_name,
+                    fallback=[f"REST API for {self.service_instance.service_full_name}"]
                 )[0]),
                 "contact": {
                     "email": "TODO@TODO.TODO"
@@ -169,7 +169,7 @@ class OpenApiSchemaGenerator:
                     },
                 } for method_info in (
                     self.generate_method_info(method_name)
-                    for method_name in self.service_instance._METHOD_NAMES)
+                    for method_name in self.service_instance.method_names)
             }
         }
         yaml.dump(schema, self.output, default_flow_style=False)
@@ -182,7 +182,7 @@ class OpenApiSchemaGenerator:
             doc_strings = get_doc_str(
                 ident_type=IdentType.RPC,
                 pkg_path=self.zs_pkg_path,
-                ident=f"{self.service_instance._SERVICE_FULL_NAME}.{method_name}")
+                ident=f"{self.service_instance.service_full_name}.{method_name}")
             if doc_strings:
                 result.docstring = doc_strings[0]
                 result.returntype = doc_strings[1]

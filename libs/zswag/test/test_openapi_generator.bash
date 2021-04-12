@@ -38,4 +38,4 @@ python -m zswag.gen \
   --config get,path,flat bitMul:post,body \
   --config identity:put \
   --output "$my_dir/.test.yaml"
-diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_1.yaml"
+diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_2.yaml"
