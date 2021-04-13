@@ -365,7 +365,7 @@ add_subdirectory(zswag)
 add_zserio_module(${PROJECT_NAME}-cpp
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}"
   ENTRY services.zs
-  TOP_LEVEL_PKG service
+  TOP_LEVEL_PKG services
   SUBDIR_DEPTH 0)
 
 # We create a myapp client executable which links to
@@ -414,10 +414,10 @@ int main (int argc, char* argv[])
     auto response = serviceMethod->call(zsrClient, request);
     
     // Unpack the response variant as an introspectable struct 
-    auto unpackedResponseValue = response.get<zsr::Introspectable>().value();
+    auto unpackedResponse = response.get<zsr::Introspectable>().value();
     
     // Use reflection to read the response's value member
-    auto responseValue = zsr::get(response, "value").get<int>().value();
+    auto responseValue = zsr::get(unpackedResponse, "value").get<int>().value();
     
     // Print the response
     std::cout << "Got " << responseValue << std::endl;
