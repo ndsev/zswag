@@ -22,6 +22,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+echo "→ [Test 1/2] Generate with auto-translation ..."
 python -m zswag.gen \
   --service calculator.Calculator \
   --input "$my_dir/calc/calculator.zs" \
@@ -29,3 +30,12 @@ python -m zswag.gen \
   --config identity:put \
   --output "$my_dir/.test.yaml"
 diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_1.yaml"
+
+echo "→ [Test 2/2] Generate with Python source ..."
+python -m zswag.gen \
+  --service calculator.Calculator \
+  --input "$(python -m zswag.test.calc path)" \
+  --config get,path,flat bitMul:post,body \
+  --config identity:put \
+  --output "$my_dir/.test.yaml"
+diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_2.yaml"

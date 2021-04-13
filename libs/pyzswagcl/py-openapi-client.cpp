@@ -62,12 +62,9 @@ namespace
 void PyOpenApiClient::bind(py::module_& m) {
     auto serviceClient = py::class_<PyOpenApiClient>(m, "OAClient")
         .def(py::init<std::string, bool, Headers>(), "url"_a, "is_local_file"_a = false, "headers"_a = Headers())
-        // zserio <= 2.2.0
-        .def("callMethod", &PyOpenApiClient::callMethod,
-             "methodName"_a, "requestData"_a, "context"_a)
         // zserio >= 2.3.0
         .def("call_method", &PyOpenApiClient::callMethod,
-             "method_name"_a, "request_data"_a, "context"_a);
+             "method_name"_a, "request"_a, "unused"_a);
 
     py::object serviceClientBase = py::module::import("zserio").attr("ServiceInterface");
     serviceClient.attr("__bases__") = py::make_tuple(serviceClientBase) + serviceClient.attr("__bases__");
@@ -92,18 +89,17 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
 
 std::vector<uint8_t> PyOpenApiClient::callMethod(
         const std::string& methodName,
-        py::bytearray& requestData,
-        py::handle context)
+        py::object request,
+        py::object unused)
 {
-    if (!context) {
-        throw std::runtime_error(stx::format(
-            "Unset context argument for call to {}! Please pass the request also as context.",
-            methodName));
+    if (!request) {
+        throw std::runtime_error("The request argument is None!");
     }
 
     auto response = client_->call(methodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper)
     {
         if (field == ZSERIO_REQUEST_PART_WHOLE) {
+            auto requestData = request.attr("byte_array");
             py::buffer_info info(py::buffer(requestData).request());
             auto* data = reinterpret_cast<uint8_t*>(info.ptr);
             auto length = static_cast<size_t>(info.size);
@@ -112,25 +108,25 @@ std::vector<uint8_t> PyOpenApiClient::callMethod(
 
         auto parts = stx::split<std::vector<std::string>>(field, ".");
         auto currentField = parts.begin();
-        auto value = context.ptr();
+        auto value = request.attr("zserio_object").cast<py::object>();
 
         while (currentField != parts.end()) {
             auto internalFieldName = stx::format("_{}_", *currentField);
-            if (!PyObject_HasAttrString(value, internalFieldName.c_str())) {
+            if (!py::hasattr(value, internalFieldName.c_str())) {
                 throw std::runtime_error(stx::format("Could not find request field {} in method {}.",
                     stx::join(parts.begin(), currentField + 1, "."),
                     methodName));
             }
-            value = PyObject_GetAttrString(value, internalFieldName.c_str());
+            value = value.attr(internalFieldName.c_str());
             assert(value);
             ++currentField;
         }
 
-        if (PySequence_Check(value)) {
-            return helper.array(valuesFromPyArray(value));
+        if (PySequence_Check(value.ptr())) {
+            return helper.array(valuesFromPyArray(value.ptr()));
         }
 
-        return helper.value(valueFromPyObject(value));
+        return helper.value(valueFromPyObject(value.ptr()));
     });
 
     std::vector<uint8_t> responseData;

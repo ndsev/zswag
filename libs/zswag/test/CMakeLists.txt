@@ -16,16 +16,16 @@ target_link_libraries(${PROJECT_NAME}
 # ourselves some build minutes and workflow headache.
 if (ZSWAG_ENABLE_TESTING AND NOT APPLE)
   add_test(
-      NAME
-        zswag-server-integration
-      WORKING_DIRECTORY
-        "${CMAKE_CURRENT_SOURCE_DIR}"
-      COMMAND
-        bash "test_integration.bash"
-          -w "${WHEEL_DEPLOY_DIRECTORY}"
-          -b "python -m zswag.test.calc server 127.0.0.1:16161"
-          -f "$<TARGET_FILE:${PROJECT_NAME}> http://127.0.0.1:16161/openapi.json"
-          -f "python -m zswag.test.calc client 127.0.0.1:16161")
+    NAME
+      zswag-server-integration
+    WORKING_DIRECTORY
+      "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMAND
+      bash "test_integration.bash"
+        -w "${WHEEL_DEPLOY_DIRECTORY}"
+        -b "python -m zswag.test.calc server 127.0.0.1:16161"
+        -f "$<TARGET_FILE:${PROJECT_NAME}> http://127.0.0.1:16161/openapi.json"
+        -f "python -m zswag.test.calc client 127.0.0.1:16161")
 
   add_test(
     NAME
