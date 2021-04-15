@@ -186,5 +186,25 @@ paths:
                 format: binary
                 type: string
       summary: ''
+  /name/{enum_value}:
+    get:
+      operationId: name
+      parameters:
+        - in: path
+          name: enum_value
+          required: true
+          x-zserio-request-part: value
+          schema:
+            format: string
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+      summary: ''
 
 servers: []

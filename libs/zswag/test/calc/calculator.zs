@@ -61,6 +61,18 @@ struct Bools
     bool values[];
 };
 
+enum int32 Enum
+{
+    TEST_ENUM_0 = 42,
+    TEST_ENUM_1 = 1,
+    TEST_ENUM_2 = 2
+};
+
+struct EnumWrapper
+{
+    Enum value;
+};
+
 /*!
 
 ### Calculator Service
@@ -86,4 +98,6 @@ service Calculator
     Double identity(Double);
 
     String concat(Strings);
+
+    String name(EnumWrapper);
 };

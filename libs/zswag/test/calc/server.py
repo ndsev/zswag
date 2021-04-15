@@ -31,6 +31,8 @@ def bit_mul(request):
 def identity(request):
     return request
 
-
 def concat(request):
     return api.String(reduce(str.__add__, request.values))
+
+def name(request):
+    return api.String(request.value.name)

@@ -4,6 +4,7 @@ import zserio
 import struct
 import functools
 import importlib
+from enum import Enum
 from typing import Type, Tuple, Any, Dict, Union, Optional, get_args, get_origin, List, get_type_hints
 from pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOLE
 from re import compile as re
@@ -12,15 +13,15 @@ NONE_T = type(None)
 SCALAR_T = (bool, int, float, str)
 
 
-class UnsupportedArrayParameterError(RuntimeError):
+class UnsupportedParameterError(RuntimeError):
     def __init__(self, member_name: str, member_type: str, method_name: str = ""):
-        super(UnsupportedArrayParameterError, self).__init__("\n" + inspect.cleandoc(f"""
+        super(UnsupportedParameterError, self).__init__("\n" + inspect.cleandoc(f"""
         WARNING: Generating method `{method_name or 'unknown'}`:
         ----------------------------{"-"*len(method_name or 'unknown')}--
         
-            The request must be passed as a blob, since the array
-            member `{member_name}` has compound
-            type `{member_type}`.
+            The request must be passed as a blob, since the
+            member `{member_name}` has unsupported type
+            `{member_type}`.
             
             Please add the following argument to zswag.gen:
                 
@@ -93,9 +94,15 @@ def unpack_zserio_arg_type(t: Type, debug_field_name: str) -> Tuple[Optional[Typ
             if get_origin(result) is list:
                 arg_type = [get_args(result)[0]]
                 if arg_type[0] not in SCALAR_T:
-                    raise UnsupportedArrayParameterError(debug_field_name, arg_type[0].__name__)
+                    raise UnsupportedParameterError(debug_field_name, f"{arg_type[0].__name__}[]")
                 return None, arg_type
             if inspect.isclass(result):
+                if not issubclass(result, Enum):
+                    mandatory_init_param_count = sum(
+                        int(parameter.default == parameter.empty)
+                        for parameter in inspect.signature(result.__init__).parameters.values())
+                    if mandatory_init_param_count > 1:
+                        raise UnsupportedParameterError(debug_field_name, result.__name__)
                 return result, None
     return None, None
 
@@ -103,7 +110,7 @@ def unpack_zserio_arg_type(t: Type, debug_field_name: str) -> Tuple[Optional[Typ
 # Returns a class instance and a dictionary which reveals
 # recursive type information for scalar-(array-)typed zserio struct members.
 def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict[str, Any]]:
-    result_instance: t = t()
+    result_instance = t()
     result_member_types: Dict[str, Any] = {}
     # Zserio initializes nested child structs with None if they are not
     # specified in the constructor. This is a problem, since request
@@ -116,7 +123,9 @@ def make_instance_and_typeinfo(t: Type, field_name_prefix="") -> Tuple[Any, Dict
             if arg_name.endswith("_"):
                 field_name: str = arg_name.strip('_')
                 compound_type, scalar_type = unpack_zserio_arg_type(arg_type, field_name_prefix+field_name)
-                if compound_type:
+                if compound_type and issubclass(compound_type, Enum):
+                    arg_type = compound_type
+                elif compound_type:
                     instance, member_types = make_instance_and_typeinfo(
                         compound_type, field_name_prefix+field_name+".")
                     setattr(result_instance, f"_{field_name}_", instance)
@@ -142,14 +151,21 @@ def str_to_bytes(s: str, fmt: OAParamFormat) -> bytes:
 
 # Convert a single passed parameter value to it's correct type
 def parse_param_value(param: OAParam, target_type: Type, value: str) -> Any:
+
+    if issubclass(target_type, Enum):
+        return target_type(parse_param_value(param, int, value))
+
     if param.format == OAParamFormat.STRING:
         if target_type is bool:
             return bool(int(value))
         return target_type(value)
+
     if param.format == OAParamFormat.HEX and target_type is int:
         return int(value, 16)
+
     value_as_bytes = str_to_bytes(value, param.format)
     struct_literal_key = (target_type, len(value_as_bytes))
+
     if struct_literal_key in C_STRUCT_LITERAL_PER_TYPE_AND_SIZE:
         return target_type(struct.unpack(
             C_STRUCT_LITERAL_PER_TYPE_AND_SIZE[struct_literal_key],
@@ -178,7 +194,7 @@ def request_object_blob(*, req_t: Type, spec: OAMethod, **kwargs) -> bytes:
         # Get raw string value
         value: Union[str, List[str]] = param.default_value
         if param_name in kwargs:
-            value = kwargs[param_name]
+            value = kwargs[param_name.replace("-", "_")]
         # Convert string value to whole blob
         if param.field == ZSERIO_REQUEST_PART_WHOLE:
             return str_to_bytes(value, param.format)
@@ -187,7 +203,6 @@ def request_object_blob(*, req_t: Type, spec: OAMethod, **kwargs) -> bytes:
             req, req_field_types = make_instance_and_typeinfo(req_t)
         # Convert string value to correct type
         target_type = req_field_types[param.field]
-        converted_value: Any = None
         if type(target_type) is list:
             assert type(value) is list
             target_type = target_type[0]  # List element target type is first element of list
