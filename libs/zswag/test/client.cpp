@@ -119,6 +119,14 @@ int main (int argc, char* argv[]) {
             })).get<zsr::Introspectable>().value();
     }, std::string("foobar"), "Pass base64-encoded strings.");
 
+    runTest([](ZsrClient& zsrClient){
+        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.name")->call(
+            zsrClient,
+            zsr::make(zsr::packages(), "calculator.EnumWrapper", {
+                {"value", 42}
+            })).get<zsr::Introspectable>().value();
+    }, std::string("TEST_ENUM_0"), "Pass enum.");
+
     if (failureCounter > 0) {
         std::cout << stx::format("[cpp-test-client] Done, {} test(s) failed!", failureCounter);
         exit(1);

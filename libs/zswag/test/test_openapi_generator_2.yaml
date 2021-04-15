@@ -32,16 +32,16 @@ paths:
       description: ''
       operationId: byteSum
       parameters:
-      - description: Member of Unknown.
-        in: path
-        name: values
-        required: true
-        schema:
-          format: string
-          items:
-            type: string
-          type: array
-        x-zserio-request-part: values
+        - description: Member of Unknown.
+          in: path
+          name: values
+          required: true
+          schema:
+            format: string
+            items:
+              type: string
+            type: array
+          x-zserio-request-part: values
       responses:
         '200':
           content:
@@ -56,16 +56,16 @@ paths:
       description: ''
       operationId: concat
       parameters:
-      - description: Member of Unknown.
-        in: path
-        name: values
-        required: true
-        schema:
-          format: string
-          items:
-            type: string
-          type: array
-        x-zserio-request-part: values
+        - description: Member of Unknown.
+          in: path
+          name: values
+          required: true
+          schema:
+            format: string
+            items:
+              type: string
+            type: array
+          x-zserio-request-part: values
       responses:
         '200':
           content:
@@ -80,16 +80,16 @@ paths:
       description: ''
       operationId: floatMul
       parameters:
-      - description: Member of Unknown.
-        in: path
-        name: values
-        required: true
-        schema:
-          format: string
-          items:
-            type: string
-          type: array
-        x-zserio-request-part: values
+        - description: Member of Unknown.
+          in: path
+          name: values
+          required: true
+          schema:
+            format: string
+            items:
+              type: string
+            type: array
+          x-zserio-request-part: values
       responses:
         '200':
           content:
@@ -104,14 +104,14 @@ paths:
       description: ''
       operationId: identity
       parameters:
-      - description: Member of Unknown.
-        in: path
-        name: value
-        required: true
-        schema:
-          format: string
-          type: string
-        x-zserio-request-part: value
+        - description: Member of Unknown.
+          in: path
+          name: value
+          required: true
+          schema:
+            format: string
+            type: string
+          x-zserio-request-part: value
       responses:
         '200':
           content:
@@ -126,16 +126,16 @@ paths:
       description: ''
       operationId: intMul
       parameters:
-      - description: Member of Unknown.
-        in: path
-        name: values
-        required: true
-        schema:
-          format: string
-          items:
-            type: string
-          type: array
-        x-zserio-request-part: values
+        - description: Member of Unknown.
+          in: path
+          name: values
+          required: true
+          schema:
+            format: string
+            items:
+              type: string
+            type: array
+          x-zserio-request-part: values
       responses:
         '200':
           content:
@@ -150,16 +150,16 @@ paths:
       description: ''
       operationId: intSum
       parameters:
-      - description: Member of Unknown.
-        in: path
-        name: values
-        required: true
-        schema:
-          format: string
-          items:
-            type: string
-          type: array
-        x-zserio-request-part: values
+        - description: Member of Unknown.
+          in: path
+          name: values
+          required: true
+          schema:
+            format: string
+            items:
+              type: string
+            type: array
+          x-zserio-request-part: values
       responses:
         '200':
           content:
@@ -169,61 +169,83 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /power/{base-value}/{exponent-value}/{unused1}/{unused2}/{unused3}/{unused5}:
+  /name/{value}:
+    get:
+      description: ''
+      operationId: name
+      parameters:
+        - description: Member of Unknown.
+          in: path
+          name: value
+          required: true
+          schema:
+            format: string
+            type: string
+          x-zserio-request-part: value
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+  /power/{base__value}/{exponent__value}/{unused1}/{unused2}/{unused3}/{unused5}:
     get:
       description: ''
       operationId: power
       parameters:
-      - description: Member of Unknown.
-        in: path
-        name: base-value
-        required: true
-        schema:
-          format: string
-          type: string
-        x-zserio-request-part: base.value
-      - description: Member of Unknown.
-        in: path
-        name: exponent-value
-        required: true
-        schema:
-          format: string
-          type: string
-        x-zserio-request-part: exponent.value
-      - description: Member of Unknown.
-        in: path
-        name: unused1
-        required: true
-        schema:
-          format: string
-          type: string
-        x-zserio-request-part: unused1
-      - description: Member of Unknown.
-        in: path
-        name: unused2
-        required: true
-        schema:
-          format: string
-          type: string
-        x-zserio-request-part: unused2
-      - description: Member of Unknown.
-        in: path
-        name: unused3
-        required: true
-        schema:
-          format: string
-          type: string
-        x-zserio-request-part: unused3
-      - description: Member of Unknown.
-        in: path
-        name: unused5
-        required: true
-        schema:
-          format: string
-          items:
+        - description: Member of Unknown.
+          in: path
+          name: base-value
+          required: true
+          schema:
+            format: string
             type: string
-          type: array
-        x-zserio-request-part: unused5
+          x-zserio-request-part: base.value
+        - description: Member of Unknown.
+          in: path
+          name: exponent-value
+          required: true
+          schema:
+            format: string
+            type: string
+          x-zserio-request-part: exponent.value
+        - description: Member of Unknown.
+          in: path
+          name: unused1
+          required: true
+          schema:
+            format: string
+            type: string
+          x-zserio-request-part: unused1
+        - description: Member of Unknown.
+          in: path
+          name: unused2
+          required: true
+          schema:
+            format: string
+            type: string
+          x-zserio-request-part: unused2
+        - description: Member of Unknown.
+          in: path
+          name: unused3
+          required: true
+          schema:
+            format: string
+            type: string
+          x-zserio-request-part: unused3
+        - description: Member of Unknown.
+          in: path
+          name: unused5
+          required: true
+          schema:
+            format: string
+            items:
+              type: string
+            type: array
+          x-zserio-request-part: unused5
       responses:
         '200':
           content:

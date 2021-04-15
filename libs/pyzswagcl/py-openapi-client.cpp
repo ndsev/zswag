@@ -21,6 +21,10 @@ namespace
             return i64;
         }
 
+        if (PyObject_HasAttrString(value, "value")) { // enum item
+            return valueFromPyObject(PyObject_GetAttrString(value, "value"));
+        }
+
         if (PyFloat_Check(value)) {
             return PyFloat_AsDouble(value);
         }
@@ -37,9 +41,9 @@ namespace
             return static_cast<uint64_t>(0);
         }
 
-        throw std::runtime_error(
+        throw pybind11::type_error(
             stx::format("Conversion error: Got {}, which was not recognized as a valid value type.",
-                PyUnicode_AsUTF8(PyObject_Str(PyObject_Type(value)))));
+                std::string(py::repr(value))));
     }
 
     std::vector<Any> valuesFromPyArray(PyObject* value) {

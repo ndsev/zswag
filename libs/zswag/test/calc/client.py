@@ -81,6 +81,12 @@ def run(host, port):
         api.Calculator.Client.concat,
         "foobar")
 
+    run_test(
+        "Pass enum.",
+        api.EnumWrapper(api.Enum.TEST_ENUM_0),
+        api.Calculator.Client.name,
+        "TEST_ENUM_0")
+
     if failed > 0:
         print(f"[py-test-client] Done, {failed} test(s) failed!", flush=True)
         exit(1)

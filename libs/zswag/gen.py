@@ -20,7 +20,7 @@ from .reflect import \
     make_instance_and_typeinfo, \
     service_method_request_type, \
     rgetattr, \
-    UnsupportedArrayParameterError
+    UnsupportedParameterError
 from .doc import get_doc_str, IdentType, md_filter_definition
 
 HTTP_METHOD_TAGS = ("get", "put", "post", "patch", "delete")
@@ -245,15 +245,15 @@ class OpenApiSchemaGenerator:
             _, field_type_info = make_instance_and_typeinfo(
                 service_method_request_type(
                     self.service_instance, result.name))
-        except UnsupportedArrayParameterError as e:
-            print(UnsupportedArrayParameterError(e.member_name, e.member_type, result.name))
+        except UnsupportedParameterError as e:
+            print(UnsupportedParameterError(e.member_name, e.member_type, result.name))
             return False
 
         param_loc_str = "query"
         if param_loc is OAParamLocation.PATH:
             param_loc_str = "path"
             for field_name in field_type_info:
-                result.path += f"/{{{field_name.replace('.', '-')}}}"
+                result.path += f"/{{{field_name.replace('.', '__')}}}"
         result.parameters = {
             "parameters": [
                 {
