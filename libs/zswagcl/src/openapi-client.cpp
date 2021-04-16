@@ -130,7 +130,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
         return std::move(result.content);
     }
 
-    throw std::runtime_error(stx::format("HTTP status code {} (method: {}, path: {}, uri: {})",
-                                         result.status, httpMethod, uri.buildPath(), uri.build()));
+    throw httpcl::IHttpClient::Error(result, stx::format("HTTP status code {} (method: {}, path: {}, uri: {})",
+                                                         result.status, httpMethod, uri.buildPath(), uri.build()));
 }
 }

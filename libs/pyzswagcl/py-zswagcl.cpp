@@ -23,6 +23,8 @@ PYBIND11_MODULE(pyzswagcl, m)
     py::bind_map<PyOpenApiClient::Headers>(m, "HeaderMap");
     py::implicitly_convertible<py::dict, PyOpenApiClient::Headers>();
 
+    py::register_exception<httpcl::IHttpClient::Error>(m, "HTTPError");
+
     ///////////////////////////////////////////////////////////////////////////
     // ParameterLocation
 
