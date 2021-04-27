@@ -5,6 +5,7 @@
 #include <memory>
 #include <functional>
 #include <map>
+#include <stdexcept>
 
 namespace httpcl
 {
@@ -15,6 +16,15 @@ public:
     struct Result {
         int status;
         std::string content;
+    };
+
+    struct Error : std::runtime_error {
+        Result result;
+
+        Error(Result result, std::string message)
+            : std::runtime_error(std::move(message))
+            , result(std::move(result))
+        {}
     };
 
     virtual ~IHttpClient() = default;

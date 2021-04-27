@@ -223,11 +223,11 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& s)
 OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
                                  httpcl::IHttpClient& client)
 {
-    // Load client config content
+    // Load client config content.
     auto uriParts = httpcl::URIComponents::fromStrRfc3986(url);
     auto res = client.get(uriParts.build());
 
-    // Create client from loaded config JSON
+    // Create client from loaded config JSON.
     if (res.status >= 200 && res.status < 300) {
         std::stringstream ss(res.content, std::ios_base::in);
 
@@ -242,8 +242,10 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
         return config;
     }
 
-    throw std::runtime_error("Error configuring service; http-status: "s +
-                             std::to_string(res.status));
+    // FIXME: Python code is parsing the HTTP status from exception message!
+    //        Pybind11 does not support custom exception types yet.
+    throw httpcl::IHttpClient::Error(res, stx::format("Error configuring OpenAPI service from URI: '{}', "
+                                                      "status: {}, content: '{}'", url, res.status, res.content));
 }
 
 }
