@@ -258,7 +258,7 @@ class OpenApiSchemaGenerator:
             "parameters": [
                 {
                     "in": param_loc_str,
-                    "name": field_name.replace('.', '-'),
+                    "name": field_name.replace('.', '__'),
                     "description": f"Member of {result.argtype}.",
                     "required": True,
                     **(
