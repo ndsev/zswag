@@ -198,7 +198,7 @@ paths:
       parameters:
         - description: Member of Unknown.
           in: path
-          name: base-value
+          name: base__value
           required: true
           schema:
             format: string
@@ -206,7 +206,7 @@ paths:
           x-zserio-request-part: base.value
         - description: Member of Unknown.
           in: path
-          name: exponent-value
+          name: exponent__value
           required: true
           schema:
             format: string
