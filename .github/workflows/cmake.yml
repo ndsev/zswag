@@ -52,23 +52,29 @@ jobs:
         architecture: x64
     - run: python -m pip install setuptools wheel
     - run: mkdir build
-    - name: Configure (macOS)
+    - name: Build (macOS)
       if: matrix.os == 'macos-latest'
       working-directory: build
       run: |
+        python -m pip install delocate
         brew install openssl
         export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
-        cmake -DPython3_ROOT_DIR=$pythonLocation -DPython3_FIND_FRAMEWORK=LAST ..
-    - name: Configure (Windows)
+        cmake -DPython3_ROOT_DIR=$pythonLocation \
+              -DPython3_FIND_FRAMEWORK=LAST \
+              -DHTTPLIB_USE_BROTLI_IF_AVAILABLE=OFF ..
+        cmake --build .
+        mv bin/wheel bin/wheel-auditme  # Same as on Linux
+        mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
+        ../deps/python-cmake-wheel/repair-wheel-macos.bash \
+              "$(pwd)"/bin/wheel-auditme/pyzswagcl*.whl \
+              "$(pwd)"/bin/wheel pyzswagcl
+    - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       working-directory: build
       run: |
         choco install --no-progress -y openssl
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
         cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST ..
-    - name: Build
-      working-directory: build
-      run: |
         cmake --build .
     - name: Test
       working-directory: build
