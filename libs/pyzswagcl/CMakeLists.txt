@@ -1,10 +1,10 @@
 project(pyzswagcl)
 
 pybind11_add_module(pyzswagcl
-  SHARED
-  py-zswagcl.cpp
-  py-openapi-client.cpp
-  py-openapi-client.h)
+  MODULE
+    py-zswagcl.cpp
+    py-openapi-client.cpp
+    py-openapi-client.h)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   target_compile_options(pyzswagcl PUBLIC /permissive-)
