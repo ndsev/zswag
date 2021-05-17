@@ -35,8 +35,7 @@ struct HttpLibHttpClient::Impl
         client->enable_server_certificate_verification(false);
         client->set_connection_timeout(60000);
         client->set_read_timeout(60000);
-        client->set_default_headers({headers.begin(), headers.end()});
-        settings.apply(uri.build(), *client);
+        settings.apply(uri.build(), *client, headers);
 
         return client;
     }
