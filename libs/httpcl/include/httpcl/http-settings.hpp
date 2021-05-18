@@ -44,12 +44,9 @@ struct HTTPSettings
      * Apply matching (url) settings to http-client instance.
      * May read keychain passwords which can block and require user interaction.
      */
-    void apply(const std::string& url, httplib::Client& client);
-
-    /**
-     * Return settings entry with url pattern, or null if none was found.
-     */
-    Settings* find(const std::string& urlPattern);
+    void apply(const std::string& url,
+               httplib::Client& client,
+               std::map<std::string, std::string> const& initial_headers);
 
     /**
      * Read password from system keychain.

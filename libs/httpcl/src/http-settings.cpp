@@ -190,9 +190,11 @@ void HTTPSettings::store()
     }
 }
 
-void HTTPSettings::apply(std::string const& url, httplib::Client& client)
+void HTTPSettings::apply(std::string const& url,
+                         httplib::Client& client,
+                         std::map<std::string, std::string> const& initial_headers)
 {
-    httplib::Headers headers;
+    httplib::Headers headers{initial_headers.begin(), initial_headers.end()};
 
     for (auto const& pair : settings) {
         if (!std::regex_match(url, std::regex(pair.first)))
