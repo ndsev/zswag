@@ -17,7 +17,7 @@ jobs:
         run: |
           python3 -m venv venv && . ./venv/bin/activate
           pip install -U setuptools wheel pip
-          mkdir build && cd build && cmake ..
+          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
       - name: Build
         working-directory: build
         run: |
@@ -30,7 +30,7 @@ jobs:
         working-directory: build
         run: |
           . ../venv/bin/activate
-          ctest -C Debug --verbose --no-test=fail
+          ctest -C Release --verbose --no-test=fail
       - name: Deploy
         uses: actions/upload-artifact@v2
         with:
@@ -61,6 +61,7 @@ jobs:
         export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
         cmake -DPython3_ROOT_DIR=$pythonLocation \
               -DPython3_FIND_FRAMEWORK=LAST \
+              -DCMAKE_BUILD_TYPE=Release \
               -DHTTPLIB_USE_BROTLI_IF_AVAILABLE=OFF ..
         cmake --build .
         mv bin/wheel bin/wheel-auditme  # Same as on Linux
@@ -74,12 +75,12 @@ jobs:
       run: |
         choco install --no-progress -y openssl
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
-        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST ..
-        cmake --build .
+        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release ..
+        cmake --build . --config Release
     - name: Test
       working-directory: build
       run: |
-        ctest -C Debug --verbose --no-test=fail
+        ctest -C Release --verbose --no-test=fail
     - name: Deploy
       uses: actions/upload-artifact@v2
       with:
