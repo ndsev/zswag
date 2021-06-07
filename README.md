@@ -61,6 +61,8 @@ Simply run `pip install zswag`. **Note: This only works with ...**
 
 * 64-bit Python 3.8.x, `pip --version` >= 19.3
 * 64-bit Python 3.9.x, `pip --version` >= 19.3
+
+**Note:** On Windows, make sure that you have the *Microsoft Visual C++ Redistributable Binaries* installed. You can find the x64 installer here: https://aka.ms/vs/16/release/vc_redist.x64.exe
  
 ### For C++ Users
 
