@@ -18,7 +18,7 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Server Component (Python)](#server-component)
   * [Using the Python Client](#using-the-python-client)
   * [C++ Client](#c-client)
-  * [HTTP Proxies and Authentication](#http-proxies-and-authentication)
+  * [HTTP Proxies and Authentication](#persistent-http-headers-proxy-cookie-and-authentication)
   * [Swagger User Interface](#swagger-user-interface)
   * [OpenAPI Options Interoperability](#openapi-options-interoperability)
     + [HTTP method](#http-method)
@@ -319,7 +319,7 @@ In this setting, a client `myapp/client.py` might look as follows:
 from zswag import OAClient
 import services.api as services
 
-openapi_url = f"http://localhost:5000/openapi.json"
+openapi_url = "http://localhost:5000/openapi.json"
 
 # The client reads per-method HTTP details from the OpenAPI URL.
 # You can also pass a local file by setting the `is_local_file` argument
@@ -333,10 +333,29 @@ client.my_api(services.Request(1))
 As you can see, an instance of `OAClient` is passed into the constructor
 for zserio to use as the service client's transport implementation.
 
-**Note:** While connecting, the client will also pass ...
-1. [Authentication headers/cookies](#http-proxies-and-authentication).
-2. Additional HTTP headers passed into the `OAClient` constructor as a
-   dictionary like `{HTTP-Header-Name: Value}`
+**Note:** While connecting, the client will also use ...
+1. [Persistent HTTP configuration](#persistent-http-headers-proxy-cookie-and-authentication).
+2. Additional HTTP query/header/cookie/proxy/basic-auth configs passed
+   into the `OAClient` constructor using an instance of `zswag.HTTPConfig`.
+   For example:
+   
+   ```python
+   from zswag import OAClient, HTTPConfig
+   import services.api as services
+   config = HTTPConfig() \
+       .header(key="X-My-Header", val="value") \
+       .proxy(host="localhost", port=5050, user="john", pw="doe") \
+       .basic_auth(user="john", pw="doe") \
+       .cookie(key="MyCookie", val="value") \
+       .query(key="MyCookie", val="value")
+   client = services.MyService.Client(
+       OAClient("http://localhost:8080/openapi.", config))
+   ```
+   
+   **Note:** The additional `config` will only enrich, not overwrite the
+   default persistent configuration. If you would like to prevent persistent
+   config from being considered at all, set `HTTP_SETTINGS_FILE` to empty,
+   e.g. via `os.environ['HTTP_SETTINGS_FILE']=''`
 
 ## C++ Client
 
@@ -429,12 +448,17 @@ int main (int argc, char* argv[])
 Unlike the Python client, the C++ OpenAPI client (`ZsrClient`) is passed directly to
 the endpoint method invocation, not to an intermediate zserio Client object.
 
-**Note:** While connecting, `HttpLibHttpClient` will also pass ...
-1. [Authentication headers/cookies](#http-proxies-and-authentication).
-2. Additional HTTP headers passed into the `HttpLibHttpClient` constructor
-   as key-value-pairs in an `std::map<string, string>`.
+**Note:** While connecting, `HttpLibHttpClient` will also use ...
+1. [Persistent HTTP configuration](#persistent-http-headers-proxy-cookie-and-authentication).
+2. Additional HTTP query/header/cookie/proxy/basic-auth configs passed
+   into the `HttpLibHttpClient` constructor using an instance of `httpcl::Config`.
+   You can include this class via `#include "httpcl/http-settings.hpp"`.
+   The additional `Config` will only enrich, not overwrite the
+   default persistent configuration. If you would like to prevent persistent
+   config from being considered at all, set `HTTP_SETTINGS_FILE` to empty,
+   e.g. via `setenv`
 
-## HTTP Proxies and Authentication
+## Persistent HTTP Headers, Proxy, Cookie and Authentication
 
 Both the Python `OAClient` and C++ `HttpLibHttpClient` read a YAML file
 stored under a path which is given by the `HTTP_SETTINGS_FILE` environment
@@ -456,7 +480,11 @@ url-match-pattern:
     user: test
     keychain: ...
   cookies:
-    test: value
+    key: value
+  headers:
+    key: value
+  query:
+    key: value
 ```
 
 **Note:** For `proxy` configs, the credentials are optional.
@@ -531,13 +559,13 @@ Zswag tools support an additional OpenAPI method parameter
 field called `x-zserio-request-part`. Through this field,
 a service provider can express that a certain request parameter
 only contains a part of, or the whole zserio request object.
-When the whole request object is contained, `x-zserio-request-part`
+When parameter contains the whole request object, `x-zserio-request-part`
 should be set to an asterisk (`*`):
 
 ```yaml
 parameters:
 - description: ''
-  in: query|path
+  in: query|path|header
   name: parameterName
   required: true
   x-zserio-request-part: "*"
@@ -572,10 +600,10 @@ only a single scalar (nested) member of the request object:
 ```yaml
 parameters:
 - description: ''
-  in: query|path
+  in: query|path|header
   name: parameterName
   required: true
-  x-zserio-request-part: "[parent_field.]*subfield"
+  x-zserio-request-part: "[parent.]*member"
   schema:
     format: string|byte|base64|base64url|hex|binary
 ```
@@ -601,12 +629,12 @@ the zserio request struct, like so:
 ```yaml
 parameters:
 - description: ''
-  in: query|path
+  in: query|path|header
   style: form|simple|label|matrix
   explode: true|false
   name: parameterName
   required: true
-  x-zserio-request-part: "[parent_field.]*array_member"
+  x-zserio-request-part: "[parent.]*array_member"
   schema:
     format: string|byte|base64|base64url|hex|binary
 ```

@@ -167,12 +167,16 @@ struct ParameterValue
     /**
      * Make query key-value pair.
      *
-     * Styles supported:
-     *   * Form
+     * For Query location, supported styles are:
+     *   * Form, explode=false
+     *   * Form, explode=true
+     *
+     * For Header location, supported styles are:
+     *   * Form, explode=false
      *
      * @see https://swagger.io/docs/specification/serialization/
      */
-    std::vector<std::pair<std::string, std::string>> queryPairs(const OpenAPIConfig::Parameter&) const;
+    std::vector<std::pair<std::string, std::string>> queryOrHeaderPairs(const OpenAPIConfig::Parameter&) const;
 };
 
 class ParameterValueHelper

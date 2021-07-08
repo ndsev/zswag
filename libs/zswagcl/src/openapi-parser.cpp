@@ -22,6 +22,8 @@ static auto parseParameterLocation(const YAML::Node& inNode)
         return OpenAPIConfig::Parameter::Query;
     else if (str == "path")
         return OpenAPIConfig::Parameter::Path;
+    else if (str == "header")
+        return OpenAPIConfig::Parameter::Header;
 
     throw std::runtime_error("Unsupported parameter location");
 }
@@ -63,6 +65,10 @@ static void parseParameterStyle(const YAML::Node& styleNode,
 {
     /* Set default style for parameter location */
     switch (parameter.location) {
+    case OpenAPIConfig::Parameter::Header:
+        parameter.style = OpenAPIConfig::Parameter::Form;
+        parameter.explode = false;
+        break;
     case OpenAPIConfig::Parameter::Query:
         parameter.style = OpenAPIConfig::Parameter::Form;
         parameter.explode = true;
@@ -75,14 +81,22 @@ static void parseParameterStyle(const YAML::Node& styleNode,
 
     if (styleNode) {
         const auto& styleStr = styleNode.as<std::string>();
-        if (styleStr == "matrix")
+        if (styleStr == "matrix") {
+            // TODO: Make sure location is path
             parameter.style = OpenAPIConfig::Parameter::Matrix;
-        if (styleStr == "label")
+        }
+        if (styleStr == "label") {
+            // TODO: Make sure location is path
             parameter.style = OpenAPIConfig::Parameter::Label;
-        if (styleStr == "form")
-            parameter.style = OpenAPIConfig::Parameter::Form;
-        if (styleStr == "simple")
+        }
+        if (styleStr == "simple") {
+            // TODO: Make sure location is path
             parameter.style = OpenAPIConfig::Parameter::Simple;
+        }
+        if (styleStr == "form") {
+            // TODO: Make sure location is not path
+            parameter.style = OpenAPIConfig::Parameter::Form;
+        }
     }
 }
 
@@ -93,6 +107,7 @@ static void parseParameterExplode(const YAML::Node& explodeNode,
         auto explodeBool = explodeNode.as<bool>();
 
         parameter.explode = explodeBool;
+        // TODO: If explode, make sure location is query or path
     }
 }
 
@@ -225,7 +240,7 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
 {
     // Load client config content.
     auto uriParts = httpcl::URIComponents::fromStrRfc3986(url);
-    auto res = client.get(uriParts.build());
+    auto res = client.get(uriParts.build(), {});
 
     // Create client from loaded config JSON.
     if (res.status >= 200 && res.status < 300) {
@@ -244,8 +259,13 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
 
     // FIXME: Python code is parsing the HTTP status from exception message!
     //        Pybind11 does not support custom exception types yet.
-    throw httpcl::IHttpClient::Error(res, stx::format("Error configuring OpenAPI service from URI: '{}', "
-                                                      "status: {}, content: '{}'", url, res.status, res.content));
+    throw httpcl::IHttpClient::Error(
+        res,
+        stx::format(
+            "Error configuring OpenAPI service from URI: '{}', status: {}, content: '{}'",
+            url,
+            res.status,
+            res.content));
 }
 
 }

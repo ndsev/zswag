@@ -16,10 +16,11 @@ static const char* KEYCHAIN_PACKAGE = "lib.openapi.zserio.client";
 
 namespace YAML
 {
+
 template <>
-struct convert<HTTPSettings::BasicAuthentication>
+struct convert<Config::BasicAuthentication>
 {
-    static Node encode(const HTTPSettings::BasicAuthentication& a)
+    static Node encode(const Config::BasicAuthentication& a)
     {
         Node node;
         node["user"] = a.user;
@@ -31,7 +32,7 @@ struct convert<HTTPSettings::BasicAuthentication>
         return node;
     }
 
-    static bool decode(const Node& node, HTTPSettings::BasicAuthentication& a)
+    static bool decode(const Node& node, Config::BasicAuthentication& a)
     {
         if (!node.IsMap())
             return false;
@@ -57,9 +58,9 @@ struct convert<HTTPSettings::BasicAuthentication>
 };
 
 template <>
-struct convert<HTTPSettings::Proxy>
+struct convert<Config::Proxy>
 {
-    static Node encode(const HTTPSettings::Proxy& a)
+    static Node encode(const Config::Proxy& a)
     {
         Node node;
         node["host"] = a.host;
@@ -76,7 +77,7 @@ struct convert<HTTPSettings::Proxy>
         return node;
     }
 
-    static bool decode(const Node& node, HTTPSettings::Proxy& a)
+    static bool decode(const Node& node, Config::Proxy& a)
     {
         const auto& host = node["host"];
         const auto& port = node["port"];
@@ -107,17 +108,95 @@ struct convert<HTTPSettings::Proxy>
 };
 }
 
-HTTPSettings::HTTPSettings()
+std::string secret::load(
+        const std::string &service,
+        const std::string &user)
+{
+    auto result = std::async(std::launch::async, [=]() {
+        keychain::Error error;
+        auto password = keychain::getPassword(
+                KEYCHAIN_PACKAGE,
+                service,
+                user,
+                error);
+
+        if (error)
+            throw std::runtime_error(error.message);
+        return password;
+    });
+
+    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
+        return {};
+
+    return result.get();
+}
+
+std::string secret::store(
+        const std::string &service,
+        const std::string &user,
+        const std::string &password)
+{
+    auto randServiceId = []() {
+        std::string id(12, '.');
+        std::generate(id.begin(), id.end(), []() {
+            return "0123456789abcdef"[rand() % 16];
+        });
+        return id;
+    };
+
+    auto newService = service.empty()
+                      ? "service password "s + randServiceId()
+                      : service;
+
+    auto result = std::async(std::launch::async, [=]() {
+        keychain::Error error;
+        keychain::setPassword(KEYCHAIN_PACKAGE,
+                              newService,
+                              user,
+                              password,
+                              error);
+
+        if (error)
+            throw std::runtime_error(error.message);
+    });
+
+    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
+        return {};
+
+    return newService;
+}
+
+bool secret::remove(
+        const std::string &service,
+        const std::string &user)
+{
+    auto result = std::async(std::launch::async, [=]() {
+        keychain::Error error;
+        keychain::deletePassword(KEYCHAIN_PACKAGE,
+                                 service,
+                                 user,
+                                 error);
+
+        return error;
+    });
+
+    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
+        return false;
+
+    return result.get();
+}
+
+Settings::Settings()
 {
     load();
 }
 
-void HTTPSettings::load()
+void Settings::load()
 {
     settings.clear();
 
     auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
-    if (!cookieJar)
+    if (!cookieJar || strcmp(cookieJar, "") == 0)
         return;
 
     try {
@@ -125,26 +204,26 @@ void HTTPSettings::load()
         uint32_t idx = 0;
 
         for (auto const& entry : node.as<std::vector<YAML::Node>>()) {
-            Settings settings;
+            Config conf;
             std::string urlPattern;
 
             if (auto entryParam = entry["url"])
                 urlPattern = entryParam.as<std::string>();
             else
                 throw std::runtime_error(
-                    "HTTPSettings: Failed to read 'url' of entry #"s + std::to_string(idx) +
+                    "Settings: Failed to read 'url' of entry #"s + std::to_string(idx) +
                     " in " + cookieJar);
 
             if (auto cookies = entry["cookies"])
-                settings.cookies = cookies.as<std::map<std::string, std::string>>();
+                conf.cookies = cookies.as<std::map<std::string, std::string>>();
 
             if (auto basicAuth = entry["basic-auth"])
-                settings.auth = basicAuth.as<HTTPSettings::BasicAuthentication>();
+                conf.auth = basicAuth.as<Config::BasicAuthentication>();
 
             if (auto proxy = entry["proxy"])
-                settings.proxy = proxy.as<HTTPSettings::Proxy>();
+                conf.proxy = proxy.as<Config::Proxy>();
 
-            this->settings[urlPattern] = std::move(settings);
+            settings[urlPattern] = std::move(conf);
             ++idx;
         }
     } catch (const YAML::BadFile&) {
@@ -155,7 +234,7 @@ void HTTPSettings::load()
     }
 }
 
-void HTTPSettings::store()
+void Settings::store()
 {
     auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
     if (!cookieJar)
@@ -179,7 +258,7 @@ void HTTPSettings::store()
             if (const auto& proxy = entry.proxy)
                 settingsNode["proxy"] = *proxy;
 
-            node.push_back(std::move(settingsNode));
+            node.push_back(settingsNode);
         }
 
         std::ofstream os(cookieJar);
@@ -190,129 +269,69 @@ void HTTPSettings::store()
     }
 }
 
-void HTTPSettings::apply(std::string const& url,
-                         httplib::Client& client,
-                         std::map<std::string, std::string> const& initial_headers)
+Config Settings::operator[] (const std::string &url) const
 {
-    httplib::Headers headers{initial_headers.begin(), initial_headers.end()};
+    Config result;
 
-    for (auto const& pair : settings) {
-        if (!std::regex_match(url, std::regex(pair.first)))
+    for (auto const& [pattern, config] : settings)
+    {
+        if (!std::regex_match(url, std::regex(pattern)))
             continue;
-
-        const auto& entry = pair.second;
-
-        /* Cookies */
-        std::string cookieHeaderValue;
-        for (const auto& cookie : entry.cookies) {
-            if (!cookieHeaderValue.empty())
-                cookieHeaderValue += "; ";
-            cookieHeaderValue += cookie.first + "=" + cookie.second;
-        }
-
-        if (!cookieHeaderValue.empty())
-            headers.insert({"Cookie", cookieHeaderValue});
-
-        /* Basic Authentication */
-        if (const auto& auth = entry.auth) {
-            auto password = auth->password;
-            if (!auth->keychain.empty()) {
-                password = loadPassword(auth->keychain,
-                                        auth->user);
-            }
-
-            headers.insert(httplib::make_basic_authentication_header(auth->user.c_str(),
-                                                                     password.c_str()));
-        }
-
-        /* Proxy Settings */
-        if (const auto& proxy = entry.proxy) {
-            client.set_proxy(proxy->host.c_str(), proxy->port);
-
-            auto password = proxy->password;
-            if (!proxy->keychain.empty())
-                password = loadPassword(proxy->keychain,
-                                        proxy->user);
-
-            if (!proxy->user.empty())
-                client.set_proxy_basic_auth(proxy->user.c_str(),
-                                            password.c_str());
-        }
+        result |= config;
     }
 
-    client.set_default_headers(std::move(headers));
+    return result;
 }
 
-std::string HTTPSettings::loadPassword(const std::string& service,
-                                       const std::string& user)
+void Config::apply(httplib::Client &cl) const
 {
-    auto result = std::async(std::launch::async, [=]() {
-        keychain::Error error;
-        auto password = keychain::getPassword(KEYCHAIN_PACKAGE,
-                                              service,
-                                              user,
-                                              error);
+    httplib::Headers httpLibHeaders{headers.begin(), headers.end()};
 
-        if (error)
-            throw std::runtime_error(error.message);
-        return password;
-    });
+    // Cookies
+    std::string cookieHeaderValue;
+    for (const auto& cookie : cookies) {
+        if (!cookieHeaderValue.empty())
+            cookieHeaderValue += "; ";
+        cookieHeaderValue += cookie.first + "=" + cookie.second;
+    }
 
-    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
-        return {};
+    if (!cookieHeaderValue.empty())
+        httpLibHeaders.insert({"Cookie", cookieHeaderValue});
 
-    return result.get();
+    // Basic Authentication
+    if (auth) {
+        auto password = auth->password;
+        if (!auth->keychain.empty()) {
+            password = secret::load(auth->keychain, auth->user);
+        }
+        httpLibHeaders.insert(
+            httplib::make_basic_authentication_header(auth->user, password));
+    }
+
+    // Proxy Settings
+    if (proxy) {
+        cl.set_proxy(proxy->host.c_str(), proxy->port);
+
+        auto password = proxy->password;
+        if (!proxy->keychain.empty())
+            password = secret::load(proxy->keychain, proxy->user);
+
+        if (!proxy->user.empty())
+            cl.set_proxy_basic_auth(
+                proxy->user.c_str(), password.c_str());
+    }
+
+    cl.set_default_headers(httpLibHeaders);
 }
 
-std::string HTTPSettings::storePassword(const std::string& service,
-                                        const std::string& user,
-                                        const std::string& password)
-{
-    auto randServiceId = []() {
-        std::string id(12, '.');
-        std::generate(id.begin(), id.end(), []() {
-            return "0123456789abcdef"[rand() % 16];
-        });
-        return id;
-    };
-
-    auto newService = service.empty()
-        ? "service password "s + randServiceId()
-        : service;
-
-    auto result = std::async(std::launch::async, [=]() {
-        keychain::Error error;
-        keychain::setPassword(KEYCHAIN_PACKAGE,
-                              newService,
-                              user,
-                              password,
-                              error);
-
-        if (error)
-            throw std::runtime_error(error.message);
-    });
-
-    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
-        return {};
-
-    return newService;
+Config& Config::operator |= (Config const& other) {
+    cookies.insert(other.cookies.begin(), other.cookies.end());
+    headers.insert(other.headers.begin(), other.headers.end());
+    query.insert(other.query.begin(), other.query.end());
+    if (other.auth)
+        auth = other.auth;
+    if (other.proxy)
+        proxy = other.proxy;
+    return *this;
 }
 
-bool HTTPSettings::deletePassword(const std::string& service,
-                                  const std::string& user)
-{
-    auto result = std::async(std::launch::async, [=]() {
-        keychain::Error error;
-        keychain::deletePassword(KEYCHAIN_PACKAGE,
-                                 service,
-                                 user,
-                                 error);
-
-        return error;
-    });
-
-    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
-        return false;
-
-    return result.get();
-}

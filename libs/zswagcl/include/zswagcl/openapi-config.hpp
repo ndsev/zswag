@@ -16,11 +16,11 @@ struct OpenAPIConfig
         enum Location {
             Path,
             Query,
+            Header
         } location = Query;
 
         /**
-         * Parameter identifier (from template) without style/explode
-         * hints ({?X*} -> X).
+         * Parameter identifier.
          */
         std::string ident;
 
