@@ -29,6 +29,7 @@ target_link_libraries(zswagcl
     stx
     httpcl
     zsr
+    speedyj
     httplib::httplib
     yaml-cpp
     ZserioCppRuntime)
