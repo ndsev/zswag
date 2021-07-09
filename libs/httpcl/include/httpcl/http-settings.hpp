@@ -6,14 +6,18 @@
 #include <vector>
 #include <string>
 
+
 namespace httpcl
 {
 
+using Headers = std::multimap<std::string, std::string>;
+using Query = std::multimap<std::string, std::string>;
+using HeadersAndQuery = std::pair<Headers, Query>;
+
 /**
- * Loads HTTP_SETTINGS_FILE.
- * Allows returning settings for a specific URL.
+ *
  */
-struct HTTPSettings
+struct Config
 {
     struct BasicAuthentication {
         std::string user;
@@ -29,48 +33,72 @@ struct HTTPSettings
         std::string keychain;
     };
 
-    struct Settings {
-        std::map<std::string, std::string> cookies;
-        std::optional<BasicAuthentication> auth;
-        std::optional<Proxy> proxy;
-    };
+    std::map<std::string, std::string> cookies;
+    std::optional<BasicAuthentication> auth;
+    std::optional<Proxy> proxy;
+    Headers headers;
+    Query query;
 
-    HTTPSettings();
+    /**
+     * Merge this configuration with another.
+     */
+    Config& operator |= (Config const& other);
+
+    /**
+     * Apply this configuration to an httplib client.
+     * May read keychain passwords which can block and require user interaction.
+     */
+    void apply(httplib::Client& cl) const;
+};
+
+/**
+ * Loads settings from HTTP_SETTINGS_FILE.
+ * Allows returning config for a specific URL.
+ */
+struct Settings
+{
+    Settings();
 
     void load();
     void store();
 
     /**
-     * Apply matching (url) settings to http-client instance.
-     * May read keychain passwords which can block and require user interaction.
+     * Get aggregated configuration for the given URL.
      */
-    void apply(const std::string& url,
-               httplib::Client& client,
-               std::map<std::string, std::string> const& initial_headers);
+    Config operator[](const std::string& url) const;
 
+    /**
+     * Map from URL pattern to some config values.
+     */
+    std::map<std::string, Config> settings;
+};
+
+struct secret
+{
     /**
      * Read password from system keychain.
      * Returns keychain service string.
      */
-    static std::string loadPassword(const std::string& service,
-                                    const std::string& user);
+    static std::string load(
+        const std::string& service,
+        const std::string& user);
 
     /**
      * Store password into system keychain.
      * Returns the generated keychain service string to be set as `keychain`.
      */
-    static std::string storePassword(const std::string& service,
-                                     const std::string& user,
-                                     const std::string& password);
+    static std::string store(
+        const std::string& service,
+        const std::string& user,
+        const std::string& password);
 
     /**
      * Delete keychain password.
      * Returns `true` on success.
      */
-    static bool deletePassword(const std::string& service,
-                               const std::string& user);
-
-    std::map<std::string, Settings> settings; /* url-pattern -> settings */
+    static bool remove(
+        const std::string& service,
+        const std::string& user);
 };
 
 }

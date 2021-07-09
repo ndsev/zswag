@@ -28,7 +28,7 @@ def run(host, port):
             print(f"[py-test-client]   -> ERROR: {str(e) or type(e).__name__}", flush=True)
 
     run_test(
-        "Pass fields in path and query",
+        "Pass fields in path and header",
         api.BaseAndExponent(api.I32(2), api.I32(3)),
         api.Calculator.Client.power,
         8.)

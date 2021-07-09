@@ -65,7 +65,37 @@ PYBIND11_MODULE(pyzswagcl, m)
             ;
 
     ///////////////////////////////////////////////////////////////////////////
-    // HTTPService::Config
+    // httpcl::Config
+
+    py::class_<httpcl::Config>(m, "HTTPConfig")
+        .def(py::init<>())
+        .def("header", [](httpcl::Config& self, std::string const& key, std::string const& value) {
+            self.headers.insert({key, value});
+            return &self;
+        }, "key"_a, "val"_a)
+        .def("query", [](httpcl::Config& self, std::string const& key, std::string const& value) {
+            self.query.insert({key, value});
+            return &self;
+        }, "key"_a, "val"_a)
+        .def("cookie", [](httpcl::Config& self, std::string const& key, std::string const& value) {
+            self.cookies.insert({key, value});
+            return &self;
+        }, "key"_a, "val"_a)
+        .def("basic_auth", [](httpcl::Config& self, std::string const& user, std::string const& pw) {
+            self.auth = httpcl::Config::BasicAuthentication{
+                user, pw, ""
+            };
+            return &self;
+        }, "user"_a, "pw"_a)
+        .def("proxy", [](httpcl::Config& self, std::string const& host, int port, std::string const& user={}, std::string const& pw={}) {
+            self.proxy = httpcl::Config::Proxy{
+                host, port, user, pw, ""
+            };
+            return &self;
+        }, "host"_a, "port"_a, "user"_a, "pw"_a);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // OpenAPIConfig
     py::class_<OpenAPIConfig>(m, "OAConfig")
             .def("__contains__", [](const OpenAPIConfig& self, std::string const& methodName) {
                 return self.methodPath.find(methodName) != self.methodPath.end();

@@ -51,26 +51,32 @@ std::string resolvePath(const OpenAPIConfig::Path& path,
 }
 
 template <class _Fun>
-auto resolveQueryParameters(const OpenAPIConfig::Path& path,
-                            const _Fun paramCb)
+void resolveHeaderAndQueryParameters(httpcl::Config& result,
+                                     const OpenAPIConfig::Path& path,
+                                     const _Fun paramCb)
 {
-    std::vector<std::pair<std::string, std::string>> pairs;
-
     for (const auto& [key, parameter] : path.parameters) {
-        if (parameter.location == OpenAPIConfig::Parameter::Location::Query) {
+        switch (parameter.location) {
+        case OpenAPIConfig::Parameter::Location::Query:
+        case OpenAPIConfig::Parameter::Location::Header:
+        {
             ParameterValueHelper helper(parameter);
-            auto values = paramCb(parameter.ident, parameter.field, helper).queryPairs(parameter);
-
-            std::copy(values.begin(), values.end(), std::back_inserter(pairs));
+            auto values = paramCb(parameter.ident, parameter.field, helper).queryOrHeaderPairs(parameter);
+            auto& destination = (parameter.location == OpenAPIConfig::Parameter::Location::Header) ?
+                result.headers : result.query;
+            for (auto const& value : values)
+                destination.insert(value);
+            break;
+        }
+        default:
+            break;
         }
     }
-
-    return pairs;
 }
 
 OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
                              std::unique_ptr<httpcl::IHttpClient> client)
-    : config(std::move(config))
+    : config_(std::move(config))
     , client_(std::move(client))
 {
     assert(client_);
@@ -84,22 +90,22 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
                                                                    const std::string&, /* zserio member path */
                                                                    ParameterValueHelper&)>& paramCb)
 {
-    auto methodIter = config.methodPath.find(methodIdent);
-    if (methodIter == config.methodPath.end())
+    auto methodIter = config_.methodPath.find(methodIdent);
+    if (methodIter == config_.methodPath.end())
         throw std::runtime_error(stx::format("The method '{}' is not part of the used OpenAPI specification", methodIdent));
 
     const auto& method = methodIter->second;
 
-    httpcl::URIComponents uri(config.uri);
+    httpcl::URIComponents uri(config_.uri);
     uri.appendPath(resolvePath(method, paramCb));
 
-    for (auto&& [key, value] : resolveQueryParameters(method, paramCb))
-        uri.addQuery(std::move(key), std::move(value));
+    auto httpConfig = settings_[uri.build()];
+    resolveHeaderAndQueryParameters(httpConfig, method, paramCb);
 
     const auto& httpMethod = method.httpMethod;
     auto result = ([&]() {
         if (httpMethod == "GET") {
-            return  client_->get(uri.build());
+            return  client_->get(uri.build(), httpConfig);
         } else {
             std::string body, bodyType;
             if (method.bodyRequestObject) {
@@ -114,15 +120,18 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
             }
 
             if (httpMethod == "POST")
-                return client_->post(uri.build(), body, bodyType);
+                return client_->post(uri.build(), body, bodyType, httpConfig);
             if (httpMethod == "PUT")
-                return client_->put(uri.build(), body, bodyType);
+                return client_->put(uri.build(), body, bodyType, httpConfig);
             if (httpMethod == "PATCH")
-                return client_->patch(uri.build(), body, bodyType);
+                return client_->patch(uri.build(), body, bodyType, httpConfig);
             if (httpMethod == "DELETE")
-                return client_->del(uri.build(), body, bodyType);
+                return client_->del(uri.build(), body, bodyType, httpConfig);
 
-            throw std::runtime_error(stx::format("Unsupported HTTP method '{}' (uri: {})", httpMethod, uri.build()));
+            throw std::runtime_error(stx::format(
+                "Unsupported HTTP method '{}' (uri: {})",
+                httpMethod,
+                uri.build()));
         }
     }());
 
@@ -130,7 +139,11 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
         return std::move(result.content);
     }
 
-    throw httpcl::IHttpClient::Error(result, stx::format("HTTP status code {} (method: {}, path: {}, uri: {})",
-                                                         result.status, httpMethod, uri.buildPath(), uri.build()));
+    throw httpcl::IHttpClient::Error(result, stx::format(
+        "HTTP status code {} (method: {}, path: {}, uri: {})",
+        result.status,
+        httpMethod,
+        uri.buildPath(),
+        uri.build()));
 }
 }

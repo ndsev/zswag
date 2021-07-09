@@ -53,7 +53,7 @@ int main (int argc, char* argv[]) {
                 {"base.value",     2},
                 {"exponent.value", 3}
         })).get<zsr::Introspectable>().value();
-    }, 8., "Pass fields in path and query");
+    }, 8., "Pass fields in path and header");
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.intSum")->call(

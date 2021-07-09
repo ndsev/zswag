@@ -19,8 +19,8 @@ paths:
           schema:
             format: string
             type: string
-        - in: query
-          name: exponent
+        - in: header
+          name: X-Ponent
           required: true
           x-zserio-request-part: exponent.value
           schema:
