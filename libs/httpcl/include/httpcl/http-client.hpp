@@ -5,6 +5,7 @@
 #include <memory>
 #include <functional>
 #include <map>
+#include <optional>
 #include <stdexcept>
 
 #include "http-settings.hpp"
@@ -13,9 +14,17 @@
 namespace httpcl
 {
 
+struct BodyAndContentType {
+    std::string body;
+    std::string contentType;
+};
+
+using OptionalBodyAndContentType = std::optional<BodyAndContentType>;
+
 class IHttpClient
 {
 public:
+
     struct Result {
         int status;
         std::string content;
@@ -35,20 +44,16 @@ public:
     virtual Result get(const std::string& path,
                        const Config& config) = 0;
     virtual Result post(const std::string& path,
-                        const std::string& body,
-                        const std::string& bodyType,
+                        const OptionalBodyAndContentType& body,
                         const Config& config) = 0;
     virtual Result put(const std::string& path,
-                       const std::string& body,
-                       const std::string& bodyType,
+                       const OptionalBodyAndContentType& body,
                        const Config& config) = 0;
     virtual Result del(const std::string& path,
-                       const std::string& body,
-                       const std::string& bodyType,
+                       const OptionalBodyAndContentType& body,
                        const Config& config) = 0;
     virtual Result patch(const std::string& path,
-                         const std::string& body,
-                         const std::string& bodyType,
+                         const OptionalBodyAndContentType& body,
                          const Config& config) = 0;
 };
 
@@ -61,20 +66,16 @@ public:
     Result get(const std::string& uri,
                const Config& config) override;
     Result post(const std::string& uri,
-                const std::string& body,
-                const std::string& bodyType,
+                const OptionalBodyAndContentType& body,
                 const Config& config) override;
     Result put(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType,
+               const OptionalBodyAndContentType& body,
                const Config& config) override;
     Result del(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType,
+               const OptionalBodyAndContentType& body,
                const Config& config) override;
     Result patch(const std::string& uri,
-                 const std::string& body,
-                 const std::string& bodyType,
+                 const OptionalBodyAndContentType& body,
                  const Config& config) override;
 
 private:
@@ -85,28 +86,28 @@ private:
 class MockHttpClient : public IHttpClient
 {
 public:
-    std::function<IHttpClient::Result(std::string_view /* uri */)> getFun;
-    std::function<IHttpClient::Result(std::string_view /* uri */,
-                                      std::string_view /* body */,
-                                      std::string_view /* type */)> postFun;
+    std::function<
+        IHttpClient::Result(std::string_view /* uri */)
+    > getFun;
+    std::function<
+        IHttpClient::Result(
+            std::string_view /* uri */,
+            OptionalBodyAndContentType const& /* body */
+    )> postFun;
 
     Result get(const std::string& uri,
                const Config& config) override;
     Result post(const std::string& uri,
-                const std::string& body,
-                const std::string& bodyType,
+                const OptionalBodyAndContentType& body,
                 const Config& config) override;
     Result put(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType,
+               const OptionalBodyAndContentType& body,
                const Config& config) override;
     Result del(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType,
+               const OptionalBodyAndContentType& body,
                const Config& config) override;
     Result patch(const std::string& uri,
-                 const std::string& body,
-                 const std::string& bodyType,
+                 const OptionalBodyAndContentType& body,
                  const Config& config) override;
 };
 

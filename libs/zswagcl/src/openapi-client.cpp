@@ -107,26 +107,28 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
         if (httpMethod == "GET") {
             return  client_->get(uri.build(), httpConfig);
         } else {
-            std::string body, bodyType;
+            httpcl::OptionalBodyAndContentType body;
             if (method.bodyRequestObject) {
-                bodyType = ZSERIO_OBJECT_CONTENT_TYPE;
+                body = httpcl::BodyAndContentType{
+                    "", ZSERIO_OBJECT_CONTENT_TYPE
+                };
 
                 OpenAPIConfig::Parameter bodyParameter;
                 bodyParameter.ident = "body";
                 bodyParameter.format = OpenAPIConfig::Parameter::Format::Binary;
 
                 ParameterValueHelper bodyHelper(bodyParameter);
-                body = paramCb("", ZSERIO_REQUEST_PART_WHOLE, bodyHelper).bodyStr();
+                body->body = paramCb("", ZSERIO_REQUEST_PART_WHOLE, bodyHelper).bodyStr();
             }
 
             if (httpMethod == "POST")
-                return client_->post(uri.build(), body, bodyType, httpConfig);
+                return client_->post(uri.build(), body, httpConfig);
             if (httpMethod == "PUT")
-                return client_->put(uri.build(), body, bodyType, httpConfig);
+                return client_->put(uri.build(), body, httpConfig);
             if (httpMethod == "PATCH")
-                return client_->patch(uri.build(), body, bodyType, httpConfig);
+                return client_->patch(uri.build(), body, httpConfig);
             if (httpMethod == "DELETE")
-                return client_->del(uri.build(), body, bodyType, httpConfig);
+                return client_->del(uri.build(), body, httpConfig);
 
             throw std::runtime_error(stx::format(
                 "Unsupported HTTP method '{}' (uri: {})",

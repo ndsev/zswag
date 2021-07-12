@@ -229,11 +229,11 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         /* Setup mock client */
         auto client = std::make_unique<httpcl::MockHttpClient>();
         client->postFun = [&](std::string_view uri,
-                              std::string_view body,
-                              std::string_view type) {
+                              httpcl::OptionalBodyAndContentType const& body) {
             REQUIRE(uri == "https://my.server.com/api/post/hello");
-            REQUIRE(type == ZSERIO_OBJECT_CONTENT_TYPE);
-            REQUIRE(std::equal(body.begin(), body.end(),
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+            REQUIRE(std::equal(body->body.begin(), body->body.end(),
                                buffer.begin(), buffer.end()));
 
             postCalled = true;

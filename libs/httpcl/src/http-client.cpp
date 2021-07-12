@@ -70,55 +70,51 @@ Result HttpLibHttpClient::get(const std::string& uriStr,
 }
 
 Result HttpLibHttpClient::post(const std::string& uriStr,
-                               const std::string& body,
-                               const std::string& bodyType,
+                               const std::optional<BodyAndContentType>& body,
                                const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Post(
         uri.buildPath().c_str(),
         {config.headers.begin(), config.headers.end()},
-        body,
-        bodyType.c_str()));
+        body ? body->body : std::string(),
+        body ? body->contentType.c_str() : nullptr));
 }
 
 Result HttpLibHttpClient::put(const std::string& uriStr,
-                              const std::string& body,
-                              const std::string& bodyType,
+                              const std::optional<BodyAndContentType>& body,
                               const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Put(
         uri.buildPath().c_str(),
         {config.headers.begin(), config.headers.end()},
-        body,
-        bodyType.c_str()));
+        body ? body->body : std::string(),
+        body ? body->contentType.c_str() : nullptr));
 }
 
 Result HttpLibHttpClient::del(const std::string& uriStr,
-                              const std::string& body,
-                              const std::string& bodyType,
+                              const std::optional<BodyAndContentType>& body,
                               const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Delete(
         uri.buildPath().c_str(),
         {config.headers.begin(), config.headers.end()},
-        body,
-        bodyType.c_str()));
+        body ? body->body : std::string(),
+        body ? body->contentType.c_str() : nullptr));
 }
 
 Result HttpLibHttpClient::patch(const std::string& uriStr,
-                                const std::string& body,
-                                const std::string& bodyType,
+                                const std::optional<BodyAndContentType>& body,
                                 const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Patch(
         uri.buildPath().c_str(),
         {config.headers.begin(), config.headers.end()},
-        body,
-        bodyType.c_str()));
+        body ? body->body : std::string(),
+        body ? body->contentType.c_str() : nullptr));
 }
 
 Result MockHttpClient::get(const std::string& uri,
@@ -132,36 +128,32 @@ Result MockHttpClient::get(const std::string& uri,
 }
 
 Result MockHttpClient::post(const std::string& uri,
-                            const std::string& body,
-                            const std::string& bodyType,
+                            const std::optional<BodyAndContentType>& body,
                             const Config& config)
 {
     auto uriWithQuery = URIComponents::fromStrRfc3986(uri);
     applyQuery(uriWithQuery, config);
     if (postFun)
-        return postFun(uriWithQuery.build(), body, bodyType);
+        return postFun(uriWithQuery.build(), body);
     return {0, ""};
 }
 
 Result MockHttpClient::put(const std::string& uri,
-                           const std::string& body,
-                           const std::string& bodyType,
+                           const std::optional<BodyAndContentType>& body,
                            const Config& config)
 {
     return {0, ""};
 }
 
 Result MockHttpClient::del(const std::string& uri,
-                           const std::string& body,
-                           const std::string& bodyType,
+                           const std::optional<BodyAndContentType>& body,
                            const Config& config)
 {
     return {0, ""};
 }
 
 Result MockHttpClient::patch(const std::string& uri,
-                             const std::string& body,
-                             const std::string& bodyType,
+                             const std::optional<BodyAndContentType>& body,
                              const Config& config)
 {
     return {0, ""};
