@@ -32,6 +32,6 @@ add_wheel(pyzswagcl
   VERSION "${ZSWAG_VERSION}"
   DESCRIPTION "Python bindings for the zswag client library."
   TARGET_DEPENDENCIES
-    zswagcl zsr httpcl
+    zswagcl zsr speedyj httpcl
   DEPLOY_FILES
     ${DEPLOY_FILES})
