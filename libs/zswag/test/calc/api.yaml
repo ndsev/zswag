@@ -30,7 +30,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 type: string
       summary: ''
@@ -52,7 +52,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -74,7 +74,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -97,7 +97,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -120,7 +120,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -142,7 +142,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -159,7 +159,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -181,7 +181,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -201,7 +201,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string

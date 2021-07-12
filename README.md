@@ -69,7 +69,7 @@ Simply run `pip install zswag`. **Note: This only works with ...**
 Using CMake, you can ...
 
 * 🌟run tests.
-* 🌟build the zswag wheels for Python != 3.8.
+* 🌟build the zswag wheels for a custom Python version.
 * 🌟[integrate the C++ client into a C++ project.](#c-client)
 
 The basic setup follows the usual CMake configure/build steps:
