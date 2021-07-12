@@ -21,7 +21,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -45,7 +45,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -69,7 +69,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -93,7 +93,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -115,7 +115,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -139,7 +139,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -163,7 +163,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -185,7 +185,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -249,7 +249,7 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string

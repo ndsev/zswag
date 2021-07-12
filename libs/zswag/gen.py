@@ -157,7 +157,7 @@ class OpenApiSchemaGenerator:
                             "200": {
                                 "description": method_info.returndoc,
                                 "content": {
-                                    "application/octet-stream": {
+                                    ZSERIO_OBJECT_CONTENT_TYPE: {
                                         "schema": {
                                             "type": "string",
                                             "format": "binary"
