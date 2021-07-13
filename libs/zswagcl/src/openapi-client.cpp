@@ -57,12 +57,12 @@ void resolveHeaderAndQueryParameters(httpcl::Config& result,
 {
     for (const auto& [key, parameter] : path.parameters) {
         switch (parameter.location) {
-        case OpenAPIConfig::Parameter::Location::Query:
-        case OpenAPIConfig::Parameter::Location::Header:
+        case OpenAPIConfig::ParameterLocation::Query:
+        case OpenAPIConfig::ParameterLocation::Header:
         {
             ParameterValueHelper helper(parameter);
             auto values = paramCb(parameter.ident, parameter.field, helper).queryOrHeaderPairs(parameter);
-            auto& destination = (parameter.location == OpenAPIConfig::Parameter::Location::Header) ?
+            auto& destination = (parameter.location == OpenAPIConfig::ParameterLocation::Header) ?
                 result.headers : result.query;
             for (auto const& value : values)
                 destination.insert(value);

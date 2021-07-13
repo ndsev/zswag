@@ -28,9 +28,10 @@ PYBIND11_MODULE(pyzswagcl, m)
     ///////////////////////////////////////////////////////////////////////////
     // ParameterLocation
 
-    py::enum_<OpenAPIConfig::Parameter::Location>(m, "OAParamLocation", py::arithmetic())
-            .value("PATH", OpenAPIConfig::Parameter::Location::Path)
-            .value("QUERY", OpenAPIConfig::Parameter::Location::Query)
+    py::enum_<OpenAPIConfig::ParameterLocation>(m, "OAParamLocation", py::arithmetic())
+            .value("PATH", OpenAPIConfig::ParameterLocation::Path)
+            .value("QUERY", OpenAPIConfig::ParameterLocation::Query)
+            .value("HEADER", OpenAPIConfig::ParameterLocation::Header)
             ;
 
     ///////////////////////////////////////////////////////////////////////////

@@ -15,7 +15,9 @@ using Query = std::multimap<std::string, std::string>;
 using HeadersAndQuery = std::pair<Headers, Query>;
 
 /**
- *
+ * Set of configs for an HTTP connection, including:
+ *   - Extra Headers
+ *   -
  */
 struct Config
 {

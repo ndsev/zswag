@@ -3,21 +3,62 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <variant>
+#include <optional>
 
 #include "export.hpp"
 #include "httpcl/uri.hpp"
+#include "httpcl/http-settings.hpp"
 
 namespace zswagcl
 {
 
 struct OpenAPIConfig
 {
+    enum class ParameterLocation {
+        Path,
+        Query,
+        Header
+    };
+
+    struct ISecurityScheme {
+        std::string name;
+        virtual ~ISecurityScheme() = default;
+        virtual bool check(httpcl::Config const&) const = 0;
+    };
+
+    using SecurityScheme = std::shared_ptr<ISecurityScheme>;
+
+    struct BasicAuth : public ISecurityScheme {
+        bool check(httpcl::Config const&) const override;
+    };
+
+    struct APIKeyAuth : public ISecurityScheme {
+        bool check(httpcl::Config const&) const override;
+        ParameterLocation location = ParameterLocation::Header;
+        std::string keyName;
+    };
+
+    struct CookieAuth : public ISecurityScheme {
+        bool check(httpcl::Config const&) const override;
+        std::string cookieName;
+    };
+
+    struct BearerAuth : public ISecurityScheme {
+        bool check(httpcl::Config const&) const override;
+    };
+
+    /**
+     * Security Scheme References
+     *
+     * Disjunctive normal form ([A [AND B]+][ OR C [AND D]+]+) of required
+     * security schemes. An empty vector is used to encode that no security
+     * scheme is required.
+     */
+    using SecurityAlternatives = std::vector<std::vector<SecurityScheme>>;
+
     struct Parameter {
-        enum Location {
-            Path,
-            Query,
-            Header
-        } location = Query;
+        ParameterLocation location = ParameterLocation::Query;
 
         /**
          * Parameter identifier.
@@ -127,6 +168,11 @@ struct OpenAPIConfig
          * Ignored if HTTP-Method is GET.
          */
         bool bodyRequestObject = false;
+
+        /**
+         * Optional security schemes override for the global default.
+         */
+        std::optional<SecurityAlternatives> security;
     };
 
     /**
@@ -138,6 +184,17 @@ struct OpenAPIConfig
      * Map from service method name to path configuration.
      */
     std::map<std::string, Path> methodPath;
+
+    /**
+     * Available security schemes.
+     */
+    std::map<std::string, SecurityScheme> securitySchemes;
+
+    /**
+     * Default security scheme for all paths. The default
+     * is an empty array of combinations, which means no auth required.
+     */
+    SecurityAlternatives defaultSecurityScheme;
 };
 
 ZSWAGCL_EXPORT extern const std::string ZSERIO_OBJECT_CONTENT_TYPE;

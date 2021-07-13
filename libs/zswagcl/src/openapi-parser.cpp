@@ -19,11 +19,11 @@ static auto parseParameterLocation(const YAML::Node& inNode)
 {
     auto str = inNode.as<std::string>();
     if (str == "query")
-        return OpenAPIConfig::Parameter::Query;
+        return OpenAPIConfig::ParameterLocation::Query;
     else if (str == "path")
-        return OpenAPIConfig::Parameter::Path;
+        return OpenAPIConfig::ParameterLocation::Path;
     else if (str == "header")
-        return OpenAPIConfig::Parameter::Header;
+        return OpenAPIConfig::ParameterLocation::Header;
 
     throw std::runtime_error("Unsupported parameter location");
 }
@@ -65,15 +65,15 @@ static void parseParameterStyle(const YAML::Node& styleNode,
 {
     /* Set default style for parameter location */
     switch (parameter.location) {
-    case OpenAPIConfig::Parameter::Header:
+    case OpenAPIConfig::ParameterLocation::Header:
         parameter.style = OpenAPIConfig::Parameter::Form;
         parameter.explode = false;
         break;
-    case OpenAPIConfig::Parameter::Query:
+    case OpenAPIConfig::ParameterLocation::Query:
         parameter.style = OpenAPIConfig::Parameter::Form;
         parameter.explode = true;
         break;
-    case OpenAPIConfig::Parameter::Path:
+    case OpenAPIConfig::ParameterLocation::Path:
         parameter.style = OpenAPIConfig::Parameter::Simple;
         parameter.explode = false;
         break;
