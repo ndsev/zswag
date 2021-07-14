@@ -479,7 +479,7 @@ url-match-pattern:
     port: 8888
     user: test
     keychain: ...
-  keys:
+  cookies:
     key: value
   headers:
     key: value

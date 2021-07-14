@@ -12,12 +12,14 @@ namespace httpcl
 
 using Headers = std::multimap<std::string, std::string>;
 using Query = std::multimap<std::string, std::string>;
-using HeadersAndQuery = std::pair<Headers, Query>;
 
 /**
  * Set of configs for an HTTP connection, including:
  *   - Extra Headers
- *   -
+ *   - Extra Query Parameters
+ *   - Extra Cookies
+ *   - Optional Proxy-Config
+ *   - Optional Basic-Auth
  */
 struct Config
 {

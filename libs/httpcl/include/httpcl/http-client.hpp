@@ -92,7 +92,8 @@ public:
     std::function<
         IHttpClient::Result(
             std::string_view /* uri */,
-            OptionalBodyAndContentType const& /* body */
+            OptionalBodyAndContentType const& /* body */,
+            Config const& config /* config */
     )> postFun;
 
     Result get(const std::string& uri,

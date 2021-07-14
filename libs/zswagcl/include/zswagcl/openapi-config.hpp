@@ -21,41 +21,46 @@ struct OpenAPIConfig
         Header
     };
 
-    struct ISecurityScheme {
-        std::string name;
-        virtual ~ISecurityScheme() = default;
-        virtual bool check(httpcl::Config const&) const = 0;
+    struct SecurityScheme {
+        std::string id;
+        explicit SecurityScheme(std::string id);
+        virtual ~SecurityScheme() = default;
+        virtual bool check(httpcl::Config const&, std::string& err) const = 0;
     };
 
-    using SecurityScheme = std::shared_ptr<ISecurityScheme>;
-
-    struct BasicAuth : public ISecurityScheme {
-        bool check(httpcl::Config const&) const override;
-    };
-
-    struct APIKeyAuth : public ISecurityScheme {
-        bool check(httpcl::Config const&) const override;
-        ParameterLocation location = ParameterLocation::Header;
-        std::string keyName;
-    };
-
-    struct CookieAuth : public ISecurityScheme {
-        bool check(httpcl::Config const&) const override;
-        std::string cookieName;
-    };
-
-    struct BearerAuth : public ISecurityScheme {
-        bool check(httpcl::Config const&) const override;
-    };
+    using SecuritySchemePtr = std::shared_ptr<SecurityScheme>;
 
     /**
      * Security Scheme References
      *
      * Disjunctive normal form ([A [AND B]+][ OR C [AND D]+]+) of required
-     * security schemes. An empty vector is used to encode that no security
+     * security schemes. An empty vector is used to encode that no auth
      * scheme is required.
      */
-    using SecurityAlternatives = std::vector<std::vector<SecurityScheme>>;
+    using SecurityAlternatives = std::vector<std::vector<SecuritySchemePtr>>;
+
+    /**
+     * Supported Authentication Schemes
+     */
+    struct BasicAuth : public SecurityScheme {
+        explicit BasicAuth(std::string id);
+        bool check(httpcl::Config const&, std::string& err) const override;
+    };
+    struct BearerAuth : public SecurityScheme {
+        explicit BearerAuth(std::string id);
+        bool check(httpcl::Config const&, std::string& err) const override;
+    };
+    struct APIKeyAuth : public SecurityScheme {
+        explicit APIKeyAuth(std::string id, ParameterLocation location, std::string keyName);
+        bool check(httpcl::Config const&, std::string& err) const override;
+        ParameterLocation location = ParameterLocation::Header;
+        std::string keyName;
+    };
+    struct CookieAuth : public SecurityScheme {
+        explicit CookieAuth(std::string id, std::string cookieName);
+        bool check(httpcl::Config const&, std::string& err) const override;
+        std::string cookieName;
+    };
 
     struct Parameter {
         ParameterLocation location = ParameterLocation::Query;
@@ -188,7 +193,7 @@ struct OpenAPIConfig
     /**
      * Available security schemes.
      */
-    std::map<std::string, SecurityScheme> securitySchemes;
+    std::map<std::string, SecuritySchemePtr> securitySchemes;
 
     /**
      * Default security scheme for all paths. The default

@@ -134,7 +134,7 @@ Result MockHttpClient::post(const std::string& uri,
     auto uriWithQuery = URIComponents::fromStrRfc3986(uri);
     applyQuery(uriWithQuery, config);
     if (postFun)
-        return postFun(uriWithQuery.build(), body);
+        return postFun(uriWithQuery.build(), body, config);
     return {0, ""};
 }
 

@@ -217,6 +217,16 @@ void Settings::load()
             if (auto cookies = entry["cookies"])
                 conf.cookies = cookies.as<std::map<std::string, std::string>>();
 
+            if (auto headers = entry["headers"]) {
+                auto headersMap = headers.as<std::map<std::string, std::string>>();
+                conf.headers.insert(headersMap.begin(), headersMap.end());
+            }
+
+            if (auto query = entry["query"]) {
+                auto queryMap = query.as<std::map<std::string, std::string>>();
+                conf.query.insert(queryMap.begin(), queryMap.end());
+            }
+
             if (auto basicAuth = entry["basic-auth"])
                 conf.auth = basicAuth.as<Config::BasicAuthentication>();
 
@@ -251,6 +261,14 @@ void Settings::store()
 
             if (!entry.cookies.empty())
                 settingsNode["cookies"] = entry.cookies;
+
+            if (!entry.headers.empty())
+                settingsNode["headers"] = std::map<std::string, std::string>{
+                    entry.headers.begin(), entry.headers.end()};
+
+            if (!entry.query.empty())
+                settingsNode["query"] = std::map<std::string, std::string>{
+                    entry.query.begin(), entry.query.end()};
 
             if (const auto& auth = entry.auth)
                 settingsNode["basic-auth"] = *auth;
@@ -295,6 +313,7 @@ void Config::apply(httplib::Client &cl) const
         cookieHeaderValue += cookie.first + "=" + cookie.second;
     }
 
+    // Headers
     if (!cookieHeaderValue.empty())
         httpLibHeaders.insert({"Cookie", cookieHeaderValue});
 

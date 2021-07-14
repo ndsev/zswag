@@ -154,6 +154,28 @@ static void parseMethodBody(const YAML::Node& methodNode,
     }
 }
 
+static OpenAPIConfig::SecurityAlternatives parseSecurity(
+        const YAML::Node& securityNode,
+        OpenAPIConfig const& config)
+{
+    OpenAPIConfig::SecurityAlternatives result;
+
+    for (auto const& alternative : securityNode)
+    {
+        auto& newAlternativeAuthSet = result.emplace_back();
+
+        for (auto const& requiredScheme : alternative) {
+            auto scheme = config.securitySchemes.find(requiredScheme.first.as<std::string>());
+            if (scheme != config.securitySchemes.end())
+                newAlternativeAuthSet.emplace_back(scheme->second);
+            // TODO: Else: Throw
+        }
+
+        // TODO: Throw if (newAlternativeAuthSet.empty())
+    }
+    return result;
+}
+
 static void parseMethod(const std::string& method,
                         const std::string& uriPath,
                         const YAML::Node& pathNode,
@@ -176,8 +198,45 @@ static void parseMethod(const std::string& method,
             parseMethodParameter(parameterNode, path);
         }
 
+        if (auto securityNode = methodNode["security"]) {
+            path.security = parseSecurity(securityNode, config);
+        }
+
         parseMethodBody(methodNode, path);
     }
+}
+
+static void parseSecurityScheme(
+    const std::string& name,
+    const YAML::Node& schemeNode,
+    OpenAPIConfig& config)
+{
+    OpenAPIConfig::SecuritySchemePtr newScheme;
+    auto schemeType = schemeNode["type"].as<std::string>();
+
+    if (schemeType == "http") {
+        auto schemeHttpType = schemeNode["scheme"].as<std::string>();
+        if (schemeHttpType == "basic")
+            newScheme = std::make_shared<OpenAPIConfig::BasicAuth>(name);
+        else if (schemeHttpType == "bearer")
+            newScheme = std::make_shared<OpenAPIConfig::BearerAuth>(name);
+        // TODO: Else: Throw
+    }
+    else if (schemeType == "apiKey") {
+        auto keyLocationString = schemeNode["in"].as<std::string>();
+        auto parameterName = schemeNode["name"].as<std::string>();
+
+        if (keyLocationString == "query")
+            newScheme = std::make_shared<OpenAPIConfig::APIKeyAuth>(name, OpenAPIConfig::ParameterLocation::Query, parameterName);
+        else if (keyLocationString == "header")
+            newScheme = std::make_shared<OpenAPIConfig::APIKeyAuth>(name, OpenAPIConfig::ParameterLocation::Header, parameterName);
+        else if (keyLocationString == "cookie")
+            newScheme = std::make_shared<OpenAPIConfig::CookieAuth>(name, parameterName);
+        // TODO: Else: Throw
+    }
+    // TODO: Else: Throw
+
+    config.securitySchemes[name] = newScheme;
 }
 
 static void parsePath(const std::string& uriPath,
@@ -222,6 +281,20 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& s)
                                          .append(e.what()));
             }
         }
+    }
+
+    if (auto components = doc["components"]) {
+        if (auto securitySchemes = components["securitySchemes"]) {
+            for (auto const& scheme : securitySchemes) {
+                parseSecurityScheme(
+                    scheme.first.as<std::string>(),
+                    scheme.second, config);
+            }
+        }
+    }
+
+    if (auto security = doc["security"]) {
+        config.defaultSecurityScheme = parseSecurity(security, config);
     }
 
     if (auto paths = doc["paths"]) {

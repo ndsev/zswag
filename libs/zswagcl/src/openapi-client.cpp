@@ -8,6 +8,8 @@
 namespace zswagcl
 {
 
+namespace {
+
 template <class _Fun>
 std::string replaceTemplate(std::string str,
                             _Fun paramCb)
@@ -74,6 +76,42 @@ void resolveHeaderAndQueryParameters(httpcl::Config& result,
     }
 }
 
+void checkSecurityAlternatives(OpenAPIConfig::SecurityAlternatives const& alts, httpcl::Config const& conf)
+{
+    if (alts.empty())
+        return; // Nothing to check
+
+    bool anyAlternativeMatched = false;
+    std::stringstream error;
+    error << "The provided HTTP configuration does not satisfy authentication requirements:\n";
+
+    int i = 0;
+    for (auto const& schemeSet : alts)
+    {
+        bool matched = true;
+
+        for (auto const& scheme : schemeSet) {
+            std::string reasonForMismatch;
+            if (!scheme->check(conf, reasonForMismatch)) {
+                error << "  In security configuration " << i << ": " << reasonForMismatch << "\n";
+                matched = false;
+                break;
+            }
+        }
+
+        if (matched) {
+            anyAlternativeMatched = true;
+            break;
+        }
+        ++i;
+    }
+
+    if (!anyAlternativeMatched)
+        throw std::runtime_error(error.str());
+}
+
+}
+
 OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
                              std::unique_ptr<httpcl::IHttpClient> client)
     : config_(std::move(config))
@@ -102,10 +140,17 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     auto httpConfig = settings_[uri.build()];
     resolveHeaderAndQueryParameters(httpConfig, method, paramCb);
 
+    // Check whether the given config fulfills the required security schemes.
+    // Throws if the http config does not fulfill any allowed scheme.
+    if (method.security)
+        checkSecurityAlternatives(*method.security, httpConfig);
+    else
+        checkSecurityAlternatives(config_.defaultSecurityScheme, httpConfig);
+
     const auto& httpMethod = method.httpMethod;
     auto result = ([&]() {
         if (httpMethod == "GET") {
-            return  client_->get(uri.build(), httpConfig);
+            return client_->get(uri.build(), httpConfig);
         } else {
             httpcl::OptionalBodyAndContentType body;
             if (method.bodyRequestObject) {
