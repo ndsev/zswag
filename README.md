@@ -144,10 +144,10 @@ optional arguments:
         The `comma-separated-tags` must be a list of tags
         which indicate OpenApi method generator preferences:
 
-        get|put|post|patch|delete : HTTP method tags
-                  query|path|body : Parameter location tags
-                        flat|blob : Flatten request object,
-                                    or pass it as whole blob.
+        get|put|post|delete : HTTP method tags
+            query|path|body : Parameter location tags
+                  flat|blob : Flatten request object,
+                              or pass it as whole blob.
 
         Note:
             * The http method defaults to `post`.
@@ -523,7 +523,7 @@ as the key under the method path, such as in the following example:
 ```yaml
 paths:
   /methodName:
-    {get|post|put|patch|delete}:
+    {get|post|put|delete}:
       ...
 ```
 
@@ -531,12 +531,17 @@ paths:
 
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
-| `get` `post` `put` `patch` `delete` | ✔️ | ✔️ | ✔️ | ✔️ |
+| `get` `post` `put` `delete` | ✔️ | ✔️ | ✔️ | ✔️ |
+| `patch` | ❌️ | ❌️ | ❌️ | ❌️ |
+
+**Note:** Patch is unsupported, because the required semantics of
+a partial object update cannot be realized in the zserio transport
+layer interface.
 
 ### Request Body
 
 A server can instruct clients to transmit their zserio request object in the
-request body when using HTTP `post`, `put`, `patch` or `delete`.
+request body when using HTTP `post`, `put` or `delete`.
 This is done by setting the OpenAPI `requestBody/content` to
 `application/x-zserio-object`:
 

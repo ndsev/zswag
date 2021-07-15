@@ -23,7 +23,7 @@ from .reflect import \
     UnsupportedParameterError
 from .doc import get_doc_str, IdentType, md_filter_definition
 
-HTTP_METHOD_TAGS = ("get", "put", "post", "patch", "delete")
+HTTP_METHOD_TAGS = ("get", "put", "post", "delete")
 PARAM_LOCATION_QUERY_TAG = "query"
 PARAM_LOCATION_BODY_TAG = "body"
 PARAM_LOCATION_PATH_TAG = "path"
@@ -330,10 +330,10 @@ if __name__ == "__main__":
                         The `comma-separated-tags` must be a list of tags
                         which indicate OpenApi method generator preferences:
                         
-                        get|put|post|patch|delete : HTTP method tags
-                                  query|path|body : Parameter location tags
-                                        flat|blob : Flatten request object,
-                                                    or pass it as whole blob.
+                        get|put|post|delete : HTTP method tags
+                            query|path|body : Parameter location tags
+                                  flat|blob : Flatten request object,
+                                              or pass it as whole blob.
                                                     
                         Note:
                             * The http method defaults to `post`.

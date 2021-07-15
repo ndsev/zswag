@@ -244,7 +244,7 @@ static void parsePath(const std::string& uriPath,
                       OpenAPIConfig& config)
 {
     static const char* supportedMethods[] = {
-        "get", "post", "put", "patch", "delete"
+        "get", "post", "put", "delete"
     };
 
     for (const auto method : supportedMethods) {
