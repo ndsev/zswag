@@ -28,6 +28,7 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
     + [URL Array Parameter](#url-array-parameter)
     + [URL Compound Parameter](#url-compound-parameter)
     + [Server URL Base Path](#server-url-base-path)
+    + [Authentication Schemes](#authentication-schemes)
 
 ## Components
 
@@ -688,3 +689,43 @@ and port, but prefix the `/path/to/my/api` string.
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
 | `servers`  | ✔️ | ✔️ | ✔️ | ❌️ |
+
+### Authentication Schemes
+
+To facilitate the communication of authentication needs for the whole or parts
+of a service, OpenAPI allows for a `securitySchemes` and `security` fields in the spec.
+Please refer to the relevant parts of the [OpenAPI 3 specification](https://swagger.io/docs/specification/authentication/) for some
+examples on how to integrate these fields into your spec.
+
+Zswag currently understands the following authentication schemes:
+
+* **HTTP Basic Authorization:** If a called endpoint requires HTTP basic auth,
+  zswag will verify that the HTTP config contains basic-auth credentials.
+  If there are none, zswag will throw a descriptive runtime error.
+* **HTTP Bearer Authorization:** If a called endpoint requires HTTP bearer auth,
+  zswag will verify that the HTTP config contains a header with the
+  key name `Authorization` and the value `Bearer <token>`, *case-sensitive*.
+* **API-Key Cookie:** If a called endpoint requires a Cookie API-Key,
+  zswag will verify that the HTTP config contains a cookie with the
+  required name, *case-sensitive*.
+* **API-Key Query Parameter:** If a called endpoint requires a Query API-Key,
+  zswag will verify that the HTTP config contains a query key-value pair with the
+  required name, *case-sensitive*.
+* **API-Key Header:** If a called endpoint requires an API-Key Header,
+  zswag will verify that the HTTP config contains a header key-value pair with the
+  required name, *case-sensitive*.
+
+**Note**: If you don't want to pass your Basic-Auth/Bearer/Query/Cookie/Header
+credential through your [persistent config](#persistent-http-headers-proxy-cookie-and-authentication),
+you can pass a `httpcl::Config`/`HTTPConfig` object to the `HttpLibHttpClient`/`OAClient`
+constructor in C++/Python with the relevant detail.
+
+#### Component Support
+
+| Feature            | C++ Client | Python Client | OAServer | zswag.gen |
+| ------------------ | ---------- | ------------- | -------- | --------- |
+| `HTTP Basic-Auth` `HTTP Bearer-Auth` `Cookie API-Key` `Header API-Key` `Query API-Key`  | ✔️ | ✔️ | ✔️(**) | ❌️ |
+| `OpenID Connect` `OAuth2`  | ❌️ | ❌️ | ✔️(**) | ❌️ |
+
+**(\*\*)**: The server support for all authentication schemes depends on your
+configuration of the WSGI server (Apache/Nginx/...) which wraps the zswag Flask app.

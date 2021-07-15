@@ -257,7 +257,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                     "requestBody": {
                         "content": {
                             "application/x-zserio-object": {
-                                "shema": { "type": "string" }
+                                "schema": { "type": "string" }
                             }
                         }
                     }
