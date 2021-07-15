@@ -2,4 +2,4 @@ connexion
 requests
 zserio>=2.3.0
 pyyaml
-pyzswagcl>=1.0.7
+pyzswagcl>=1.1.0rc0
