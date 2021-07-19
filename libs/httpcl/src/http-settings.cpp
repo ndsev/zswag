@@ -233,6 +233,9 @@ void Settings::load()
             if (auto proxy = entry["proxy"])
                 conf.proxy = proxy.as<Config::Proxy>();
 
+            if (auto apiKey = entry["api-key"])
+                conf.apiKey = apiKey.as<std::string>();
+
             settings[urlPattern] = std::move(conf);
             ++idx;
         }
@@ -270,11 +273,14 @@ void Settings::store()
                 settingsNode["query"] = std::map<std::string, std::string>{
                     entry.query.begin(), entry.query.end()};
 
-            if (const auto& auth = entry.auth)
-                settingsNode["basic-auth"] = *auth;
+            if (entry.auth)
+                settingsNode["basic-auth"] = *entry.auth;
 
-            if (const auto& proxy = entry.proxy)
-                settingsNode["proxy"] = *proxy;
+            if (entry.proxy)
+                settingsNode["proxy"] = *entry.proxy;
+
+            if (entry.apiKey)
+                settingsNode["api-key"] = *entry.apiKey;
 
             node.push_back(settingsNode);
         }
@@ -351,6 +357,7 @@ Config& Config::operator |= (Config const& other) {
         auth = other.auth;
     if (other.proxy)
         proxy = other.proxy;
+    if (other.apiKey)
+        apiKey = other.apiKey;
     return *this;
 }
-

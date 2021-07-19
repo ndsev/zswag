@@ -10,24 +10,47 @@ const std::string ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
 const std::string ZSERIO_REQUEST_PART = "x-zserio-request-part";
 const std::string ZSERIO_REQUEST_PART_WHOLE = "*";
 
-bool OpenAPIConfig::BasicAuth::check(httpcl::Config const& config, std::string& err) const {
+bool OpenAPIConfig::BasicAuth::checkOrApply(httpcl::Config& config, std::string& err) const {
     if (config.auth.has_value())
         return true;
+
+    std::regex basicAuthValueRe{
+            "^Basic .+$",
+            std::regex_constants::ECMAScript|std::regex_constants::icase
+    };
+
+    auto found = std::any_of(config.headers.begin(), config.headers.end(), [&](auto const& headerNameAndValue){
+        return headerNameAndValue.first == "Authorization" &&
+               std::regex_match(headerNameAndValue.second, basicAuthValueRe);
+    });
+
+    if (found)
+        return true;
+
     err = "HTTP basic-auth credentials are missing.";
     return false;
 }
 
-bool OpenAPIConfig::APIKeyAuth::check(httpcl::Config const& config, std::string& err) const {
+bool OpenAPIConfig::APIKeyAuth::checkOrApply(httpcl::Config& config, std::string& err) const {
+
     switch (location) {
         case ParameterLocation::Query:
             if (config.query.find(keyName) != config.query.end())
                 return true;
-            err = stx::format("Query parameter `{}` is missing.", keyName);
+            if (config.apiKey) {
+                config.query.insert({keyName, *config.apiKey});
+                return true;
+            }
+            err = stx::format("Neither api-key nor query parameter `{}` is set.", keyName);
             return false;
         case ParameterLocation::Header:
             if (config.headers.find(keyName) != config.headers.end())
                 return true;
-            err = stx::format("Header `{}` is missing.", keyName);
+            if (config.apiKey) {
+                config.headers.insert({keyName, *config.apiKey});
+                return true;
+            }
+            err = stx::format("Neither api-key nor header `{}` is set.", keyName);
             return false;
         default:
             err = stx::format("Unsupported API-key location.");
@@ -38,7 +61,11 @@ bool OpenAPIConfig::APIKeyAuth::check(httpcl::Config const& config, std::string&
 bool OpenAPIConfig::CookieAuth::checkOrApply(httpcl::Config& config, std::string& err) const {
     if (config.cookies.find(cookieName) != config.cookies.end())
         return true;
-    err = stx::format("Cookie `{}` is missing.", cookieName);
+    if (config.apiKey) {
+        config.cookies.insert({cookieName, *config.apiKey});
+        return true;
+    }
+    err = stx::format("Neither api-key nor cookie `{}` is set.", cookieName);
     return false;
 }
 

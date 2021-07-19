@@ -20,6 +20,7 @@ using Query = std::multimap<std::string, std::string>;
  *   - Extra Cookies
  *   - Optional Proxy-Config
  *   - Optional Basic-Auth
+ *   - API-Key
  */
 struct Config
 {
@@ -40,6 +41,7 @@ struct Config
     std::map<std::string, std::string> cookies;
     std::optional<BasicAuthentication> auth;
     std::optional<Proxy> proxy;
+    std::optional<std::string> apiKey;
     Headers headers;
     Query query;
 

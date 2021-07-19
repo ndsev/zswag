@@ -17,6 +17,12 @@
         "requestBody": {"content": {"application/x-zserio-object": {}}}
       }
     },
+    "/api-key-auth": {
+      "post": {
+        "operationId": "api-key-auth",
+        "requestBody": {"content": {"application/x-zserio-object": {}}}
+      }
+    },
     "/bad-auth": {
       "post": {
         "operationId": "bad-auth",

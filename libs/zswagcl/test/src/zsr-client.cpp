@@ -318,7 +318,18 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         SECTION("Catch-All Header") {
             REQUIRE_FALSE(config.defaultSecurityScheme.empty());
             REQUIRE_FALSE(config.methodPath["generic"].security);
-            REQUIRE_NOTHROW(callAndCheck("generic", [](httpcl::Config const& c){}));
+            REQUIRE_NOTHROW(callAndCheck("generic", [](httpcl::Config const& c){
+                REQUIRE(c.headers.find("X-Generic-Token") != c.headers.end());
+                REQUIRE(c.headers.find("X-Never-Visible") == c.headers.end());
+            }));
+        }
+
+        SECTION("API Key") {
+            REQUIRE_FALSE(config.methodPath["api-key-auth"].security);
+            REQUIRE_NOTHROW(callAndCheck("api-key-auth", [](httpcl::Config const& c){
+                REQUIRE(c.headers.find("X-Generic-Token") != c.headers.end());
+                REQUIRE(c.headers.find("X-Never-Visible") == c.headers.end());
+            }));
         }
 
         SECTION("Insufficient Credentials") {

@@ -17,3 +17,5 @@
 - url: .*/bearer-auth
   headers:
     Authorization: Bearer 0000
+- url: .*/api-key-auth
+  api-key: "1234"

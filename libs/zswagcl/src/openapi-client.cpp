@@ -76,7 +76,7 @@ void resolveHeaderAndQueryParameters(httpcl::Config& result,
     }
 }
 
-void checkSecurityAlternatives(OpenAPIConfig::SecurityAlternatives const& alts, httpcl::Config const& conf)
+void checkSecurityAlternativesAndApplyApiKey(OpenAPIConfig::SecurityAlternatives const& alts, httpcl::Config& conf)
 {
     if (alts.empty())
         return; // Nothing to check
@@ -146,9 +146,9 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     // Check whether the given config fulfills the required security schemes.
     // Throws if the http config does not fulfill any allowed scheme.
     if (method.security)
-        checkSecurityAlternatives(*method.security, httpConfig);
+        checkSecurityAlternativesAndApplyApiKey(*method.security, httpConfig);
     else
-        checkSecurityAlternatives(config_.defaultSecurityScheme, httpConfig);
+        checkSecurityAlternativesAndApplyApiKey(config_.defaultSecurityScheme, httpConfig);
 
     const auto& httpMethod = method.httpMethod;
     auto result = ([&]() {

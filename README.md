@@ -344,13 +344,20 @@ for zserio to use as the service client's transport implementation.
    from zswag import OAClient, HTTPConfig
    import services.api as services
    config = HTTPConfig() \
-       .header(key="X-My-Header", val="value") \
+       .header(key="X-My-Header", val="value") \  # Can be specified 
+       .cookie(key="MyCookie", val="value")    \  # multiple times.
+       .query(key="MyCookie", val="value")     \  # 
        .proxy(host="localhost", port=5050, user="john", pw="doe") \
        .basic_auth(user="john", pw="doe") \
-       .cookie(key="MyCookie", val="value") \
-       .query(key="MyCookie", val="value")
+       .bearer("bearer-token") \
+       .api_key("token")
+   
    client = services.MyService.Client(
-       OAClient("http://localhost:8080/openapi.", config))
+       OAClient("http://localhost:8080/openapi.", config=config))
+   
+   # Alternative when specifying api-key or bearer
+   client = services.MyService.Client(
+       OAClient("http://localhost:8080/openapi.", api_key="token", bearer="token"))
    ```
    
    **Note:** The additional `config` will only enrich, not overwrite the
@@ -486,9 +493,14 @@ url-match-pattern:
     key: value
   query:
     key: value
+  api-key: value
 ```
 
 **Note:** For `proxy` configs, the credentials are optional.
+
+The **`api-key`** setting will be applied under the correct
+cookie/header/query parameter, if the service
+you are connecting to uses an [OpenAPI `apiKey` auth scheme](#authentication-schemes).
 
 Passwords can be stored in clear text by setting a `password` field instead
 of the `keychain` field. Keychain entries can be made with different tools
@@ -711,14 +723,14 @@ Zswag currently understands the following authentication schemes:
   zswag will verify that the HTTP config contains a header with the
   key name `Authorization` and the value `Bearer <token>`, *case-sensitive*.
 * **API-Key Cookie:** If a called endpoint requires a Cookie API-Key,
-  zswag will verify that the HTTP config contains a cookie with the
-  required name, *case-sensitive*.
+  zswag will either apply [the `api-key` setting](#persistent-http-headers-proxy-cookie-and-authentication), or verify that the
+  HTTP config contains a cookie with the required name, *case-sensitive*.
 * **API-Key Query Parameter:** If a called endpoint requires a Query API-Key,
-  zswag will verify that the HTTP config contains a query key-value pair with the
-  required name, *case-sensitive*.
+  zswag will either apply the `api-key` setting, or verify that the
+  HTTP config contains a query key-value pair with the required name, *case-sensitive*.
 * **API-Key Header:** If a called endpoint requires an API-Key Header,
-  zswag will verify that the HTTP config contains a header key-value pair with the
-  required name, *case-sensitive*.
+  zswag will either apply the `api-key` setting, or verify that the
+  HTTP config contains a header key-value pair with the required name, *case-sensitive*.
 
 **Note**: If you don't want to pass your Basic-Auth/Bearer/Query/Cookie/Header
 credential through your [persistent config](#persistent-http-headers-proxy-cookie-and-authentication),

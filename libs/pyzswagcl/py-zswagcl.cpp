@@ -83,6 +83,14 @@ PYBIND11_MODULE(pyzswagcl, m)
             self.cookies.insert({key, value});
             return &self;
         }, "key"_a, "val"_a)
+        .def("bearer", [](httpcl::Config& self, std::string const& key) {
+            self.headers.insert({"Authorization", stx::format("Bearer {}", key)});
+            return &self;
+        }, "token"_a)
+        .def("api_key", [](httpcl::Config& self, std::string const& key) {
+            self.apiKey = key;
+            return &self;
+        }, "token"_a)
         .def("basic_auth", [](httpcl::Config& self, std::string const& user, std::string const& pw) {
             self.auth = httpcl::Config::BasicAuthentication{
                 user, pw, ""

@@ -16,7 +16,9 @@ public:
 
     PyOpenApiClient(std::string const& openApiUrl,
                     bool isLocalFile,
-                    httpcl::Config const& config);
+                    httpcl::Config const& config,
+                    std::optional<std::string> apiKey,
+                    std::optional<std::string> bearer);
 
     std::vector<uint8_t> callMethod(
         const std::string& methodName,
