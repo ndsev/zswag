@@ -25,7 +25,7 @@ setuptools.setup(
     author="Klebert Engineering",
     author_email="j.birkner@klebert-engineering.de",
 
-    description="Server middleware for implementing zserio services at warp 10.",
+    description="OpenAPI service transport layer for zserio.",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
