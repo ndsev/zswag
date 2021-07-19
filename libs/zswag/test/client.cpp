@@ -22,7 +22,7 @@ int main (int argc, char* argv[]) {
 
     std::cout << "[cpp-test-client] Starting integration tests with " << specUrl << "\n";
 
-    auto runTest = [&] (auto const& fn, auto expect, std::string const& aspect)
+    auto runTest = [&] (auto const& fn, auto expect, std::string const& aspect, std::function<void(httpcl::Config&)> const& authFun)
     {
         ++testCounter;
         std::cout << stx::format("[cpp-test-client] Executing test #{}: {} ...", testCounter, aspect) << std::endl;
@@ -31,7 +31,9 @@ int main (int argc, char* argv[]) {
             std::cout << "[cpp-test-client]   → Instantiating client." << std::endl;
             auto httpClient = std::make_unique<HttpLibHttpClient>();
             auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
-            auto zsrClient = ZsrClient(openApiConfig, std::move(httpClient));
+            httpcl::Config authHttpConf;
+            authFun(authHttpConf);
+            auto zsrClient = ZsrClient(openApiConfig, std::move(httpClient), authHttpConf);
             std::cout << "[cpp-test-client]   → Running request." << std::endl;
             auto responseObject = fn(zsrClient);
             auto response = zsr::get(responseObject, "value").template get<decltype(expect)>().value();
@@ -53,7 +55,8 @@ int main (int argc, char* argv[]) {
                 {"base.value",     2},
                 {"exponent.value", 3}
         })).get<zsr::Introspectable>().value();
-    }, 8., "Pass fields in path and header");
+    }, 8., "Pass fields in path and header",
+    [](httpcl::Config& conf){});
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.intSum")->call(
@@ -61,7 +64,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Integers", {
                 {"values", std::vector{100, -200, 400}}
         })).get<zsr::Introspectable>().value();
-    }, 300., "Pass hex-encoded array in query");
+    }, 300., "Pass hex-encoded array in query",
+    [](httpcl::Config& conf){
+        conf.headers.insert({"Authorization", "Bearer 123"});
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.byteSum")->call(
@@ -69,7 +75,12 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Bytes", {
                     {"values", std::vector<uint8_t>{8, 16, 32, 64}}
             })).get<zsr::Introspectable>().value();
-    }, 120., "Pass base64url-encoded byte array in path");
+    }, 120., "Pass base64url-encoded byte array in path",
+    [](httpcl::Config& conf){
+        conf.auth = httpcl::Config::BasicAuthentication{
+            "u", "pw", ""
+        };
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.intMul")->call(
@@ -77,7 +88,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Integers", {
                 {"values", std::vector{1, 2, 3, 4}}
         })).get<zsr::Introspectable>().value();
-    }, 24., "Pass base64-encoded long array in path");
+    }, 24., "Pass base64-encoded long array in path",
+    [](httpcl::Config& conf){
+        conf.query.insert({"api-key", "42"});
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.floatMul")->call(
@@ -85,7 +99,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Doubles", {
                     {"values", std::vector<double>{34.5, 2.}}
             })).get<zsr::Introspectable>().value();
-    }, 69., "Pass float array in query.");
+    }, 69., "Pass float array in query.",
+    [](httpcl::Config& conf){
+        conf.cookies.insert({"api-cookie", "42"});
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bitMul")->call(
@@ -93,7 +110,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Bools", {
                 {"values", std::vector<bool>{true, false}}
             })).get<zsr::Introspectable>().value();
-    }, false, "Pass bool array in query (expect false).");
+    }, false, "Pass bool array in query (expect false).",
+    [](httpcl::Config& conf){
+        conf.apiKey = "42";
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bitMul")->call(
@@ -101,7 +121,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Bools", {
                     {"values", std::vector<bool>{true, true}}
             })).get<zsr::Introspectable>().value();
-    }, true, "Pass bool array in query (expect true).");
+    }, true, "Pass bool array in query (expect true).",
+    [](httpcl::Config& conf){
+        conf.headers.insert({"X-Generic-Token", "42"});
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.identity")->call(
@@ -109,7 +132,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Double", {
                 {"value", 1.}
         })).get<zsr::Introspectable>().value();
-    }, 1., "Pass request as blob in body");
+    }, 1., "Pass request as blob in body",
+    [](httpcl::Config& conf){
+        conf.headers.insert({"X-Generic-Token", "42"});
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.concat")->call(
@@ -117,7 +143,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.Strings", {
                 {"values", std::vector<std::string>{"foo", "bar"}}
             })).get<zsr::Introspectable>().value();
-    }, std::string("foobar"), "Pass base64-encoded strings.");
+    }, std::string("foobar"), "Pass base64-encoded strings.",
+    [](httpcl::Config& conf){
+        conf.headers.insert({"Authorization", "Bearer 123"});
+    });
 
     runTest([](ZsrClient& zsrClient){
         return zsr::find<zsr::ServiceMethod>("calculator.Calculator.name")->call(
@@ -125,7 +154,10 @@ int main (int argc, char* argv[]) {
             zsr::make(zsr::packages(), "calculator.EnumWrapper", {
                 {"value", 42}
             })).get<zsr::Introspectable>().value();
-    }, std::string("TEST_ENUM_0"), "Pass enum.");
+    }, std::string("TEST_ENUM_0"), "Pass enum.",
+    [](httpcl::Config& conf){
+        conf.apiKey = "42";
+    });
 
     if (failureCounter > 0) {
         std::cout << stx::format("[cpp-test-client] Done, {} test(s) failed!", failureCounter);

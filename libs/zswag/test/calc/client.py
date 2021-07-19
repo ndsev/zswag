@@ -1,6 +1,6 @@
 from enum import Enum
 import calculator.api as api
-from zswag import OAClient
+from zswag import OAClient, HTTPConfig
 
 
 def run(host, port):
@@ -10,13 +10,13 @@ def run(host, port):
     failed = 0
     print(f"[py-test-client] Connecting to {server_url}", flush=True)
 
-    def run_test(aspect, request, fn, expect):
+    def run_test(aspect, request, fn, expect, auth_args):
         nonlocal counter, failed
         counter += 1
         try:
             print(f"[py-test-client] Test#{counter}: {aspect}", flush=True)
             print(f"[py-test-client]   -> Instantiating client.", flush=True)
-            client = api.Calculator.Client(OAClient(f"http://{host}:{port}/openapi.json"))
+            client = api.Calculator.Client(OAClient(f"http://{host}:{port}/openapi.json", **auth_args))
             print(f"[py-test-client]   -> Running request.", flush=True)
             resp = fn(client, request)
             if resp.value == expect:
@@ -31,61 +31,89 @@ def run(host, port):
         "Pass fields in path and header",
         api.BaseAndExponent(api.I32(2), api.I32(3)),
         api.Calculator.Client.power,
-        8.)
+        8.,
+        {})
 
     run_test(
         "Pass hex-encoded array in query",
         api.Integers([100, -200, 400]),
         api.Calculator.Client.int_sum,
-        300.)
+        300.,
+        {
+            "config": HTTPConfig().header("Authorization", "Bearer 123")
+        })
 
     run_test(
         "Pass base64url-encoded byte array in path",
         api.Bytes([8, 16, 32, 64]),
         api.Calculator.Client.byte_sum,
-        120.)
+        120.,
+        {
+            "config": HTTPConfig().basic_auth("u", "pw")
+        })
 
     run_test(
         "Pass base64-encoded long array in path",
         api.Integers([1, 2, 3, 4]),
         api.Calculator.Client.int_mul,
-        24.)
+        24.,
+        {
+            "config": HTTPConfig().query("api-key", "42")
+        })
 
     run_test(
         "Pass float array in query.",
         api.Doubles([34.5, 2.]),
         api.Calculator.Client.float_mul,
-        69.)
+        69.,
+        {
+            "api_key": "42"
+        })
 
     run_test(
         "Pass bool array in query (expect false).",
         api.Bools([True, False]),
         api.Calculator.Client.bit_mul,
-        False)
+        False,
+        {
+            "api_key": "42"
+        })
 
     run_test(
         "Pass bool array in query (expect true).",
         api.Bools([True, True]),
         api.Calculator.Client.bit_mul,
-        True)
+        True,
+        {
+            "config": HTTPConfig().header("X-Generic-Token", "42")
+        })
 
     run_test(
         "Pass request as blob in body",
         api.Double(1.),
         api.Calculator.Client.identity,
-        1.)
+        1.,
+        {
+            "config": HTTPConfig().header("X-Generic-Token", "42")
+        })
 
     run_test(
         "Pass base64-encoded strings.",
         api.Strings(["foo", "bar"]),
         api.Calculator.Client.concat,
-        "foobar")
+        "foobar",
+        {
+            "bearer": "123"
+        })
 
     run_test(
         "Pass enum.",
         api.EnumWrapper(api.Enum.TEST_ENUM_0),
         api.Calculator.Client.name,
-        "TEST_ENUM_0")
+        "TEST_ENUM_0",
+        {
+            "config": HTTPConfig().api_key("42")
+        })
 
     if failed > 0:
         print(f"[py-test-client] Done, {failed} test(s) failed!", flush=True)

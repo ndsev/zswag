@@ -11,6 +11,7 @@ paths:
   /power/{base}:
     get:
       operationId: power
+      security: []
       parameters:
         - in: path
           name: base
@@ -37,6 +38,7 @@ paths:
   /isum:
     get:
       operationId: intSum
+      security: [ { BearerAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -60,6 +62,7 @@ paths:
   /bsum/{values}:
     get:
       operationId: byteSum
+      security: [ { BasicAuth: [ ] } ]
       parameters:
         - in: path
           name: values
@@ -82,6 +85,7 @@ paths:
   /imul/{values}:
     get:
       operationId: intMul
+      security: [ { QueryAuth: [ ] } ]
       parameters:
         - in: path
           name: values
@@ -105,6 +109,7 @@ paths:
   /fmul:
     get:
       operationId: floatMul
+      security: [ { CookieAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -128,6 +133,7 @@ paths:
   /bmul:
     get:
       operationId: bitMul
+      security: [ { HeaderAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -150,6 +156,7 @@ paths:
   /identity:
     post:
       operationId: identity
+      security: [ { HeaderAuth: [ ] } ]
       requestBody:
         content:
           application/x-zserio-object:
@@ -167,6 +174,7 @@ paths:
   /concat:
     get:
       operationId: concat
+      security: [ { BearerAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -189,6 +197,7 @@ paths:
   /name/{enum_value}:
     get:
       operationId: name
+      # Implicit Header auth
       parameters:
         - in: path
           name: enum_value
@@ -208,3 +217,29 @@ paths:
       summary: ''
 
 servers: []
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+      x-basicInfoFunc: zswag.test.calc.server.validate_basic_auth
+    BearerAuth:
+      type: http
+      scheme: bearer
+      x-bearerInfoFunc: zswag.test.calc.server.validate_bearer
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: api-cookie
+      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+    HeaderAuth:
+      type: apiKey
+      in: header
+      name: X-Generic-Token
+      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+    QueryAuth:
+      type: apiKey
+      in: query
+      name: api-key
+      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+security: [{HeaderAuth: []}]
