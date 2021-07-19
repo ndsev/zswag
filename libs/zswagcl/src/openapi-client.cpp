@@ -92,7 +92,7 @@ void checkSecurityAlternatives(OpenAPIConfig::SecurityAlternatives const& alts, 
 
         for (auto const& scheme : schemeSet) {
             std::string reasonForMismatch;
-            if (!scheme->check(conf, reasonForMismatch)) {
+            if (!scheme->checkOrApply(conf, reasonForMismatch)) {
                 error << "  In security configuration " << i << ": " << reasonForMismatch << "\n";
                 matched = false;
                 break;
@@ -113,9 +113,11 @@ void checkSecurityAlternatives(OpenAPIConfig::SecurityAlternatives const& alts, 
 }
 
 OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
+                             httpcl::Config httpConfig,
                              std::unique_ptr<httpcl::IHttpClient> client)
     : config_(std::move(config))
     , client_(std::move(client))
+    , httpConfig_(httpConfig)
 {
     assert(client_);
 }
@@ -138,6 +140,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     uri.appendPath(resolvePath(method, paramCb));
 
     auto httpConfig = settings_[uri.build()];
+    httpConfig |= httpConfig_;
     resolveHeaderAndQueryParameters(httpConfig, method, paramCb);
 
     // Check whether the given config fulfills the required security schemes.

@@ -10,8 +10,9 @@ namespace zswagcl
 {
 
 ZsrClient::ZsrClient(zswagcl::OpenAPIConfig config,
-                     std::unique_ptr<httpcl::IHttpClient> client)
-    : client_(std::move(config), std::move(client))
+                     std::unique_ptr<httpcl::IHttpClient> client,
+                     httpcl::Config httpConfig)
+    : client_(std::move(config), std::move(httpConfig), std::move(client))
 {}
 
 template <class _Iter>

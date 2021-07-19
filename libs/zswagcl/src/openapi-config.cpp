@@ -35,14 +35,14 @@ bool OpenAPIConfig::APIKeyAuth::check(httpcl::Config const& config, std::string&
     }
 }
 
-bool OpenAPIConfig::CookieAuth::check(httpcl::Config const& config, std::string& err) const {
+bool OpenAPIConfig::CookieAuth::checkOrApply(httpcl::Config& config, std::string& err) const {
     if (config.cookies.find(cookieName) != config.cookies.end())
         return true;
     err = stx::format("Cookie `{}` is missing.", cookieName);
     return false;
 }
 
-bool OpenAPIConfig::BearerAuth::check(httpcl::Config const& config, std::string& err) const {
+bool OpenAPIConfig::BearerAuth::checkOrApply(httpcl::Config& config, std::string& err) const {
     std::regex bearerValueRe{
         "^Bearer .+$",
         std::regex_constants::ECMAScript|std::regex_constants::icase

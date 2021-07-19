@@ -25,7 +25,7 @@ struct OpenAPIConfig
         std::string id;
         explicit SecurityScheme(std::string id);
         virtual ~SecurityScheme() = default;
-        virtual bool check(httpcl::Config const&, std::string& err) const = 0;
+        virtual bool checkOrApply(httpcl::Config& config, std::string& err) const = 0;
     };
 
     using SecuritySchemePtr = std::shared_ptr<SecurityScheme>;
@@ -44,21 +44,21 @@ struct OpenAPIConfig
      */
     struct BasicAuth : public SecurityScheme {
         explicit BasicAuth(std::string id);
-        bool check(httpcl::Config const&, std::string& err) const override;
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
     };
     struct BearerAuth : public SecurityScheme {
         explicit BearerAuth(std::string id);
-        bool check(httpcl::Config const&, std::string& err) const override;
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
     };
     struct APIKeyAuth : public SecurityScheme {
         explicit APIKeyAuth(std::string id, ParameterLocation location, std::string keyName);
-        bool check(httpcl::Config const&, std::string& err) const override;
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
         ParameterLocation location = ParameterLocation::Header;
         std::string keyName;
     };
     struct CookieAuth : public SecurityScheme {
         explicit CookieAuth(std::string id, std::string cookieName);
-        bool check(httpcl::Config const&, std::string& err) const override;
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
         std::string cookieName;
     };
 

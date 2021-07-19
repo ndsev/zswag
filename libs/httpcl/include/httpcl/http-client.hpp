@@ -60,7 +60,7 @@ public:
 class HttpLibHttpClient : public IHttpClient
 {
 public:
-    explicit HttpLibHttpClient(Config const& config={});
+    explicit HttpLibHttpClient();
     ~HttpLibHttpClient() override;
 
     Result get(const std::string& uri,

@@ -29,9 +29,7 @@ using Result = HttpLibHttpClient::Result;
 
 struct HttpLibHttpClient::Impl
 {
-    explicit Impl(Config config) : userConfig_(std::move(config)) {}
-
-    Config userConfig_;
+    explicit Impl() {}
 
     auto makeClientAndApplyQuery(URIComponents& uri, Config const& config)
     {
@@ -39,21 +37,15 @@ struct HttpLibHttpClient::Impl
         client->enable_server_certificate_verification(false);
         client->set_connection_timeout(60000);
         client->set_read_timeout(60000);
-
-        // First fetch persistent config for this URI,
-        // then apply user-specified config overrides.
-        auto uriSpecificConfig = config;
-        uriSpecificConfig |= userConfig_;
-        uriSpecificConfig.apply(*client);
+        config.apply(*client);
 
         applyQuery(uri, config);
-
         return client;
     }
 };
 
-HttpLibHttpClient::HttpLibHttpClient(Config const& config)
-    : impl_(std::make_unique<Impl>(config))
+HttpLibHttpClient::HttpLibHttpClient()
+    : impl_(std::make_unique<Impl>())
 {}
 
 HttpLibHttpClient::~HttpLibHttpClient() {
@@ -65,8 +57,7 @@ Result HttpLibHttpClient::get(const std::string& uriStr,
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Get(
-        uri.buildPath().c_str(),
-        {config.headers.begin(), config.headers.end()}));
+        uri.buildPath().c_str()));
 }
 
 Result HttpLibHttpClient::post(const std::string& uriStr,
@@ -76,7 +67,6 @@ Result HttpLibHttpClient::post(const std::string& uriStr,
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Post(
         uri.buildPath().c_str(),
-        {config.headers.begin(), config.headers.end()},
         body ? body->body : std::string(),
         body ? body->contentType.c_str() : nullptr));
 }
@@ -88,7 +78,6 @@ Result HttpLibHttpClient::put(const std::string& uriStr,
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Put(
         uri.buildPath().c_str(),
-        {config.headers.begin(), config.headers.end()},
         body ? body->body : std::string(),
         body ? body->contentType.c_str() : nullptr));
 }
@@ -100,7 +89,6 @@ Result HttpLibHttpClient::del(const std::string& uriStr,
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Delete(
         uri.buildPath().c_str(),
-        {config.headers.begin(), config.headers.end()},
         body ? body->body : std::string(),
         body ? body->contentType.c_str() : nullptr));
 }
@@ -112,7 +100,6 @@ Result HttpLibHttpClient::patch(const std::string& uriStr,
     auto uri = URIComponents::fromStrRfc3986(uriStr);
     return makeResult(impl_->makeClientAndApplyQuery(uri, config)->Patch(
         uri.buildPath().c_str(),
-        {config.headers.begin(), config.headers.end()},
         body ? body->body : std::string(),
         body ? body->contentType.c_str() : nullptr));
 }

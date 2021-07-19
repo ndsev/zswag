@@ -16,8 +16,10 @@ class OpenAPIClient
 {
 public:
     OpenAPIConfig config_;
+    httpcl::Config httpConfig_;
 
     OpenAPIClient(OpenAPIConfig config,
+                  httpcl::Config httpConfig,
                   std::unique_ptr<httpcl::IHttpClient> client);
     ~OpenAPIClient();
 

@@ -7,6 +7,7 @@
 #include "zswagcl/openapi-parser.hpp"
 #include "httpcl/http-settings.hpp"
 #include "py-openapi-client.h"
+#include "stx/format.h"
 
 namespace py = pybind11;
 using namespace py::literals;
