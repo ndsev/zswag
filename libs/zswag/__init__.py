@@ -1,3 +1,4 @@
 from .app import *
 
-from pyzswagcl import OAClient, HTTPError
+from pyzswagcl import OAClient, HTTPError, HTTPConfig
+
