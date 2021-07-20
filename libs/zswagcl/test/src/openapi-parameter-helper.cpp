@@ -30,10 +30,10 @@ static auto pathStr(const Parameter& parameter, _Fun fun)
 }
 
 template <class _Fun>
-static auto queryPairs(const Parameter& parameter, _Fun fun)
+static auto queryOrHeaderPairs(const Parameter& parameter, _Fun fun)
 {
     ParameterValueHelper helper(parameter);
-    return fun(helper).queryPairs(parameter);
+    return fun(helper).queryOrHeaderPairs(parameter);
 }
 
 /* Testdata */
@@ -268,7 +268,7 @@ TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
             auto explode = GENERATE(false, true);
             INFO("Explode: " << explode);
 
-            auto r = queryPairs(makeParameter("id", style, explode), [&](auto& helper) {
+            auto r = queryOrHeaderPairs(makeParameter("id", style, explode), [&](auto& helper) {
                 return helper.value(value);
             });
 
@@ -281,7 +281,7 @@ TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
 
         SECTION("Array") {
             SECTION("Normal") {
-                auto r = queryPairs(makeParameter("id", style, false), [&](auto& helper) {
+                auto r = queryOrHeaderPairs(makeParameter("id", style, false), [&](auto& helper) {
                     return helper.array(list);
                 });
 
@@ -292,7 +292,7 @@ TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
                 REQUIRE(v == "3,4,5");
             }
             SECTION("Explode") {
-                auto r = queryPairs(makeParameter("id", style, true), [&](auto& helper) {
+                auto r = queryOrHeaderPairs(makeParameter("id", style, true), [&](auto& helper) {
                     return helper.array(list);
                 });
 
@@ -308,7 +308,7 @@ TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
 
         SECTION("Object") {
             SECTION("Normal") {
-                auto r = queryPairs(makeParameter("id", style, false), [&](auto& helper) {
+                auto r = queryOrHeaderPairs(makeParameter("id", style, false), [&](auto& helper) {
                     return helper.object(object);
                 });
 
@@ -319,7 +319,7 @@ TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
                 REQUIRE(v == "firstName,Alex,role,admin");
             }
             SECTION("Explode") {
-                auto r = queryPairs(makeParameter("id", style, true), [&](auto& helper) {
+                auto r = queryOrHeaderPairs(makeParameter("id", style, true), [&](auto& helper) {
                     return helper.object(object);
                 });
 

@@ -1,0 +1,98 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "OpenAPI Testdata Template",
+    "description": "OpenAPI Testdata Template",
+    "version": "2021.01"
+  },
+  "servers": [
+    {
+      "url": "https://my.server.com/api"
+    }
+  ],
+  "paths": {
+    "/generic": {
+      "post": {
+        "operationId": "generic",
+        "requestBody": {"content": {"application/x-zserio-object": {}}}
+      }
+    },
+    "/api-key-auth": {
+      "post": {
+        "operationId": "api-key-auth",
+        "requestBody": {"content": {"application/x-zserio-object": {}}}
+      }
+    },
+    "/bad-auth": {
+      "post": {
+        "operationId": "bad-auth",
+        "requestBody": {"content": {"application/x-zserio-object": {}}},
+        "security": [{"QueryAuth":  [], "BearerAuth":  []}]
+      }
+    },
+    "/cookie-and-basic-auth": {
+      "post": {
+        "operationId": "cookie-and-basic-auth",
+        "requestBody": {"content": {"application/x-zserio-object": {}}},
+        "security": [{"BasicAuth":  [], "CookieAuth":  []}]
+      }
+    },
+    "/bearer-auth": {
+      "post": {
+        "operationId": "bearer-auth",
+        "requestBody": {"content": {"application/x-zserio-object": {}}},
+        "security": [{"QueryAuth":  []}, {"BearerAuth":  []}]
+      }
+    },
+    "/basic-auth": {
+      "post": {
+        "operationId": "basic-auth",
+        "requestBody": {"content": {"application/x-zserio-object": {}}},
+        "security": [{"BasicAuth":  []}]
+      }
+    },
+    "/query-auth": {
+      "post": {
+        "operationId": "query-auth",
+        "requestBody": {"content": {"application/x-zserio-object": {}}},
+        "security": [{"QueryAuth":  []}]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "binary": {
+        "type": "string",
+        "format": "binary"
+      }
+    },
+    "securitySchemes": {
+      "BasicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "CookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "api-cookie"
+      },
+      "GenericHeaderAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Generic-Token"
+      },
+      "QueryAuth": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api-key"
+      }
+    }
+  },
+  "security": [
+    {"GenericHeaderAuth": []}
+  ]
+}

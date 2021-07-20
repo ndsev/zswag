@@ -11,6 +11,7 @@ paths:
   /power/{base}:
     get:
       operationId: power
+      security: []
       parameters:
         - in: path
           name: base
@@ -19,8 +20,8 @@ paths:
           schema:
             format: string
             type: string
-        - in: query
-          name: exponent
+        - in: header
+          name: X-Ponent
           required: true
           x-zserio-request-part: exponent.value
           schema:
@@ -30,13 +31,14 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 type: string
       summary: ''
   /isum:
     get:
       operationId: intSum
+      security: [ { BearerAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -52,7 +54,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -60,6 +62,7 @@ paths:
   /bsum/{values}:
     get:
       operationId: byteSum
+      security: [ { BasicAuth: [ ] } ]
       parameters:
         - in: path
           name: values
@@ -74,7 +77,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -82,6 +85,7 @@ paths:
   /imul/{values}:
     get:
       operationId: intMul
+      security: [ { QueryAuth: [ ] } ]
       parameters:
         - in: path
           name: values
@@ -97,7 +101,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -105,6 +109,7 @@ paths:
   /fmul:
     get:
       operationId: floatMul
+      security: [ { CookieAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -120,7 +125,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -128,6 +133,7 @@ paths:
   /bmul:
     get:
       operationId: bitMul
+      security: [ { HeaderAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -142,7 +148,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -150,6 +156,7 @@ paths:
   /identity:
     post:
       operationId: identity
+      security: [ { CookieAuth: [ ] } ]
       requestBody:
         content:
           application/x-zserio-object:
@@ -159,7 +166,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -167,6 +174,7 @@ paths:
   /concat:
     get:
       operationId: concat
+      security: [ { BearerAuth: [ ] } ]
       parameters:
         - in: query
           name: values
@@ -181,7 +189,7 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
@@ -189,6 +197,7 @@ paths:
   /name/{enum_value}:
     get:
       operationId: name
+      # Implicit Header auth
       parameters:
         - in: path
           name: enum_value
@@ -201,10 +210,36 @@ paths:
         '200':
           description: ''
           content:
-            application/octet-stream:
+            application/x-zserio-object:
               schema:
                 format: binary
                 type: string
       summary: ''
 
 servers: []
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+      x-basicInfoFunc: zswag.test.calc.server.validate_basic_auth
+    BearerAuth:
+      type: http
+      scheme: bearer
+      x-bearerInfoFunc: zswag.test.calc.server.validate_bearer
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: api-cookie
+      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+    HeaderAuth:
+      type: apiKey
+      in: header
+      name: X-Generic-Token
+      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+    QueryAuth:
+      type: apiKey
+      in: query
+      name: api-key
+      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+security: [{HeaderAuth: []}]

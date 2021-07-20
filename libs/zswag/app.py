@@ -5,6 +5,7 @@ import zserio
 import sys
 import yaml
 from typing import Type
+from flask import request as flask_request
 
 from pyzswagcl import \
     parse_openapi_config, \
@@ -156,7 +157,11 @@ class OAServer(connexion.App):
                 if spec.body_request_object:
                     request_blob = kwargs["body"]
                 else:
-                    request_blob = request_object_blob(req_t=req_t, spec=spec, **kwargs)
+                    request_blob = request_object_blob(
+                        req_t=req_t,
+                        spec=spec,
+                        headers=flask_request.headers,
+                        **kwargs)
                 return bytes(fun(request_blob, None).byte_array)
             setattr(self.service_instance, method_name, wsgi_method)
 

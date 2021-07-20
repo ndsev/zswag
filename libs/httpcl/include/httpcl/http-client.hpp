@@ -5,14 +5,26 @@
 #include <memory>
 #include <functional>
 #include <map>
+#include <optional>
 #include <stdexcept>
+
+#include "http-settings.hpp"
+#include "uri.hpp"
 
 namespace httpcl
 {
 
+struct BodyAndContentType {
+    std::string body;
+    std::string contentType;
+};
+
+using OptionalBodyAndContentType = std::optional<BodyAndContentType>;
+
 class IHttpClient
 {
 public:
+
     struct Result {
         int status;
         std::string content;
@@ -21,75 +33,76 @@ public:
     struct Error : std::runtime_error {
         Result result;
 
-        Error(Result result, std::string message)
-            : std::runtime_error(std::move(message))
+        Error(Result result, std::string const& message)
+            : std::runtime_error(message)
             , result(std::move(result))
         {}
     };
 
     virtual ~IHttpClient() = default;
 
-    virtual Result get(const std::string& path) = 0;
+    virtual Result get(const std::string& path,
+                       const Config& config) = 0;
     virtual Result post(const std::string& path,
-                        const std::string& body,
-                        const std::string& bodyType) = 0;
+                        const OptionalBodyAndContentType& body,
+                        const Config& config) = 0;
     virtual Result put(const std::string& path,
-                       const std::string& body,
-                       const std::string& bodyType) = 0;
+                       const OptionalBodyAndContentType& body,
+                       const Config& config) = 0;
     virtual Result del(const std::string& path,
-                       const std::string& body,
-                       const std::string& bodyType) = 0;
+                       const OptionalBodyAndContentType& body,
+                       const Config& config) = 0;
     virtual Result patch(const std::string& path,
-                         const std::string& body,
-                         const std::string& bodyType) = 0;
+                         const OptionalBodyAndContentType& body,
+                         const Config& config) = 0;
 };
 
 class HttpLibHttpClient : public IHttpClient
 {
 public:
-    explicit HttpLibHttpClient(std::map<std::string, std::string> const& headers={});
-    ~HttpLibHttpClient() override;
-
-    Result get(const std::string& uri) override;
+    Result get(const std::string& uri,
+               const Config& config) override;
     Result post(const std::string& uri,
-                const std::string& body,
-                const std::string& bodyType) override;
+                const OptionalBodyAndContentType& body,
+                const Config& config) override;
     Result put(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType) override;
+               const OptionalBodyAndContentType& body,
+               const Config& config) override;
     Result del(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType) override;
+               const OptionalBodyAndContentType& body,
+               const Config& config) override;
     Result patch(const std::string& uri,
-                 const std::string& body,
-                 const std::string& bodyType) override;
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
+                 const OptionalBodyAndContentType& body,
+                 const Config& config) override;
 };
 
 class MockHttpClient : public IHttpClient
 {
 public:
-    std::function<IHttpClient::Result(std::string_view /* uri */)> getFun;
-    std::function<IHttpClient::Result(std::string_view /* uri */,
-                                      std::string_view /* body */,
-                                      std::string_view /* type */)> postFun;
+    std::function<
+        IHttpClient::Result(std::string_view /* uri */)
+    > getFun;
+    std::function<
+        IHttpClient::Result(
+            std::string_view /* uri */,
+            OptionalBodyAndContentType const& /* body */,
+            Config const& config /* config */
+    )> postFun;
 
-    Result get(const std::string& uri) override;
+    Result get(const std::string& uri,
+               const Config& config) override;
     Result post(const std::string& uri,
-                const std::string& body,
-                const std::string& bodyType) override;
+                const OptionalBodyAndContentType& body,
+                const Config& config) override;
     Result put(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType) override;
+               const OptionalBodyAndContentType& body,
+               const Config& config) override;
     Result del(const std::string& uri,
-               const std::string& body,
-               const std::string& bodyType) override;
+               const OptionalBodyAndContentType& body,
+               const Config& config) override;
     Result patch(const std::string& uri,
-                 const std::string& body,
-                 const std::string& bodyType) override;
+                 const OptionalBodyAndContentType& body,
+                 const Config& config) override;
 };
 
 }

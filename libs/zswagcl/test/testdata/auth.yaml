@@ -1,0 +1,21 @@
+- url: .*
+  headers:
+    X-Generic-Token: 1
+- url: .*/no
+  headers:
+    X-Never-Visible: 2
+- url: .*/query-auth
+  query:
+    api-key: 3
+- url: .*/cookie-and-basic-auth
+  cookies:
+    api-cookie: 4
+- url: .*/(basic-auth|cookie-and-basic-auth)
+  basic-auth:
+    user: johndoe
+    password: xxx
+- url: .*/bearer-auth
+  headers:
+    Authorization: Bearer 0000
+- url: .*/api-key-auth
+  api-key: "1234"

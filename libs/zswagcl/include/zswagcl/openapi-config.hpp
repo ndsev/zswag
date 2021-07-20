@@ -3,24 +3,70 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <variant>
+#include <optional>
 
 #include "export.hpp"
 #include "httpcl/uri.hpp"
+#include "httpcl/http-settings.hpp"
 
 namespace zswagcl
 {
 
 struct OpenAPIConfig
 {
+    enum class ParameterLocation {
+        Path,
+        Query,
+        Header
+    };
+
+    struct SecurityScheme {
+        std::string id;
+        explicit SecurityScheme(std::string id);
+        virtual ~SecurityScheme() = default;
+        virtual bool checkOrApply(httpcl::Config& config, std::string& err) const = 0;
+    };
+
+    using SecuritySchemePtr = std::shared_ptr<SecurityScheme>;
+
+    /**
+     * Security Scheme References
+     *
+     * Disjunctive normal form ([A [AND B]+][ OR C [AND D]+]+) of required
+     * security schemes. An empty vector is used to encode that no auth
+     * scheme is required.
+     */
+    using SecurityAlternatives = std::vector<std::vector<SecuritySchemePtr>>;
+
+    /**
+     * Supported Authentication Schemes
+     */
+    struct BasicAuth : public SecurityScheme {
+        explicit BasicAuth(std::string id);
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
+    };
+    struct BearerAuth : public SecurityScheme {
+        explicit BearerAuth(std::string id);
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
+    };
+    struct APIKeyAuth : public SecurityScheme {
+        explicit APIKeyAuth(std::string id, ParameterLocation location, std::string keyName);
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
+        ParameterLocation location = ParameterLocation::Header;
+        std::string keyName;
+    };
+    struct CookieAuth : public SecurityScheme {
+        explicit CookieAuth(std::string id, std::string cookieName);
+        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
+        std::string cookieName;
+    };
+
     struct Parameter {
-        enum Location {
-            Path,
-            Query,
-        } location = Query;
+        ParameterLocation location = ParameterLocation::Query;
 
         /**
-         * Parameter identifier (from template) without style/explode
-         * hints ({?X*} -> X).
+         * Parameter identifier.
          */
         std::string ident;
 
@@ -127,6 +173,11 @@ struct OpenAPIConfig
          * Ignored if HTTP-Method is GET.
          */
         bool bodyRequestObject = false;
+
+        /**
+         * Optional security schemes override for the global default.
+         */
+        std::optional<SecurityAlternatives> security;
     };
 
     /**
@@ -138,6 +189,17 @@ struct OpenAPIConfig
      * Map from service method name to path configuration.
      */
     std::map<std::string, Path> methodPath;
+
+    /**
+     * Available security schemes.
+     */
+    std::map<std::string, SecuritySchemePtr> securitySchemes;
+
+    /**
+     * Default security scheme for all paths. The default
+     * is an empty array of combinations, which means no auth required.
+     */
+    SecurityAlternatives defaultSecurityScheme;
 };
 
 ZSWAGCL_EXPORT extern const std::string ZSERIO_OBJECT_CONTENT_TYPE;

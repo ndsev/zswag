@@ -182,7 +182,7 @@ def parse_param_values(param: OAParam, target_type: Type, value: List[str]) -> L
 
 # Get a blob for a zserio request type, a set of request parameter values
 # and an OpenAPI method path spec.
-def request_object_blob(*, req_t: Type, spec: OAMethod, **kwargs) -> bytes:
+def request_object_blob(*, req_t: Type, headers: Dict[str, Any], spec: OAMethod, **kwargs) -> bytes:
     # Lazy instantiation of request object and type info
     req: Optional[req_t] = None
     req_field_types: Dict = {}
@@ -193,8 +193,12 @@ def request_object_blob(*, req_t: Type, spec: OAMethod, **kwargs) -> bytes:
     for param_name, param in spec.parameters.items():
         # Get raw string value
         value: Union[str, List[str]] = param.default_value
+        param_name = param_name.replace("-", "_")
         if param_name in kwargs:
-            value = kwargs[param_name.replace("-", "_")]
+            value = kwargs[param_name]
+        else:
+            if param_name in headers:
+                value = headers[param_name]
         # Convert string value to whole blob
         if param.field == ZSERIO_REQUEST_PART_WHOLE:
             return str_to_bytes(value, param.format)

@@ -4,6 +4,7 @@
 
 #include "zswagcl/openapi-config.hpp"
 #include "httpcl/http-client.hpp"
+#include "httpcl/http-settings.hpp"
 
 namespace zswagcl
 {
@@ -14,7 +15,8 @@ namespace zswagcl
  * Throws on error.
  */
 OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
-                                 httpcl::IHttpClient& client);
+                                 httpcl::IHttpClient& client,
+                                 httpcl::Config httpConfig = {});
 
 /**
  * Parse OpenAPI config from input-stream.

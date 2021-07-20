@@ -7,6 +7,7 @@
 #include "zswagcl/openapi-parser.hpp"
 #include "httpcl/http-settings.hpp"
 #include "py-openapi-client.h"
+#include "stx/format.h"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -28,9 +29,10 @@ PYBIND11_MODULE(pyzswagcl, m)
     ///////////////////////////////////////////////////////////////////////////
     // ParameterLocation
 
-    py::enum_<OpenAPIConfig::Parameter::Location>(m, "OAParamLocation", py::arithmetic())
-            .value("PATH", OpenAPIConfig::Parameter::Location::Path)
-            .value("QUERY", OpenAPIConfig::Parameter::Location::Query)
+    py::enum_<OpenAPIConfig::ParameterLocation>(m, "OAParamLocation", py::arithmetic())
+            .value("PATH", OpenAPIConfig::ParameterLocation::Path)
+            .value("QUERY", OpenAPIConfig::ParameterLocation::Query)
+            .value("HEADER", OpenAPIConfig::ParameterLocation::Header)
             ;
 
     ///////////////////////////////////////////////////////////////////////////
@@ -65,7 +67,45 @@ PYBIND11_MODULE(pyzswagcl, m)
             ;
 
     ///////////////////////////////////////////////////////////////////////////
-    // HTTPService::Config
+    // httpcl::Config
+
+    py::class_<httpcl::Config>(m, "HTTPConfig")
+        .def(py::init<>())
+        .def("header", [](httpcl::Config& self, std::string const& key, std::string const& value) {
+            self.headers.insert({key, value});
+            return &self;
+        }, "key"_a, "val"_a)
+        .def("query", [](httpcl::Config& self, std::string const& key, std::string const& value) {
+            self.query.insert({key, value});
+            return &self;
+        }, "key"_a, "val"_a)
+        .def("cookie", [](httpcl::Config& self, std::string const& key, std::string const& value) {
+            self.cookies.insert({key, value});
+            return &self;
+        }, "key"_a, "val"_a)
+        .def("bearer", [](httpcl::Config& self, std::string const& key) {
+            self.headers.insert({"Authorization", stx::format("Bearer {}", key)});
+            return &self;
+        }, "token"_a)
+        .def("api_key", [](httpcl::Config& self, std::string const& key) {
+            self.apiKey = key;
+            return &self;
+        }, "token"_a)
+        .def("basic_auth", [](httpcl::Config& self, std::string const& user, std::string const& pw) {
+            self.auth = httpcl::Config::BasicAuthentication{
+                user, pw, ""
+            };
+            return &self;
+        }, "user"_a, "pw"_a)
+        .def("proxy", [](httpcl::Config& self, std::string const& host, int port, std::string const& user={}, std::string const& pw={}) {
+            self.proxy = httpcl::Config::Proxy{
+                host, port, user, pw, ""
+            };
+            return &self;
+        }, "host"_a, "port"_a, "user"_a, "pw"_a);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // OpenAPIConfig
     py::class_<OpenAPIConfig>(m, "OAConfig")
             .def("__contains__", [](const OpenAPIConfig& self, std::string const& methodName) {
                 return self.methodPath.find(methodName) != self.methodPath.end();

@@ -15,9 +15,11 @@ namespace zswagcl
 class OpenAPIClient
 {
 public:
-    OpenAPIConfig config;
+    OpenAPIConfig config_;
+    httpcl::Config httpConfig_;
 
     OpenAPIClient(OpenAPIConfig config,
+                  httpcl::Config httpConfig,
                   std::unique_ptr<httpcl::IHttpClient> client);
     ~OpenAPIClient();
 
@@ -38,6 +40,7 @@ public:
 
 private:
     std::unique_ptr<httpcl::IHttpClient> client_;
+    httpcl::Settings settings_;
 };
 
 }

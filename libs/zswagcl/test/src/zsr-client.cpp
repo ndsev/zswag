@@ -31,10 +31,10 @@ static auto makeRequest(std::string_view compound, zsr::VariantMap values)
 /**
  * Load config template file and replace pathes with input string.
  */
-static auto makeConfig(std::string paths)
+static auto makeConfig(std::string pathsReplacement, std::string source = TESTDATA "/config-template.json")
 {
     std::string contents;
-    std::ifstream file(TESTDATA "/config-template.json");
+    std::ifstream file(source);
 
     while (!file.eof()) {
         std::array<char, 4000> buffer;
@@ -43,14 +43,14 @@ static auto makeConfig(std::string paths)
         contents.append(buffer.data(), file.gcount());
     }
 
-    contents = stx::replace_with(contents, "<<PATHS>>", paths);
+    contents = stx::replace_with(contents, "<<PATHS>>", pathsReplacement);
 
     std::istringstream ss(contents);
     return parseOpenAPIConfig(ss);
 }
 
 TEST_CASE("HTTP-Service", "[zsr-client]") {
-    SECTION("fetch server config") {
+    SECTION("Fetch Server Config") {
         httpcl::MockHttpClient configClient;
         configClient.getFun = [&](std::string_view uri) {
             REQUIRE(uri == "https://dummy");
@@ -66,7 +66,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         );
     }
 
-    SECTION("path parameters") {
+    SECTION("Path Parameters") {
         /* Setup mock client */
         auto getCalled = false;
         auto client = std::make_unique<httpcl::MockHttpClient>();
@@ -141,7 +141,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         REQUIRE(getCalled);
     }
 
-    SECTION("query parameters") {
+    SECTION("Query Parameters") {
         /* Setup mock client */
         auto getCalled = false;
         auto client = std::make_unique<httpcl::MockHttpClient>();
@@ -219,7 +219,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         REQUIRE(getCalled);
     }
 
-    SECTION("http post request-buffer") {
+    SECTION("HTTP Post Request-Buffer") {
         auto postCalled = false;
 
         /* Make request */
@@ -229,11 +229,13 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         /* Setup mock client */
         auto client = std::make_unique<httpcl::MockHttpClient>();
         client->postFun = [&](std::string_view uri,
-                              std::string_view body,
-                              std::string_view type) {
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf)
+        {
             REQUIRE(uri == "https://my.server.com/api/post/hello");
-            REQUIRE(type == ZSERIO_OBJECT_CONTENT_TYPE);
-            REQUIRE(std::equal(body.begin(), body.end(),
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+            REQUIRE(std::equal(body->body.begin(), body->body.end(),
                                buffer.begin(), buffer.end()));
 
             postCalled = true;
@@ -255,7 +257,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                     "requestBody": {
                         "content": {
                             "application/x-zserio-object": {
-                                "shema": { "type": "string" }
+                                "schema": { "type": "string" }
                             }
                         }
                     }
@@ -270,5 +272,110 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
 
         /* Check result */
         REQUIRE(postCalled);
+    }
+
+    SECTION("Authorization Schemes")
+    {
+        /* Initialize environment */
+        static auto httpConfig = std::string("HTTP_SETTINGS_FILE=" TESTDATA "/auth.yaml");
+
+#if _MSC_VER
+        _putenv(httpConfig.c_str());
+#else
+        putenv((char*)httpConfig.c_str());
+#endif
+
+        /* Make request */
+        auto [request_, buffer_] = makeRequest("Request", {{"str", "hello"}});
+        const auto &buffer = buffer_; /* llvm does not allow capturing bindings in lambdas. */
+        const auto &request = request_;
+
+        /* Make config, client, service */
+        auto config = makeConfig("", TESTDATA "/config-with-auth.json");
+        REQUIRE(config.securitySchemes.size() == 5);
+
+        zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
+
+        /* Prepare generic test function */
+        auto callAndCheck = [&](std::string const& op, std::function<void(httpcl::Config const&)> const& test){
+            auto postCalled = false;
+            auto client = std::make_unique<httpcl::MockHttpClient>();
+            client->postFun = [&](
+                std::string_view uri,
+                httpcl::OptionalBodyAndContentType const& body,
+                httpcl::Config const& conf)
+            {
+                if (test) test(conf);
+                postCalled = true;
+                return httpcl::IHttpClient::Result{200, {}};
+            };
+            std::vector<uint8_t> response;
+            auto service = ZsrClient(config, std::move(client));
+            service.callMethod(op, buffer, response, &ctx);
+            REQUIRE(postCalled);
+        };
+
+        SECTION("Catch-All Header") {
+            REQUIRE_FALSE(config.defaultSecurityScheme.empty());
+            REQUIRE_FALSE(config.methodPath["generic"].security);
+            REQUIRE_NOTHROW(callAndCheck("generic", [](httpcl::Config const& c){
+                REQUIRE(c.headers.find("X-Generic-Token") != c.headers.end());
+                REQUIRE(c.headers.find("X-Never-Visible") == c.headers.end());
+            }));
+        }
+
+        SECTION("API Key") {
+            REQUIRE_FALSE(config.methodPath["api-key-auth"].security);
+            REQUIRE_NOTHROW(callAndCheck("api-key-auth", [](httpcl::Config const& c){
+                REQUIRE(c.headers.find("X-Generic-Token") != c.headers.end());
+                REQUIRE(c.headers.find("X-Never-Visible") == c.headers.end());
+            }));
+        }
+
+        SECTION("Insufficient Credentials") {
+            REQUIRE(config.methodPath["bad-auth"].security);
+            REQUIRE_THROWS_MATCHES(
+                callAndCheck("bad-auth", [](httpcl::Config const& c){}),
+                std::runtime_error,
+                Catch::Matchers::Predicate<std::runtime_error>(
+                    [](std::runtime_error const& e) -> bool {
+                        std::string req = "The provided HTTP configuration does not satisfy authentication requirements";
+                        std::string msg = e.what();
+                        return msg.rfind(req, 0) == 0;
+                    }
+                )
+            );
+        }
+
+        SECTION("Combined Cookie and Basic-Auth") {
+            REQUIRE(config.methodPath["cookie-and-basic-auth"].security);
+            REQUIRE_NOTHROW(callAndCheck("cookie-and-basic-auth", [](httpcl::Config const& c){
+                REQUIRE(c.cookies.find("api-cookie") != c.cookies.end());
+                REQUIRE(c.auth);
+            }));
+        }
+
+        SECTION("Bearer-Auth") {
+            REQUIRE(config.methodPath["bearer-auth"].security);
+            REQUIRE_NOTHROW(callAndCheck("bearer-auth", [](httpcl::Config const& c){
+                auto auth = c.headers.find("Authorization");
+                REQUIRE(auth != c.headers.end());
+                REQUIRE(auth->second == "Bearer 0000");
+            }));
+        }
+
+        SECTION("Basic-Auth") {
+            REQUIRE(config.methodPath["basic-auth"].security);
+            REQUIRE_NOTHROW(callAndCheck("basic-auth", [](httpcl::Config const& c){
+                REQUIRE(c.auth);
+            }));
+        }
+
+        SECTION("Query-Token Auth") {
+            REQUIRE(config.methodPath["query-auth"].security);
+            REQUIRE_NOTHROW(callAndCheck("query-auth", [](httpcl::Config const& c){
+                REQUIRE(c.query.find("api-key") != c.query.end());
+            }));
+        }
     }
 }

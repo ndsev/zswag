@@ -16,10 +16,11 @@ static const char* KEYCHAIN_PACKAGE = "lib.openapi.zserio.client";
 
 namespace YAML
 {
+
 template <>
-struct convert<HTTPSettings::BasicAuthentication>
+struct convert<Config::BasicAuthentication>
 {
-    static Node encode(const HTTPSettings::BasicAuthentication& a)
+    static Node encode(const Config::BasicAuthentication& a)
     {
         Node node;
         node["user"] = a.user;
@@ -31,7 +32,7 @@ struct convert<HTTPSettings::BasicAuthentication>
         return node;
     }
 
-    static bool decode(const Node& node, HTTPSettings::BasicAuthentication& a)
+    static bool decode(const Node& node, Config::BasicAuthentication& a)
     {
         if (!node.IsMap())
             return false;
@@ -57,9 +58,9 @@ struct convert<HTTPSettings::BasicAuthentication>
 };
 
 template <>
-struct convert<HTTPSettings::Proxy>
+struct convert<Config::Proxy>
 {
-    static Node encode(const HTTPSettings::Proxy& a)
+    static Node encode(const Config::Proxy& a)
     {
         Node node;
         node["host"] = a.host;
@@ -76,7 +77,7 @@ struct convert<HTTPSettings::Proxy>
         return node;
     }
 
-    static bool decode(const Node& node, HTTPSettings::Proxy& a)
+    static bool decode(const Node& node, Config::Proxy& a)
     {
         const auto& host = node["host"];
         const auto& port = node["port"];
@@ -107,151 +108,17 @@ struct convert<HTTPSettings::Proxy>
 };
 }
 
-HTTPSettings::HTTPSettings()
-{
-    load();
-}
-
-void HTTPSettings::load()
-{
-    settings.clear();
-
-    auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
-    if (!cookieJar)
-        return;
-
-    try {
-        auto node = YAML::LoadFile(cookieJar);
-        uint32_t idx = 0;
-
-        for (auto const& entry : node.as<std::vector<YAML::Node>>()) {
-            Settings settings;
-            std::string urlPattern;
-
-            if (auto entryParam = entry["url"])
-                urlPattern = entryParam.as<std::string>();
-            else
-                throw std::runtime_error(
-                    "HTTPSettings: Failed to read 'url' of entry #"s + std::to_string(idx) +
-                    " in " + cookieJar);
-
-            if (auto cookies = entry["cookies"])
-                settings.cookies = cookies.as<std::map<std::string, std::string>>();
-
-            if (auto basicAuth = entry["basic-auth"])
-                settings.auth = basicAuth.as<HTTPSettings::BasicAuthentication>();
-
-            if (auto proxy = entry["proxy"])
-                settings.proxy = proxy.as<HTTPSettings::Proxy>();
-
-            this->settings[urlPattern] = std::move(settings);
-            ++idx;
-        }
-    } catch (const YAML::BadFile&) {
-        /* Ignore: Could not read file. */
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to read http-settings from '"
-                  << cookieJar << "': " << e.what() << std::endl;
-    }
-}
-
-void HTTPSettings::store()
-{
-    auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
-    if (!cookieJar)
-        return;
-
-    try {
-        auto node = YAML::Node();
-
-        for (const auto& pair : settings) {
-            auto settingsNode = YAML::Node();
-
-            settingsNode["url"] = pair.first;
-            const auto& entry = pair.second;
-
-            if (!entry.cookies.empty())
-                settingsNode["cookies"] = entry.cookies;
-
-            if (const auto& auth = entry.auth)
-                settingsNode["basic-auth"] = *auth;
-
-            if (const auto& proxy = entry.proxy)
-                settingsNode["proxy"] = *proxy;
-
-            node.push_back(std::move(settingsNode));
-        }
-
-        std::ofstream os(cookieJar);
-        os << node;
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to write http-settings to '"
-                  << cookieJar << "': " << e.what() << "\n";
-    }
-}
-
-void HTTPSettings::apply(std::string const& url,
-                         httplib::Client& client,
-                         std::map<std::string, std::string> const& initial_headers)
-{
-    httplib::Headers headers{initial_headers.begin(), initial_headers.end()};
-
-    for (auto const& pair : settings) {
-        if (!std::regex_match(url, std::regex(pair.first)))
-            continue;
-
-        const auto& entry = pair.second;
-
-        /* Cookies */
-        std::string cookieHeaderValue;
-        for (const auto& cookie : entry.cookies) {
-            if (!cookieHeaderValue.empty())
-                cookieHeaderValue += "; ";
-            cookieHeaderValue += cookie.first + "=" + cookie.second;
-        }
-
-        if (!cookieHeaderValue.empty())
-            headers.insert({"Cookie", cookieHeaderValue});
-
-        /* Basic Authentication */
-        if (const auto& auth = entry.auth) {
-            auto password = auth->password;
-            if (!auth->keychain.empty()) {
-                password = loadPassword(auth->keychain,
-                                        auth->user);
-            }
-
-            headers.insert(httplib::make_basic_authentication_header(auth->user.c_str(),
-                                                                     password.c_str()));
-        }
-
-        /* Proxy Settings */
-        if (const auto& proxy = entry.proxy) {
-            client.set_proxy(proxy->host.c_str(), proxy->port);
-
-            auto password = proxy->password;
-            if (!proxy->keychain.empty())
-                password = loadPassword(proxy->keychain,
-                                        proxy->user);
-
-            if (!proxy->user.empty())
-                client.set_proxy_basic_auth(proxy->user.c_str(),
-                                            password.c_str());
-        }
-    }
-
-    client.set_default_headers(std::move(headers));
-}
-
-std::string HTTPSettings::loadPassword(const std::string& service,
-                                       const std::string& user)
+std::string secret::load(
+        const std::string &service,
+        const std::string &user)
 {
     auto result = std::async(std::launch::async, [=]() {
         keychain::Error error;
-        auto password = keychain::getPassword(KEYCHAIN_PACKAGE,
-                                              service,
-                                              user,
-                                              error);
+        auto password = keychain::getPassword(
+                KEYCHAIN_PACKAGE,
+                service,
+                user,
+                error);
 
         if (error)
             throw std::runtime_error(error.message);
@@ -264,9 +131,10 @@ std::string HTTPSettings::loadPassword(const std::string& service,
     return result.get();
 }
 
-std::string HTTPSettings::storePassword(const std::string& service,
-                                        const std::string& user,
-                                        const std::string& password)
+std::string secret::store(
+        const std::string &service,
+        const std::string &user,
+        const std::string &password)
 {
     auto randServiceId = []() {
         std::string id(12, '.');
@@ -277,8 +145,8 @@ std::string HTTPSettings::storePassword(const std::string& service,
     };
 
     auto newService = service.empty()
-        ? "service password "s + randServiceId()
-        : service;
+                      ? "service password "s + randServiceId()
+                      : service;
 
     auto result = std::async(std::launch::async, [=]() {
         keychain::Error error;
@@ -298,8 +166,9 @@ std::string HTTPSettings::storePassword(const std::string& service,
     return newService;
 }
 
-bool HTTPSettings::deletePassword(const std::string& service,
-                                  const std::string& user)
+bool secret::remove(
+        const std::string &service,
+        const std::string &user)
 {
     auto result = std::async(std::launch::async, [=]() {
         keychain::Error error;
@@ -315,4 +184,179 @@ bool HTTPSettings::deletePassword(const std::string& service,
         return false;
 
     return result.get();
+}
+
+Settings::Settings()
+{
+    load();
+}
+
+void Settings::load()
+{
+    settings.clear();
+
+    auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
+    if (!cookieJar || strcmp(cookieJar, "") == 0)
+        return;
+
+    try {
+        auto node = YAML::LoadFile(cookieJar);
+        uint32_t idx = 0;
+
+        for (auto const& entry : node.as<std::vector<YAML::Node>>()) {
+            Config conf;
+            std::string urlPattern;
+
+            if (auto entryParam = entry["url"])
+                urlPattern = entryParam.as<std::string>();
+            else
+                throw std::runtime_error(
+                    "Settings: Failed to read 'url' of entry #"s + std::to_string(idx) +
+                    " in " + cookieJar);
+
+            if (auto cookies = entry["cookies"])
+                conf.cookies = cookies.as<std::map<std::string, std::string>>();
+
+            if (auto headers = entry["headers"]) {
+                auto headersMap = headers.as<std::map<std::string, std::string>>();
+                conf.headers.insert(headersMap.begin(), headersMap.end());
+            }
+
+            if (auto query = entry["query"]) {
+                auto queryMap = query.as<std::map<std::string, std::string>>();
+                conf.query.insert(queryMap.begin(), queryMap.end());
+            }
+
+            if (auto basicAuth = entry["basic-auth"])
+                conf.auth = basicAuth.as<Config::BasicAuthentication>();
+
+            if (auto proxy = entry["proxy"])
+                conf.proxy = proxy.as<Config::Proxy>();
+
+            if (auto apiKey = entry["api-key"])
+                conf.apiKey = apiKey.as<std::string>();
+
+            settings[urlPattern] = std::move(conf);
+            ++idx;
+        }
+    } catch (const YAML::BadFile&) {
+        /* Ignore: Could not read file. */
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to read http-settings from '"
+                  << cookieJar << "': " << e.what() << std::endl;
+    }
+}
+
+void Settings::store()
+{
+    auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
+    if (!cookieJar)
+        return;
+
+    try {
+        auto node = YAML::Node();
+
+        for (const auto& pair : settings) {
+            auto settingsNode = YAML::Node();
+
+            settingsNode["url"] = pair.first;
+            const auto& entry = pair.second;
+
+            if (!entry.cookies.empty())
+                settingsNode["cookies"] = entry.cookies;
+
+            if (!entry.headers.empty())
+                settingsNode["headers"] = std::map<std::string, std::string>{
+                    entry.headers.begin(), entry.headers.end()};
+
+            if (!entry.query.empty())
+                settingsNode["query"] = std::map<std::string, std::string>{
+                    entry.query.begin(), entry.query.end()};
+
+            if (entry.auth)
+                settingsNode["basic-auth"] = *entry.auth;
+
+            if (entry.proxy)
+                settingsNode["proxy"] = *entry.proxy;
+
+            if (entry.apiKey)
+                settingsNode["api-key"] = *entry.apiKey;
+
+            node.push_back(settingsNode);
+        }
+
+        std::ofstream os(cookieJar);
+        os << node;
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to write http-settings to '"
+                  << cookieJar << "': " << e.what() << "\n";
+    }
+}
+
+Config Settings::operator[] (const std::string &url) const
+{
+    Config result;
+
+    for (auto const& [pattern, config] : settings)
+    {
+        if (!std::regex_match(url, std::regex(pattern)))
+            continue;
+        result |= config;
+    }
+
+    return result;
+}
+
+void Config::apply(httplib::Client &cl) const
+{
+    // Headers
+    httplib::Headers httpLibHeaders{headers.begin(), headers.end()};
+
+    // Cookies
+    std::string cookieHeaderValue;
+    for (const auto& cookie : cookies) {
+        if (!cookieHeaderValue.empty())
+            cookieHeaderValue += "; ";
+        cookieHeaderValue += cookie.first + "=" + cookie.second;
+    }
+    if (!cookieHeaderValue.empty())
+        httpLibHeaders.insert({"Cookie", cookieHeaderValue});
+
+    // Basic Authentication
+    if (auth) {
+        auto password = auth->password;
+        if (!auth->keychain.empty()) {
+            password = secret::load(auth->keychain, auth->user);
+        }
+        httpLibHeaders.insert(
+            httplib::make_basic_authentication_header(auth->user, password));
+    }
+
+    // Proxy Settings
+    if (proxy) {
+        cl.set_proxy(proxy->host.c_str(), proxy->port);
+
+        auto password = proxy->password;
+        if (!proxy->keychain.empty())
+            password = secret::load(proxy->keychain, proxy->user);
+
+        if (!proxy->user.empty())
+            cl.set_proxy_basic_auth(
+                proxy->user.c_str(), password.c_str());
+    }
+
+    cl.set_default_headers(httpLibHeaders);
+}
+
+Config& Config::operator |= (Config const& other) {
+    cookies.insert(other.cookies.begin(), other.cookies.end());
+    headers.insert(other.headers.begin(), other.headers.end());
+    query.insert(other.query.begin(), other.query.end());
+    if (other.auth)
+        auth = other.auth;
+    if (other.proxy)
+        proxy = other.proxy;
+    if (other.apiKey)
+        apiKey = other.apiKey;
+    return *this;
 }

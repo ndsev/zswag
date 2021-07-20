@@ -162,7 +162,7 @@ std::string ParameterValue::pathStr(const OpenAPIConfig::Parameter& param) const
 
 }
 
-std::vector<std::pair<std::string, std::string>> ParameterValue::queryPairs(const OpenAPIConfig::Parameter& param) const
+std::vector<std::pair<std::string, std::string>> ParameterValue::queryOrHeaderPairs(const OpenAPIConfig::Parameter& param) const
 {
     using Pair = std::pair<std::string, std::string>;
     using List = std::vector<Pair>;
