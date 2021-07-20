@@ -60,9 +60,6 @@ public:
 class HttpLibHttpClient : public IHttpClient
 {
 public:
-    explicit HttpLibHttpClient();
-    ~HttpLibHttpClient() override;
-
     Result get(const std::string& uri,
                const Config& config) override;
     Result post(const std::string& uri,
@@ -77,10 +74,6 @@ public:
     Result patch(const std::string& uri,
                  const OptionalBodyAndContentType& body,
                  const Config& config) override;
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
 };
 
 class MockHttpClient : public IHttpClient

@@ -309,6 +309,7 @@ Config Settings::operator[] (const std::string &url) const
 
 void Config::apply(httplib::Client &cl) const
 {
+    // Headers
     httplib::Headers httpLibHeaders{headers.begin(), headers.end()};
 
     // Cookies
@@ -318,8 +319,6 @@ void Config::apply(httplib::Client &cl) const
             cookieHeaderValue += "; ";
         cookieHeaderValue += cookie.first + "=" + cookie.second;
     }
-
-    // Headers
     if (!cookieHeaderValue.empty())
         httpLibHeaders.insert({"Cookie", cookieHeaderValue});
 

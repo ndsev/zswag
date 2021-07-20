@@ -94,7 +94,7 @@ def run(host, port):
         api.Calculator.Client.identity,
         1.,
         {
-            "config": HTTPConfig().header("X-Generic-Token", "42")
+            "config": HTTPConfig().cookie("api-cookie", "42")
         })
 
     run_test(

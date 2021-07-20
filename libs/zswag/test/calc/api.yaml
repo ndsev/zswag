@@ -156,7 +156,7 @@ paths:
   /identity:
     post:
       operationId: identity
-      security: [ { HeaderAuth: [ ] } ]
+      security: [ { CookieAuth: [ ] } ]
       requestBody:
         content:
           application/x-zserio-object:

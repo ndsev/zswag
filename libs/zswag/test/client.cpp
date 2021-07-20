@@ -134,7 +134,7 @@ int main (int argc, char* argv[]) {
         })).get<zsr::Introspectable>().value();
     }, 1., "Pass request as blob in body",
     [](httpcl::Config& conf){
-        conf.headers.insert({"X-Generic-Token", "42"});
+        conf.cookies.insert({"api-cookie", "42"});
     });
 
     runTest([](ZsrClient& zsrClient){

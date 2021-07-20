@@ -710,7 +710,7 @@ and port, but prefix the `/path/to/my/api` string.
 ### Authentication Schemes
 
 To facilitate the communication of authentication needs for the whole or parts
-of a service, OpenAPI allows for a `securitySchemes` and `security` fields in the spec.
+of a service, OpenAPI allows for `securitySchemes` and `security` fields in the spec.
 Please refer to the relevant parts of the [OpenAPI 3 specification](https://swagger.io/docs/specification/authentication/) for some
 examples on how to integrate these fields into your spec.
 

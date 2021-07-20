@@ -426,11 +426,15 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& s)
 }
 
 OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
-                                 httpcl::IHttpClient& client)
+                                 httpcl::IHttpClient& client,
+                                 httpcl::Config httpConfig)
 {
+    // Add persistent configuration
+    httpConfig |= httpcl::Settings()[url];
+
     // Load client config content.
     auto uriParts = httpcl::URIComponents::fromStrRfc3986(url);
-    auto res = client.get(uriParts.build(), {});
+    auto res = client.get(uriParts.build(), httpConfig);
 
     // Create client from loaded config JSON.
     if (res.status >= 200 && res.status < 300) {
