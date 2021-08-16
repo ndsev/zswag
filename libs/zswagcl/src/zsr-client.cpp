@@ -47,7 +47,7 @@ struct VariantVisitor
 
     auto operator()()
     {
-        return helper.binary({});
+        return helper.binary(std::vector<uint8_t>{});
     }
 
     template <class _T>
@@ -58,7 +58,8 @@ struct VariantVisitor
 
     auto operator()(const zserio::BitBuffer& value)
     {
-        return helper.binary({value.getBuffer(), value.getBuffer() + value.getByteSize()});
+        return helper.binary(std::vector<uint8_t>{
+            value.getBuffer(), value.getBuffer() + value.getByteSize()});
     }
 
     auto operator()(const zsr::Introspectable& value)
@@ -122,29 +123,27 @@ struct VariantVisitor
             assert(meta);
             assert(meta->write);
 
-            zserio::BitStreamWriter writer;
+            zserio::BitBuffer buffer;
+            zserio::BitStreamWriter writer(buffer);
             meta->write(const_cast<zsr::Introspectable&>(object), writer);
-
-            size_t size = 0ull;
-            auto buffer = writer.getWriteBuffer(size);
-
-            array.emplace_back(buffer, buffer + size);
+            array.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
         }
 
         return helper.array(array);
     }
 };
 
-void ZsrClient::callMethod(const std::string& method,
-                           const std::vector<uint8_t>& requestData,
-                           std::vector<uint8_t>& responseData,
+void ZsrClient::callMethod(zserio::StringView methodName,
+                           zserio::Span<const uint8_t> requestData,
+                           zserio::IBlobBuffer& responseData,
                            void* context)
 {
     assert(context);
 
     const auto* ctx = reinterpret_cast<const zsr::ServiceMethod::Context*>(context);
+    const auto strMethodName = std::string(methodName.begin(), methodName.end());
 
-    auto response = client_.call(method, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper) {
+    auto response = client_.call(strMethodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper) -> ParameterValue {
         if (field == ZSERIO_REQUEST_PART_WHOLE)
             return helper.binary(requestData);
 
@@ -155,7 +154,12 @@ void ZsrClient::callMethod(const std::string& method,
         return zsr::visit(value, visitor);
     });
 
-    responseData.assign(response.begin(), response.end());
+    responseData.resize(response.size());
+    std::transform(
+        response.begin(),
+        response.end(),
+        responseData.data().begin(),
+        [](auto const& x){return x;});
 }
 
 }

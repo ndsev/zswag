@@ -49,9 +49,9 @@ int main (int argc, char* argv[]) {
     };
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.power")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.power")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.BaseAndExponent", {
+            zsr::make(zsr::packages(), "calculator.calculator.BaseAndExponent", {
                 {"base.value",     2},
                 {"exponent.value", 3}
         })).get<zsr::Introspectable>().value();
@@ -59,9 +59,9 @@ int main (int argc, char* argv[]) {
     [](httpcl::Config& conf){});
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.intSum")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.intSum")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Integers", {
+            zsr::make(zsr::packages(), "calculator.calculator.Integers", {
                 {"values", std::vector{100, -200, 400}}
         })).get<zsr::Introspectable>().value();
     }, 300., "Pass hex-encoded array in query",
@@ -70,9 +70,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.byteSum")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.byteSum")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Bytes", {
+            zsr::make(zsr::packages(), "calculator.calculator.Bytes", {
                     {"values", std::vector<uint8_t>{8, 16, 32, 64}}
             })).get<zsr::Introspectable>().value();
     }, 120., "Pass base64url-encoded byte array in path",
@@ -83,9 +83,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.intMul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.intMul")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Integers", {
+            zsr::make(zsr::packages(), "calculator.calculator.Integers", {
                 {"values", std::vector{1, 2, 3, 4}}
         })).get<zsr::Introspectable>().value();
     }, 24., "Pass base64-encoded long array in path",
@@ -94,9 +94,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.floatMul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.floatMul")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Doubles", {
+            zsr::make(zsr::packages(), "calculator.calculator.Doubles", {
                     {"values", std::vector<double>{34.5, 2.}}
             })).get<zsr::Introspectable>().value();
     }, 69., "Pass float array in query.",
@@ -105,9 +105,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bitMul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.bitMul")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Bools", {
+            zsr::make(zsr::packages(), "calculator.calculator.Bools", {
                 {"values", std::vector<bool>{true, false}}
             })).get<zsr::Introspectable>().value();
     }, false, "Pass bool array in query (expect false).",
@@ -116,9 +116,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.bitMul")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.bitMul")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Bools", {
+            zsr::make(zsr::packages(), "calculator.calculator.Bools", {
                     {"values", std::vector<bool>{true, true}}
             })).get<zsr::Introspectable>().value();
     }, true, "Pass bool array in query (expect true).",
@@ -127,9 +127,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.identity")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.identity")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Double", {
+            zsr::make(zsr::packages(), "calculator.calculator.Double", {
                 {"value", 1.}
         })).get<zsr::Introspectable>().value();
     }, 1., "Pass request as blob in body",
@@ -138,9 +138,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.concat")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.concat")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.Strings", {
+            zsr::make(zsr::packages(), "calculator.calculator.Strings", {
                 {"values", std::vector<std::string>{"foo", "bar"}}
             })).get<zsr::Introspectable>().value();
     }, std::string("foobar"), "Pass base64-encoded strings.",
@@ -149,9 +149,9 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](ZsrClient& zsrClient){
-        return zsr::find<zsr::ServiceMethod>("calculator.Calculator.name")->call(
+        return zsr::find<zsr::ServiceMethod>("calculator.calculator.Calculator.name")->call(
             zsrClient,
-            zsr::make(zsr::packages(), "calculator.EnumWrapper", {
+            zsr::make(zsr::packages(), "calculator.calculator.EnumWrapper", {
                 {"value", 42}
             })).get<zsr::Introspectable>().value();
     }, std::string("TEST_ENUM_0"), "Pass enum.",

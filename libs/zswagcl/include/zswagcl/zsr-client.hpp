@@ -15,9 +15,9 @@ public:
               std::unique_ptr<httpcl::IHttpClient> client,
               httpcl::Config httpConfig = {});
 
-    void callMethod(const std::string& methodName,
-                    const std::vector<uint8_t>& requestData,
-                    std::vector<uint8_t>& responseData,
+    void callMethod(zserio::StringView methodName,
+                    zserio::Span<const uint8_t> requestData,
+                    zserio::IBlobBuffer& responseData,
                     void* context) override;
 
 private:

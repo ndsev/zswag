@@ -19,13 +19,12 @@ static auto makeRequest(std::string_view compound, zsr::VariantMap values)
 {
     auto request = zsr::make(zsr::packages().front(), compound, std::move(values));
 
-    zserio::BitStreamWriter writer;
+    zserio::BitBuffer buffer;
+    zserio::BitStreamWriter writer(buffer);
     request.meta()->write(request, writer);
 
-    std::size_t size = 0u;
-    auto buffer = writer.getWriteBuffer(size);
-
-    return std::make_tuple(request, std::vector<uint8_t>(buffer, buffer + size));
+    return std::make_tuple(request, std::vector<uint8_t>(
+        buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
 }
 
 /**
@@ -134,7 +133,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         auto service = ZsrClient(config, std::move(client));
 
         zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
-        std::vector<uint8_t> response;
+        zserio::BlobBuffer response;
         service.callMethod("multi", buffer, response, &ctx);
 
         /* Check result */
@@ -212,7 +211,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         auto service = ZsrClient(config, std::move(client));
 
         zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
-        std::vector<uint8_t> response;
+        zserio::BlobBuffer response;
         service.callMethod("q", buffer, response, &ctx);
 
         /* Check result */
@@ -267,7 +266,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         auto service = ZsrClient(config, std::move(client));
 
         zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
-        std::vector<uint8_t> response;
+        zserio::BlobBuffer response;
         service.callMethod("post", buffer, response, &ctx);
 
         /* Check result */
@@ -309,7 +308,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                 postCalled = true;
                 return httpcl::IHttpClient::Result{200, {}};
             };
-            std::vector<uint8_t> response;
+            zserio::BlobBuffer response;
             auto service = ZsrClient(config, std::move(client));
             service.callMethod(op, buffer, response, &ctx);
             REQUIRE(postCalled);

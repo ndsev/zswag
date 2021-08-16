@@ -10,6 +10,7 @@
 #include <array>
 
 #include "stx/string.h"
+#include "zserio/Span.h"
 
 namespace zswagcl
 {
@@ -224,6 +225,12 @@ public:
     ParameterValue binary(const std::vector<std::uint8_t>& v)
     {
         return ParameterValue(format(v));
+    }
+
+    ParameterValue binary(const zserio::Span<const uint8_t>& v)
+    {
+        std::vector<uint8_t> buf{v.begin(), v.end()};
+        return ParameterValue(format(std::move(buf)));
     }
 
 private:
