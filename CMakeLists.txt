@@ -79,15 +79,20 @@ endif ()
 
 add_subdirectory(libs/httpcl)
 add_subdirectory(libs/zswagcl)
-add_subdirectory(libs/pyzswagcl)
-add_subdirectory(libs/zswag/test)
 
 ##############
-# zswag server wheel
+# wheels
 
-add_custom_target(zswag-server-wheel
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_LIST_DIR}
-  COMMAND
-    ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
-add_dependencies(wheel zswag-server-wheel)
+option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
+
+if (ZSWAG_BUILD_WHEELS)
+  add_subdirectory(libs/pyzswagcl)
+  add_subdirectory(libs/zswag/test)
+
+  add_custom_target(zswag-server-wheel
+    WORKING_DIRECTORY
+      ${CMAKE_CURRENT_LIST_DIR}
+    COMMAND
+      ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
+  add_dependencies(wheel zswag-server-wheel)
+endif()
