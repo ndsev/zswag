@@ -8,17 +8,18 @@
 namespace zswagcl
 {
 
-class ZsrClient : public ::zserio::IService
+class ZsrClient : public ::zserio::IServiceClient
 {
 public:
-    ZsrClient(zswagcl::OpenAPIConfig config,
-              std::unique_ptr<httpcl::IHttpClient> client,
-              httpcl::Config httpConfig = {});
+    ZsrClient(
+        zswagcl::OpenAPIConfig config,
+        std::unique_ptr<httpcl::IHttpClient> client,
+        httpcl::Config httpConfig = {});
 
-    void callMethod(zserio::StringView methodName,
-                    zserio::Span<const uint8_t> requestData,
-                    zserio::IBlobBuffer& responseData,
-                    void* context) override;
+    std::vector<uint8_t> callMethod(
+        zserio::StringView methodName,
+        zserio::RequestData const& requestData,
+        void* context) override;
 
 private:
     OpenAPIClient client_;

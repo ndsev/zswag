@@ -12,23 +12,16 @@ add_library(zswagcl SHARED
   include/zswagcl/zsr-client.hpp
 
   src/base64.cpp
-  src/base64.hpp
   src/openapi-client.cpp
-  include/zswagcl/openapi-client.hpp
   src/openapi-config.cpp
-  include/zswagcl/openapi-config.hpp
   src/openapi-parameter-helper.cpp
-  include/zswagcl/openapi-parameter-helper.hpp
   src/openapi-parser.cpp
-  include/zswagcl/openapi-parser.hpp
-  src/zsr-client.cpp
-  include/zswagcl/zsr-client.hpp)
+  src/zsr-client.cpp)
 
 target_link_libraries(zswagcl
   PUBLIC
     stx
     httpcl
-    zsr
     speedyj
     httplib::httplib
     yaml-cpp
@@ -49,4 +42,4 @@ target_include_directories(zswagcl
   PUBLIC
     include)
 
-add_subdirectory(test)
+# add_subdirectory(test)

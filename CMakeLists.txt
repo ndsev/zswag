@@ -6,6 +6,7 @@ endif()
 
 project(zswag)
 enable_testing()
+include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,8 +40,20 @@ if (NOT TARGET yaml-cpp)
 endif ()
 
 if (NOT TARGET stx)
-  add_subdirectory(deps/stx)
-endif ()
+  FetchContent_Declare(stx
+    GIT_REPOSITORY "https://github.com/Klebert-Engineering/stx.git"
+    GIT_TAG        "main"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(stx)
+endif()
+
+if (NOT TARGET speedyj)
+  FetchContent_Declare(speedyj
+    GIT_REPOSITORY "https://github.com/Klebert-Engineering/speedyj.git"
+    GIT_TAG        "master"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(speedyj)
+endif()
 
 if (NOT TARGET Catch2)
   add_subdirectory(deps/Catch2)
@@ -66,17 +79,13 @@ if (NOT TARGET ZserioCppRuntime)
   add_subdirectory(deps/zserio/compiler/extensions/cpp/runtime/src)
 endif ()
 
-if (NOT TARGET zsr)
-  add_subdirectory(deps/zsr)
-endif ()
-
 ##############
 # libs
 
 add_subdirectory(libs/httpcl)
 add_subdirectory(libs/zswagcl)
 add_subdirectory(libs/pyzswagcl)
-add_subdirectory(libs/zswag/test)
+# add_subdirectory(libs/zswag/test)
 
 ##############
 # zswag server wheel

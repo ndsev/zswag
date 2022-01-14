@@ -1,8 +1,5 @@
 #include "zsr-client.hpp"
 
-#include <zsr/find.hpp>
-#include <zsr/introspectable.hpp>
-
 #include <cassert>
 #include "stx/format.h"
 
@@ -15,151 +12,120 @@ ZsrClient::ZsrClient(zswagcl::OpenAPIConfig config,
     : client_(std::move(config), std::move(httpConfig), std::move(client))
 {}
 
-template <class _Iter>
-zsr::Variant queryFieldRecursive(zsr::Variant object, _Iter begin, _Iter end)
-{
-    if (begin == end)
-        return object;
-
-    if (auto introspectable = object.get<zsr::Introspectable>()) {
-        auto meta = introspectable->meta();
-        assert(meta);
-
-        if (auto field = zsr::find<zsr::Field>(*meta, std::string(*begin)))
-            return queryFieldRecursive(field->get(*introspectable), begin + 1, end);
-
-        if (auto fun = zsr::find<zsr::Function>(*meta, std::string(*begin)))
-            return queryFieldRecursive(fun->call(*introspectable), begin + 1, end);
-
-        throw std::runtime_error(stx::format("Could not find field/function for identifier '{}'", *begin));
+template<typename arr_elem_t>
+ParameterValue reflectableArrayToParameterValue(std::function<void(std::vector<arr_elem_t>&, size_t)> appendFun, size_t length, ParameterValueHelper& helper) {
+    std::vector<arr_elem_t> values;
+    values.reserve(length);
+    for (auto i = 0; i < length; ++i) {
+        appendFun(values, i);
     }
-
-    throw std::runtime_error(stx::format("Returned root value '{}' is not an object", stx::join(begin, end, ".")));
+    return helper.array(values);
 }
 
-struct VariantVisitor
+ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio::IReflectablePtr const& ref, zserio::ITypeInfo const& refType, ParameterValueHelper& helper)
 {
-    ParameterValueHelper& helper;
-
-    VariantVisitor(ParameterValueHelper& helper)
-        : helper(helper)
-    {}
-
-    auto operator()()
+    switch (refType.getCppType())
     {
-        return helper.binary(std::vector<uint8_t>{});
-    }
-
-    template <class _T>
-    auto operator()(_T value)
-    {
-        return helper.value(std::forward<_T>(value));
-    }
-
-    auto operator()(const zserio::BitBuffer& value)
-    {
-        return helper.binary(std::vector<uint8_t>{
-            value.getBuffer(), value.getBuffer() + value.getByteSize()});
-    }
-
-    auto operator()(const zsr::Introspectable& value)
-    {
-        auto meta = value.meta();
-        assert(meta);
-
-        std::map<std::string, Any> map;
-        for (const auto& field : meta->fields) {
-            assert(field.get);
-
-            /* Skip optional fields */
-            if (field.has)
-                if (!field.has(value))
-                    continue;
-
-            auto fieldValue = field.get(value);
-            auto read = [&]() -> Any {
-                if (auto tmp = fieldValue.get<std::int64_t>())
-                    return *tmp;
-                if (auto tmp = fieldValue.get<std::uint64_t>())
-                    return *tmp;
-                if (auto tmp = fieldValue.get<double>())
-                    return *tmp;
-                if (auto tmp = fieldValue.get<std::string>())
-                    return *tmp;
-
-                throw std::runtime_error("Unsupported variant type");
-            };
-
-            map[field.ident] = read();
+        case zserio::CppType::BOOL:
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<bool>([&](auto& arr, auto i) {
+                    arr.emplace_back(ref->getBool());
+                }, ref->size(), helper);
+            }
+            return helper.value(ref->getBool());
+        case zserio::CppType::INT8:
+        case zserio::CppType::INT16:
+        case zserio::CppType::INT32:
+        case zserio::CppType::INT64:
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<int64_t>([&](auto& arr, auto i) {
+                    arr.emplace_back(ref->toInt());
+                }, ref->size(), helper);
+            }
+            return helper.value(ref->toInt());
+        case zserio::CppType::UINT8:
+        case zserio::CppType::UINT16:
+        case zserio::CppType::UINT32:
+        case zserio::CppType::UINT64:
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<uint64_t>([&](auto& arr, auto i) {
+                    arr.emplace_back(ref->toUInt());
+                }, ref->size(), helper);
+            }
+            return helper.value(ref->toUInt());
+        case zserio::CppType::FLOAT:
+        case zserio::CppType::DOUBLE:
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<double>([&](auto& arr, auto i) {
+                    arr.emplace_back(ref->toDouble());
+                }, ref->size(), helper);
+            }
+            return helper.value(ref->toDouble());
+        case zserio::CppType::STRING:
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
+                    arr.emplace_back(ref->toString());
+                }, ref->size(), helper);
+            }
+            return helper.value(ref->toString());
+        case zserio::CppType::BIT_BUFFER: {
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
+                    auto const& buffer = ref->getBitBuffer();
+                    arr.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
+                }, ref->size(), helper);
+            }
+            auto const& buffer = ref->getBitBuffer();
+            return helper.binary(std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
         }
-
-        return helper.object(map);
-    }
-
-    template <class _T>
-    auto operator()(const std::vector<_T>& value)
-    {
-        return helper.array(value);
-    }
-
-    auto operator()(const std::vector<zserio::BitBuffer>& value)
-    {
-        std::vector<std::string> array;
-        array.reserve(value.size());
-
-        for (const auto& buffer : value)
-            array.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
-
-        return helper.array(array);
-    }
-
-    auto operator()(const std::vector<zsr::Introspectable>& value)
-    {
-        std::vector<std::string> array;
-        array.reserve(value.size());
-
-        for (auto& object : value) {
-            auto meta = object.meta();
-            assert(meta);
-            assert(meta->write);
-
+        case zserio::CppType::ENUM:
+        case zserio::CppType::BITMASK: {
+            return reflectableToParameterValue(fieldName, ref, refType.getUnderlyingType(), helper);
+        }
+        case zserio::CppType::STRUCT:
+        case zserio::CppType::CHOICE:
+        case zserio::CppType::UNION: {
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
+                    zserio::BitBuffer buffer;
+                    zserio::BitStreamWriter writer(buffer);
+                    ref->at(i)->write(writer);
+                    arr.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
+                }, ref->size(), helper);
+            }
             zserio::BitBuffer buffer;
             zserio::BitStreamWriter writer(buffer);
-            meta->write(const_cast<zsr::Introspectable&>(object), writer);
-            array.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
+            ref->write(writer);
+            return helper.binary(std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
         }
 
-        return helper.array(array);
+        case zserio::CppType::SQL_TABLE:
+        case zserio::CppType::SQL_DATABASE:
+        case zserio::CppType::SERVICE:
+        case zserio::CppType::PUBSUB:
+            break;
     }
-};
 
-void ZsrClient::callMethod(zserio::StringView methodName,
-                           zserio::Span<const uint8_t> requestData,
-                           zserio::IBlobBuffer& responseData,
-                           void* context)
+    throw std::runtime_error(stx::format("Failed to serialize field '{}' for HTTP transport.", fieldName));
+}
+
+std::vector<uint8_t> ZsrClient::callMethod(
+    zserio::StringView methodName,
+    zserio::RequestData const& requestData,
+    void* context)
 {
-    assert(context);
-
-    const auto* ctx = reinterpret_cast<const zsr::ServiceMethod::Context*>(context);
     const auto strMethodName = std::string(methodName.begin(), methodName.end());
 
     auto response = client_.call(strMethodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper) -> ParameterValue {
         if (field == ZSERIO_REQUEST_PART_WHOLE)
-            return helper.binary(requestData);
-
-        auto parts = stx::split<std::vector<std::string_view>>(field, ".");
-        auto value = queryFieldRecursive(ctx->request, parts.begin(), parts.end());
-
-        VariantVisitor visitor(helper);
-        return zsr::visit(value, visitor);
+            return helper.binary(requestData.getData());
+        auto reflectableField = requestData.getReflectable()->find(field);
+        if (!reflectableField)
+            throw std::runtime_error(stx::format("Could not find field/function for identifier '{}'", field));
+        return reflectableToParameterValue(field, reflectableField, reflectableField->getTypeInfo(), helper);
     });
 
-    responseData.resize(response.size());
-    std::transform(
-        response.begin(),
-        response.end(),
-        responseData.data().begin(),
-        [](auto const& x){return x;});
+    return {response.begin(), response.end()};
 }
 
 }
