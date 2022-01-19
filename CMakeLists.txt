@@ -10,7 +10,7 @@ include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.1.1)
+set(ZSWAG_VERSION 1.2.0)
 
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -90,7 +90,7 @@ endif()
 add_subdirectory(libs/httpcl)
 add_subdirectory(libs/zswagcl)
 add_subdirectory(libs/pyzswagcl)
-# add_subdirectory(libs/zswag/test)
+add_subdirectory(libs/zswag/test)
 
 ##############
 # zswag server wheel

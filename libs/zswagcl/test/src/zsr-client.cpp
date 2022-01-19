@@ -4,8 +4,8 @@
 
 #include "zswagcl/zsr-client.hpp"
 #include "zserio/SerializeUtil.h"
-#include "service_client_test/service_client_test/Flat.h"
-#include "service_client_test/service_client_test/Request.h"
+#include "service_client_test/Flat.h"
+#include "service_client_test/Request.h"
 
 using namespace zswagcl;
 
@@ -64,9 +64,9 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         };
 
         /* Create request object */
-        auto request = service_client_test::service_client_test::Request(
+        auto request = service_client_test::Request(
             "hello", 3, std::vector<std::string>{"a", "b", "c"},
-            service_client_test::service_client_test::Flat("", ""));
+            service_client_test::Flat("", ""));
 
         /* Fire request */
         auto config = makeConfig(R"json(
@@ -137,9 +137,9 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         };
 
         /* Create request object */
-        auto request = service_client_test::service_client_test::Request(
+        auto request = service_client_test::Request(
             "hello", 3, std::vector<std::string>{"a", "b", "c"},
-            service_client_test::service_client_test::Flat("admin", "Alex"));
+            service_client_test::Flat("admin", "Alex"));
 
         /* Fire request */
         auto config = makeConfig(R"json(
@@ -181,9 +181,9 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         auto postCalled = false;
 
         /* Create request object */
-        auto request = service_client_test::service_client_test::Request(
+        auto request = service_client_test::Request(
             "hello", 0, std::vector<std::string>{},
-            service_client_test::service_client_test::Flat("", ""));
+            service_client_test::Flat("", ""));
         auto bitBuf = zserio::serialize(request);
         std::vector<uint8_t> buffer(bitBuf.getBuffer(), bitBuf.getBuffer() + bitBuf.getByteSize());
 
@@ -244,9 +244,9 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
 #endif
 
         /* Create request object */
-        auto request = service_client_test::service_client_test::Request(
+        auto request = service_client_test::Request(
             "hello", 0, std::vector<std::string>{},
-            service_client_test::service_client_test::Flat("", ""));
+            service_client_test::Flat("", ""));
         zserio::BasicRequestData requestData{request.reflectable()};
 
         /* Make config, client, service */

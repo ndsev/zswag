@@ -3,7 +3,7 @@ project(zswagcl-test)
 add_zserio_library(zswagcl-test-zs
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src"
   ENTRY "service_client_test.zs"
-  TOP_LEVEL_PKG "service_client_test")
+  WITH_REFLECTION)
 
 add_executable(zswagcl-test
   src/main.cpp
