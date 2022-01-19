@@ -80,7 +80,7 @@ if (NOT TARGET ZserioCppRuntime)
   set(ZSERIO_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/deps/zserio")
 endif ()
 
-if (NOT TARGET zserio-libraries)
+if (NOT TARGET zserio-cmake-helper)
   add_subdirectory(deps/zserio-cmake-helper)
 endif()
 
