@@ -28,11 +28,11 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
     {
         case zserio::CppType::BOOL:
             if (ref->isArray()) {
-                return reflectableArrayToParameterValue<bool>([&](auto& arr, auto i) {
-                    arr.emplace_back(ref->at(i)->getBool());
+                return reflectableArrayToParameterValue<uint8_t>([&](auto& arr, auto i) {
+                    arr.emplace_back(static_cast<uint8_t>(ref->at(i)->getBool()));
                 }, ref->size(), helper);
             }
-            return helper.value(ref->getBool());
+            return helper.value(static_cast<uint8_t>(ref->getBool()));
         case zserio::CppType::INT8:
         case zserio::CppType::INT16:
         case zserio::CppType::INT32:

@@ -71,7 +71,7 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Integers req(std::vector{1, 2, 3, 4});
+        calculator::Integers req(std::vector<int32_t>{1, 2, 3, 4});
         return calcClient.intMulMethod(req);
     }, 24., "Pass base64-encoded long array in path",
     [](httpcl::Config& conf){
