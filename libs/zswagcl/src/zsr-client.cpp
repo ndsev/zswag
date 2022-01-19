@@ -29,7 +29,7 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
         case zserio::CppType::BOOL:
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<bool>([&](auto& arr, auto i) {
-                    arr.emplace_back(ref->getBool());
+                    arr.emplace_back(ref->at(i)->getBool());
                 }, ref->size(), helper);
             }
             return helper.value(ref->getBool());
@@ -39,7 +39,7 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
         case zserio::CppType::INT64:
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<int64_t>([&](auto& arr, auto i) {
-                    arr.emplace_back(ref->toInt());
+                    arr.emplace_back(ref->at(i)->toInt());
                 }, ref->size(), helper);
             }
             return helper.value(ref->toInt());
@@ -49,7 +49,7 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
         case zserio::CppType::UINT64:
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<uint64_t>([&](auto& arr, auto i) {
-                    arr.emplace_back(ref->toUInt());
+                    arr.emplace_back(ref->at(i)->toUInt());
                 }, ref->size(), helper);
             }
             return helper.value(ref->toUInt());
@@ -57,21 +57,21 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
         case zserio::CppType::DOUBLE:
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<double>([&](auto& arr, auto i) {
-                    arr.emplace_back(ref->toDouble());
+                    arr.emplace_back(ref->at(i)->toDouble());
                 }, ref->size(), helper);
             }
             return helper.value(ref->toDouble());
         case zserio::CppType::STRING:
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
-                    arr.emplace_back(ref->toString());
+                    arr.emplace_back(ref->at(i)->toString());
                 }, ref->size(), helper);
             }
             return helper.value(ref->toString());
         case zserio::CppType::BIT_BUFFER: {
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
-                    auto const& buffer = ref->getBitBuffer();
+                    auto const& buffer = ref->at(i)->getBitBuffer();
                     arr.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
                 }, ref->size(), helper);
             }
@@ -87,13 +87,13 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
         case zserio::CppType::UNION: {
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
-                    zserio::BitBuffer buffer;
+                    zserio::BitBuffer buffer(ref->at(i)->bitSizeOf());
                     zserio::BitStreamWriter writer(buffer);
                     ref->at(i)->write(writer);
                     arr.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
                 }, ref->size(), helper);
             }
-            zserio::BitBuffer buffer;
+            zserio::BitBuffer buffer(ref->bitSizeOf());
             zserio::BitStreamWriter writer(buffer);
             ref->write(writer);
             return helper.binary(std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
@@ -114,11 +114,18 @@ std::vector<uint8_t> ZsrClient::callMethod(
     zserio::RequestData const& requestData,
     void* context)
 {
+    if (!requestData.getReflectable()) {
+        throw std::runtime_error(stx::format("Cannot use ZsrClient: Make sure that zserio generator call has -withTypeInfo flag!"));
+    }
     const auto strMethodName = std::string(methodName.begin(), methodName.end());
 
     auto response = client_.call(strMethodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper) -> ParameterValue {
-        if (field == ZSERIO_REQUEST_PART_WHOLE)
-            return helper.binary(requestData.getData());
+        if (field == ZSERIO_REQUEST_PART_WHOLE) {
+            zserio::BitBuffer buffer(requestData.getReflectable()->bitSizeOf());
+            zserio::BitStreamWriter writer(buffer);
+            requestData.getReflectable()->write(writer);
+            return helper.binary(std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
+        }
         auto reflectableField = requestData.getReflectable()->find(field);
         if (!reflectableField)
             throw std::runtime_error(stx::format("Could not find field/function for identifier '{}'", field));

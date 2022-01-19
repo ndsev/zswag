@@ -77,7 +77,12 @@ endif ()
 
 if (NOT TARGET ZserioCppRuntime)
   add_subdirectory(deps/zserio/compiler/extensions/cpp/runtime/src)
+  set(ZSERIO_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/deps/zserio")
 endif ()
+
+if (NOT TARGET zserio-libraries)
+  add_subdirectory(deps/zserio-cmake-helper)
+endif()
 
 ##############
 # libs

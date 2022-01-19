@@ -42,4 +42,4 @@ target_include_directories(zswagcl
   PUBLIC
     include)
 
-# add_subdirectory(test)
+add_subdirectory(test)

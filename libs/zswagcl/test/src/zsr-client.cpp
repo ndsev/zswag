@@ -3,29 +3,11 @@
 #include <fstream>
 
 #include "zswagcl/zsr-client.hpp"
-#include "zswagcl/openapi-parser.hpp"
-
-#include "zsr/find.hpp"
-#include "zsr/variant.hpp"
-#include "zsr/reflection-main.hpp"
-#include "zsr/getset.hpp"
+#include "zserio/SerializeUtil.h"
+#include "service_client_test/service_client_test/Flat.h"
+#include "service_client_test/service_client_test/Request.h"
 
 using namespace zswagcl;
-
-static zsr::Service dummyService(nullptr);
-static zsr::ServiceMethod dummyServiceMethod(&dummyService);
-
-static auto makeRequest(std::string_view compound, zsr::VariantMap values)
-{
-    auto request = zsr::make(zsr::packages().front(), compound, std::move(values));
-
-    zserio::BitBuffer buffer;
-    zserio::BitStreamWriter writer(buffer);
-    request.meta()->write(request, writer);
-
-    return std::make_tuple(request, std::vector<uint8_t>(
-        buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
-}
 
 /**
  * Load config template file and replace pathes with input string.
@@ -82,10 +64,9 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         };
 
         /* Create request object */
-        auto [request, buffer] = makeRequest("Request", {
-            {"str", "hello"},
-            {"strLen", 3},
-            {"strArray", std::vector<std::string>{"a", "b", "c"}}});
+        auto request = service_client_test::service_client_test::Request(
+            "hello", 3, std::vector<std::string>{"a", "b", "c"},
+            service_client_test::service_client_test::Flat("", ""));
 
         /* Fire request */
         auto config = makeConfig(R"json(
@@ -130,11 +111,9 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                 }
             }
         )json");
-        auto service = ZsrClient(config, std::move(client));
 
-        zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
-        zserio::BlobBuffer response;
-        service.callMethod("multi", buffer, response, &ctx);
+        auto service = ZsrClient(config, std::move(client));
+        auto response = service.callMethod("multi", zserio::BasicRequestData(request.reflectable()), nullptr);
 
         /* Check result */
         REQUIRE(getCalled);
@@ -150,23 +129,17 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
             getCalled = true;
 
             REQUIRE(uri == "https://my.server.com/api/q?"
-                           "firstName=Alex&" /* x-form-obj */
                            "form=hello&"
                            "form-arr=a,b,c&"
-                           "form-obj=firstName,Alex,role,admin&"
-                           "role=admin&" /* x-form-obj */
                            "x-form-arr=a&x-form-arr=b&x-form-arr=c");
 
             return httpcl::IHttpClient::Result{200, {}};
         };
 
         /* Create request object */
-        auto [request, buffer] = makeRequest("Request", {
-            {"str", "hello"},
-            {"strLen", 3},
-            {"strArray", std::vector<std::string>{"a", "b", "c"}},
-            {"flat.role", "admin"},
-            {"flat.firstName", "Alex"}});
+        auto request = service_client_test::service_client_test::Request(
+            "hello", 3, std::vector<std::string>{"a", "b", "c"},
+            service_client_test::service_client_test::Flat("admin", "Alex"));
 
         /* Fire request */
         auto config = makeConfig(R"json(
@@ -191,28 +164,14 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                             "style": "form",
                             "explode": False,
                             "x-zserio-request-part": "strArray"
-                        }, {
-                            "name": "x-form-obj",
-                            "in": "query",
-                            "style": "form",
-                            "explode": True,
-                            "x-zserio-request-part": "flat"
-                        }, {
-                            "name": "form-obj",
-                            "in": "query",
-                            "style": "form",
-                            "explode": False,
-                            "x-zserio-request-part": "flat"
                         }
                     ]
                 }
             }
         )json");
-        auto service = ZsrClient(config, std::move(client));
 
-        zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
-        zserio::BlobBuffer response;
-        service.callMethod("q", buffer, response, &ctx);
+        auto service = ZsrClient(config, std::move(client));
+        auto response = service.callMethod("q", zserio::BasicRequestData(request.reflectable()), nullptr);
 
         /* Check result */
         REQUIRE(getCalled);
@@ -221,9 +180,12 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
     SECTION("HTTP Post Request-Buffer") {
         auto postCalled = false;
 
-        /* Make request */
-        auto [request, buffer_] = makeRequest("Request", {{"str", "hello"}});
-        const auto &buffer = buffer_; /* llvm does not allow capturing bindings in lambdas. */
+        /* Create request object */
+        auto request = service_client_test::service_client_test::Request(
+            "hello", 0, std::vector<std::string>{},
+            service_client_test::service_client_test::Flat("", ""));
+        auto bitBuf = zserio::serialize(request);
+        std::vector<uint8_t> buffer(bitBuf.getBuffer(), bitBuf.getBuffer() + bitBuf.getByteSize());
 
         /* Setup mock client */
         auto client = std::make_unique<httpcl::MockHttpClient>();
@@ -264,10 +226,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
             }
         )json");
         auto service = ZsrClient(config, std::move(client));
-
-        zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
-        zserio::BlobBuffer response;
-        service.callMethod("post", buffer, response, &ctx);
+        auto response = service.callMethod("post", zserio::BasicRequestData(request.reflectable()), nullptr);
 
         /* Check result */
         REQUIRE(postCalled);
@@ -284,16 +243,16 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
         putenv((char*)httpConfig.c_str());
 #endif
 
-        /* Make request */
-        auto [request_, buffer_] = makeRequest("Request", {{"str", "hello"}});
-        const auto &buffer = buffer_; /* llvm does not allow capturing bindings in lambdas. */
-        const auto &request = request_;
+        /* Create request object */
+        auto request = service_client_test::service_client_test::Request(
+            "hello", 0, std::vector<std::string>{},
+            service_client_test::service_client_test::Flat("", ""));
+        zserio::BasicRequestData requestData{request.reflectable()};
 
         /* Make config, client, service */
         auto config = makeConfig("", TESTDATA "/config-with-auth.json");
         REQUIRE(config.securitySchemes.size() == 5);
 
-        zsr::ServiceMethod::Context ctx{dummyService, dummyServiceMethod, request};
 
         /* Prepare generic test function */
         auto callAndCheck = [&](std::string const& op, std::function<void(httpcl::Config const&)> const& test){
@@ -308,9 +267,8 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                 postCalled = true;
                 return httpcl::IHttpClient::Result{200, {}};
             };
-            zserio::BlobBuffer response;
             auto service = ZsrClient(config, std::move(client));
-            service.callMethod(op, buffer, response, &ctx);
+            service.callMethod(op, requestData, nullptr);
             REQUIRE(postCalled);
         };
 

@@ -1,10 +1,9 @@
 project(zswagcl-test)
 
-add_zserio_module(zscl-test
+add_zserio_library(zswagcl-test-zs
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src"
   ENTRY "service_client_test.zs"
-  TOP_LEVEL_PKG "service_client_test"
-  SUBDIR_DEPTH 1)
+  TOP_LEVEL_PKG "service_client_test")
 
 add_executable(zswagcl-test
   src/main.cpp
@@ -14,16 +13,13 @@ add_executable(zswagcl-test
 
 target_link_libraries(zswagcl-test
   PUBLIC
-    zscl-test
-    zscl-test-reflection
+    zswagcl-test-zs
     zswagcl
-    zsr
     Catch2::Catch2)
 
 target_compile_definitions(zswagcl-test
   PRIVATE
     -DTESTDATA="${CMAKE_CURRENT_LIST_DIR}/testdata/")
-
 
 if (ZSWAG_ENABLE_TESTING)
   add_test(NAME zswagcl-test
