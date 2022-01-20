@@ -43,16 +43,17 @@ The following UML diagram provides a more in-depth overview:
 Here are some brief descriptions of the main components:
 
 * `zswagcl` is a C++ Library which exposes the zserio OpenAPI service client `OAClient`
-  as well as the more generic `OpenApiClient` and `OpenApiConfig` classes
-  which are reused in Python.
+  as well as the more generic `OpenApiClient` and `OpenApiConfig` classes.
+  The latter two are reused for the Python client library.
 * `zswag` is a Python Library which provides both a zserio Python service client
   (`OAClient`) as well as a zserio-OpenAPI server layer based on Flask/Connexion
   (`OAServer`). It also contains the command-line tool `zswag.gen`, which can be
   used to generate an OpenAPI specification from a zserio Python service class.
 * `pyzswagcl` is a binding library which exposes the C++-based OpenApi
-  parsing/request functionality to Python. Please consider it "internal".
-* `httpcl` is a wrapper around the [cpp-httplib](https://github.com/yhirose/cpp-httplib),
-  and http request configuration and secret injection abilities.
+  parsing/request functionality to Python. **Please consider it "internal".**
+* `httpcl` is a wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib),
+  HTTP request configuration and OS secret storage abilities based on
+  the [keychain](https://github.com/hrantzsch/keychain) library.
   
 ## Setup
 
@@ -368,9 +369,9 @@ for zserio to use as the service client's transport implementation.
 ## C++ Client
 
 The generic C++ client talks to any zserio service that is running
-via HTTP/REST, and provides an OpenAPI specification of it's interface.
-The C++ client is based on the [ZSR zserio C++ reflection](https://github.com/klebert-engineering/zsr)
-extension.
+via HTTP/REST, and provides an OpenAPI specification of its interface.
+When using the C++ `OAClient` with your zserio schema, make sure
+that the flag `-withTypeInfoCode` is passed to the zserio C++ emitter.
 
 ### Integration Example
 
@@ -392,6 +393,7 @@ add_subdirectory(zswag)
 # This command is provided by zswag to easily create
 # a CMake C++ reflection library from zserio code.
 add_zserio_library(${PROJECT_NAME}-zserio-cpp
+  WITH_REFLECTION
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}"
   ENTRY services.zs
   TOP_LEVEL_PKG myapp_services)

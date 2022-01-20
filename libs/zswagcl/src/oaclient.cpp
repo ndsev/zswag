@@ -115,7 +115,7 @@ std::vector<uint8_t> OAClient::callMethod(
     void* context)
 {
     if (!requestData.getReflectable()) {
-        throw std::runtime_error(stx::format("Cannot use OAClient: Make sure that zserio generator call has -withTypeInfo flag!"));
+        throw std::runtime_error(stx::format("Cannot use OAClient: Make sure that zserio generator call has -withTypeInfoCode flag!"));
     }
     const auto strMethodName = std::string(methodName.begin(), methodName.end());
 
