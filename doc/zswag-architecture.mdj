@@ -1451,7 +1451,7 @@
 											"top": 207,
 											"width": 239,
 											"height": 13,
-											"text": "ZsrClient"
+											"text": "OAClient"
 										},
 										{
 											"_type": "LabelView",
@@ -6824,7 +6824,7 @@
 							"_parent": {
 								"$ref": "AAAAAAF4bgIuhKbdLYk="
 							},
-							"name": "ZsrClient",
+							"name": "OAClient",
 							"ownedElements": [
 								{
 									"_type": "UMLDependency",

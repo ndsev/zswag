@@ -1,4 +1,4 @@
-#include "zswagcl/openapi-client.hpp"
+#include "zswagcl/private/openapi-client.hpp"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/stl.h>

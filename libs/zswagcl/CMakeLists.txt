@@ -5,18 +5,18 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_library(zswagcl SHARED
   src/base64.hpp
-  include/zswagcl/openapi-client.hpp
-  include/zswagcl/openapi-config.hpp
-  include/zswagcl/openapi-parameter-helper.hpp
-  include/zswagcl/openapi-parser.hpp
-  include/zswagcl/zsr-client.hpp
+  include/zswagcl/private/openapi-client.hpp
+  include/zswagcl/private/openapi-config.hpp
+  include/zswagcl/private/openapi-parameter-helper.hpp
+  include/zswagcl/private/openapi-parser.hpp
+  include/zswagcl/oaclient.hpp
 
   src/base64.cpp
   src/openapi-client.cpp
   src/openapi-config.cpp
   src/openapi-parameter-helper.cpp
   src/openapi-parser.cpp
-  src/zsr-client.cpp)
+  src/oaclient.cpp)
 
 target_link_libraries(zswagcl
   PUBLIC

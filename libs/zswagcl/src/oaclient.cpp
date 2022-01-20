@@ -1,4 +1,4 @@
-#include "zsr-client.hpp"
+#include "oaclient.hpp"
 
 #include <cassert>
 #include "stx/format.h"
@@ -6,9 +6,9 @@
 namespace zswagcl
 {
 
-ZsrClient::ZsrClient(zswagcl::OpenAPIConfig config,
-                     std::unique_ptr<httpcl::IHttpClient> client,
-                     httpcl::Config httpConfig)
+OAClient::OAClient(zswagcl::OpenAPIConfig config,
+                   std::unique_ptr<httpcl::IHttpClient> client,
+                   httpcl::Config httpConfig)
     : client_(std::move(config), std::move(httpConfig), std::move(client))
 {}
 
@@ -109,13 +109,13 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
     throw std::runtime_error(stx::format("Failed to serialize field '{}' for HTTP transport.", fieldName));
 }
 
-std::vector<uint8_t> ZsrClient::callMethod(
+std::vector<uint8_t> OAClient::callMethod(
     zserio::StringView methodName,
     zserio::RequestData const& requestData,
     void* context)
 {
     if (!requestData.getReflectable()) {
-        throw std::runtime_error(stx::format("Cannot use ZsrClient: Make sure that zserio generator call has -withTypeInfo flag!"));
+        throw std::runtime_error(stx::format("Cannot use OAClient: Make sure that zserio generator call has -withTypeInfo flag!"));
     }
     const auto strMethodName = std::string(methodName.begin(), methodName.end());
 

@@ -1,4 +1,4 @@
-#include "zswagcl/zsr-client.hpp"
+#include "zswagcl/oaclient.hpp"
 #include "stx/format.h"
 
 #include <iostream>
@@ -31,7 +31,7 @@ int main (int argc, char* argv[]) {
             auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
             httpcl::Config authHttpConf;
             authFun(authHttpConf);
-            auto zsrClient = ZsrClient(openApiConfig, std::move(httpClient), authHttpConf);
+            auto zsrClient = OAClient(openApiConfig, std::move(httpClient), authHttpConf);
             std::cout << "[cpp-test-client]   → Running request." << std::endl;
             calculator::Calculator::Client calcClient(zsrClient);
             auto response = fn(calcClient);

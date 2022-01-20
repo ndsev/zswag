@@ -42,7 +42,7 @@ The following UML diagram provides a more in-depth overview:
 
 Here are some brief descriptions of the main components:
 
-* `zswagcl` is a C++ Library which exposes the zserio OpenAPI service client `ZsrClient`
+* `zswagcl` is a C++ Library which exposes the zserio OpenAPI service client `OAClient`
   as well as the more generic `OpenApiClient` and `OpenApiConfig` classes
   which are reused in Python.
 * `zswag` is a Python Library which provides both a zserio Python service client
@@ -431,7 +431,7 @@ int main (int argc, char* argv[])
     
     // Create a Zserio reflection-based OpenAPI client that
     // uses the OpenAPI configuration we just retrieved.
-    auto zsrClient = ZsrClient(openApiConfig, std::move(httpClient));
+    auto zsrClient = OAClient(openApiConfig, std::move(httpClient));
         
     // Use reflection to find the service method that we want to call.
     auto serviceMethod = zsr::find<zsr::ServiceMethod>("services.MyService.my_api");
@@ -453,13 +453,13 @@ int main (int argc, char* argv[])
 }
 ```
 
-Unlike the Python client, the C++ OpenAPI client (`ZsrClient`) is passed directly to
+Unlike the Python client, the C++ OpenAPI client (`OAClient`) is passed directly to
 the endpoint method invocation, not to an intermediate zserio Client object.
 
 **Note:** While connecting, `HttpLibHttpClient` will also use ...
 1. [Persistent HTTP configuration](#persistent-http-headers-proxy-cookie-and-authentication).
 2. Additional HTTP query/header/cookie/proxy/basic-auth configs passed
-   into the `ZsrClient` constructor using an instance of `httpcl::Config`.
+   into the `OAClient` constructor using an instance of `httpcl::Config`.
    You can include this class via `#include "httpcl/http-settings.hpp"`.
    The additional `Config` will only enrich, not overwrite the
    default persistent configuration. If you would like to prevent persistent
@@ -734,7 +734,7 @@ Zswag currently understands the following authentication schemes:
 
 **Note**: If you don't want to pass your Basic-Auth/Bearer/Query/Cookie/Header
 credential through your [persistent config](#persistent-http-headers-proxy-cookie-and-authentication),
-you can pass a `httpcl::Config`/[`HTTPConfig`](#using-the-python-client) object to the `ZsrClient`/[`OAClient`](#using-the-python-client).
+you can pass a `httpcl::Config`/[`HTTPConfig`](#using-the-python-client) object to the `OAClient`/[`OAClient`](#using-the-python-client).
 constructor in C++/Python with the relevant detail.
 
 #### Component Support

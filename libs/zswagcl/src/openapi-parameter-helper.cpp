@@ -1,4 +1,4 @@
-#include "openapi-parameter-helper.hpp"
+#include "private/openapi-parameter-helper.hpp"
 
 #include "base64.hpp"
 

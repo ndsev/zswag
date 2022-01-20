@@ -2,16 +2,16 @@
 
 #include <zserio/IService.h>
 
-#include "openapi-client.hpp"
+#include "private/openapi-client.hpp"
 #include "httpcl/http-client.hpp"
 
 namespace zswagcl
 {
 
-class ZsrClient : public ::zserio::IServiceClient
+class OAClient : public ::zserio::IServiceClient
 {
 public:
-    ZsrClient(
+    OAClient(
         zswagcl::OpenAPIConfig config,
         std::unique_ptr<httpcl::IHttpClient> client,
         httpcl::Config httpConfig = {});

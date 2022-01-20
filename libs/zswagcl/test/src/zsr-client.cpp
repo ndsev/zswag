@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-#include "zswagcl/zsr-client.hpp"
+#include "zswagcl/oaclient.hpp"
 #include "zserio/SerializeUtil.h"
 #include "service_client_test/Flat.h"
 #include "service_client_test/Request.h"
@@ -112,7 +112,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
             }
         )json");
 
-        auto service = ZsrClient(config, std::move(client));
+        auto service = OAClient(config, std::move(client));
         auto response = service.callMethod("multi", zserio::BasicRequestData(request.reflectable()), nullptr);
 
         /* Check result */
@@ -170,7 +170,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
             }
         )json");
 
-        auto service = ZsrClient(config, std::move(client));
+        auto service = OAClient(config, std::move(client));
         auto response = service.callMethod("q", zserio::BasicRequestData(request.reflectable()), nullptr);
 
         /* Check result */
@@ -225,7 +225,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                 }
             }
         )json");
-        auto service = ZsrClient(config, std::move(client));
+        auto service = OAClient(config, std::move(client));
         auto response = service.callMethod("post", zserio::BasicRequestData(request.reflectable()), nullptr);
 
         /* Check result */
@@ -267,7 +267,7 @@ TEST_CASE("HTTP-Service", "[zsr-client]") {
                 postCalled = true;
                 return httpcl::IHttpClient::Result{200, {}};
             };
-            auto service = ZsrClient(config, std::move(client));
+            auto service = OAClient(config, std::move(client));
             service.callMethod(op, requestData, nullptr);
             REQUIRE(postCalled);
         };
