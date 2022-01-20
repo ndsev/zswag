@@ -389,20 +389,19 @@ project(myapp)
 # and its dependencies, such as zserio.
 add_subdirectory(zswag)
 
-# This command is provided by ZSR to easily create
+# This command is provided by zswag to easily create
 # a CMake C++ reflection library from zserio code.
-add_zserio_module(${PROJECT_NAME}-cpp
+add_zserio_library(${PROJECT_NAME}-zserio-cpp
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}"
   ENTRY services.zs
-  TOP_LEVEL_PKG services
-  SUBDIR_DEPTH 0)
+  TOP_LEVEL_PKG myapp_services)
 
 # We create a myapp client executable which links to
-# the generated zserio C++ library, the zswag client
-# library and the ZSR reflection runtime.
+# the generated zserio C++ library and the zswag client
+# library.
 add_executable(${PROJECT_NAME} client.cpp)
 target_link_libraries(${PROJECT_NAME}
-    ${PROJECT_NAME}-cpp-reflection zswagcl zsr)
+    ${PROJECT_NAME}-zserio-cpp zswagcl)
 ```
 
 The `add_executable` command above references the file `myapp/client.cpp`,
@@ -411,12 +410,11 @@ which contains the code to actually use the zswag C++ client.
 ```cpp
 #include "zswagcl/zsr-client.hpp"
 #include <iostream>
-#include <zsr/types.hpp>
-#include <zsr/find.hpp>
-#include <zsr/getset.hpp>
+#include "myapp_services/services/MyService.h"
 
 using namespace zswagcl;
 using namespace httpcl;
+using MyService = myapp_services::services::MyService;
 
 int main (int argc, char* argv[])
 {
@@ -431,30 +429,22 @@ int main (int argc, char* argv[])
     
     // Create a Zserio reflection-based OpenAPI client that
     // uses the OpenAPI configuration we just retrieved.
-    auto zsrClient = OAClient(openApiConfig, std::move(httpClient));
+    auto openApiClient = OAClient(openApiConfig, std::move(httpClient));
         
-    // Use reflection to find the service method that we want to call.
-    auto serviceMethod = zsr::find<zsr::ServiceMethod>("services.MyService.my_api");
+    // Create a MyService client based on the OpenApi-Client
+    // implementation of the zserio::IServiceClient interface.
+    auto myServiceClient = MyService::Client(openApiClient);
     
-    // Use reflection to create the request object
-    auto request = zsr::make(zsr::packages(), "services.Request", {{"value", 2}});
+    // Create the request object
+    auto request = myapp_services::services::Request(2);
 
     // Invoke the REST endpoint
-    auto response = serviceMethod->call(zsrClient, request);
-    
-    // Unpack the response variant as an introspectable struct 
-    auto unpackedResponse = response.get<zsr::Introspectable>().value();
-    
-    // Use reflection to read the response's value member
-    auto responseValue = zsr::get(unpackedResponse, "value").get<int>().value();
+    auto response = myServiceClient.my_api(request);
     
     // Print the response
-    std::cout << "Got " << responseValue << std::endl;
+    std::cout << "Got " << response.getValue() << std::endl;
 }
 ```
-
-Unlike the Python client, the C++ OpenAPI client (`OAClient`) is passed directly to
-the endpoint method invocation, not to an intermediate zserio Client object.
 
 **Note:** While connecting, `HttpLibHttpClient` will also use ...
 1. [Persistent HTTP configuration](#persistent-http-headers-proxy-cookie-and-authentication).
@@ -674,17 +664,14 @@ specifiers.
 
 ### URL Compound Parameter
 
-In this case, `x-zserio-request-part` points to a zserio compound struct.
-The OpenAPI schema options are the same as for arrays. All fields
-of the designated struct which have a scalar type are exposed
-as key-value pairs. We strongly discourage using this OpenAPI feature, and
-tool support is very limited.
+In this case, `x-zserio-request-part` points to a zserio compound struct
+instead of a field with a scalar value. **This is currently not supported.**
 
 #### Component Support
 
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
-| `x-zserio-request-part: <[parent.]*array_member>`  | ✔️ | ❌️ | ❌️ | ❌️ |
+| `x-zserio-request-part: <[parent.]*compound_member>`  | ❌️ | ❌️ | ❌️ | ❌️ |
 
 ### Server URL Base Path
 

@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include "zswagcl/openapi-parameter-helper.hpp"
+#include "zswagcl/private/openapi-parameter-helper.hpp"
 
 using namespace zswagcl;
 
