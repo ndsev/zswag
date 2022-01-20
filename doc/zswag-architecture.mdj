@@ -4471,11 +4471,11 @@
 											},
 											"fillColor": "#e2e2e2",
 											"font": "Arial;13;1",
-											"left": 1125,
+											"left": 1085,
 											"top": 150,
-											"width": 79,
+											"width": 135,
 											"height": 13,
-											"text": "zserio"
+											"text": "zserio PyPI package"
 										},
 										{
 											"_type": "LabelView",
@@ -4509,9 +4509,9 @@
 									],
 									"fillColor": "#e2e2e2",
 									"font": "Arial;13;0",
-									"left": 1120,
+									"left": 1080,
 									"top": 143,
-									"width": 89,
+									"width": 145,
 									"height": 25,
 									"stereotypeLabel": {
 										"$ref": "AAAAAAF4biS/lPNKncs="
@@ -4533,9 +4533,9 @@
 							"fillColor": "#e2e2e2",
 							"font": "Arial;13;0",
 							"containerChangeable": true,
-							"left": 1120,
+							"left": 1080,
 							"top": 128,
-							"width": 89,
+							"width": 145,
 							"height": 40,
 							"nameCompartment": {
 								"$ref": "AAAAAAF4biS/lPNJtNI="
@@ -5115,204 +5115,6 @@
 							"height": 40,
 							"nameCompartment": {
 								"$ref": "AAAAAAF4bhSO3K5FXmA="
-							}
-						},
-						{
-							"_type": "UMLPackageView",
-							"_id": "AAAAAAF4bjBw30Gotxw=",
-							"_parent": {
-								"$ref": "AAAAAAFF+qBtyKM79qY="
-							},
-							"model": {
-								"$ref": "AAAAAAF4bjBw30GmDwg="
-							},
-							"subViews": [
-								{
-									"_type": "UMLNameCompartmentView",
-									"_id": "AAAAAAF4bjBw4EGp5KI=",
-									"_parent": {
-										"$ref": "AAAAAAF4bjBw30Gotxw="
-									},
-									"model": {
-										"$ref": "AAAAAAF4bjBw30GmDwg="
-									},
-									"subViews": [
-										{
-											"_type": "LabelView",
-											"_id": "AAAAAAF4bjBw4EGqYks=",
-											"_parent": {
-												"$ref": "AAAAAAF4bjBw4EGp5KI="
-											},
-											"visible": false,
-											"fillColor": "#e2e2e2",
-											"font": "Arial;13;0",
-											"top": -48,
-											"height": 13
-										},
-										{
-											"_type": "LabelView",
-											"_id": "AAAAAAF4bjBw4EGrOTg=",
-											"_parent": {
-												"$ref": "AAAAAAF4bjBw4EGp5KI="
-											},
-											"fillColor": "#e2e2e2",
-											"font": "Arial;13;1",
-											"left": 269,
-											"top": 310,
-											"width": 167.8544921875,
-											"height": 13,
-											"text": "zserio-cpp-reflection"
-										},
-										{
-											"_type": "LabelView",
-											"_id": "AAAAAAF4bjBw4EGsC2c=",
-											"_parent": {
-												"$ref": "AAAAAAF4bjBw4EGp5KI="
-											},
-											"visible": false,
-											"fillColor": "#e2e2e2",
-											"font": "Arial;13;0",
-											"top": -48,
-											"width": 73.67724609375,
-											"height": 13,
-											"text": "(from Model)"
-										},
-										{
-											"_type": "LabelView",
-											"_id": "AAAAAAF4bjBw4EGtIGk=",
-											"_parent": {
-												"$ref": "AAAAAAF4bjBw4EGp5KI="
-											},
-											"visible": false,
-											"fillColor": "#e2e2e2",
-											"font": "Arial;13;0",
-											"top": -48,
-											"height": 13,
-											"horizontalAlignment": 1
-										}
-									],
-									"fillColor": "#e2e2e2",
-									"font": "Arial;13;0",
-									"left": 264,
-									"top": 303,
-									"width": 177.8544921875,
-									"height": 25,
-									"stereotypeLabel": {
-										"$ref": "AAAAAAF4bjBw4EGqYks="
-									},
-									"nameLabel": {
-										"$ref": "AAAAAAF4bjBw4EGrOTg="
-									},
-									"namespaceLabel": {
-										"$ref": "AAAAAAF4bjBw4EGsC2c="
-									},
-									"propertyLabel": {
-										"$ref": "AAAAAAF4bjBw4EGtIGk="
-									}
-								}
-							],
-							"fillColor": "#e2e2e2",
-							"font": "Arial;13;0",
-							"containerChangeable": true,
-							"left": 264,
-							"top": 288,
-							"width": 177.8544921875,
-							"height": 40,
-							"nameCompartment": {
-								"$ref": "AAAAAAF4bjBw4EGp5KI="
-							}
-						},
-						{
-							"_type": "UMLDependencyView",
-							"_id": "AAAAAAF4bjI7Ok1qYZE=",
-							"_parent": {
-								"$ref": "AAAAAAFF+qBtyKM79qY="
-							},
-							"model": {
-								"$ref": "AAAAAAF4bjI7OU1o+pM="
-							},
-							"subViews": [
-								{
-									"_type": "EdgeLabelView",
-									"_id": "AAAAAAF4bjI7Ok1rr7o=",
-									"_parent": {
-										"$ref": "AAAAAAF4bjI7Ok1qYZE="
-									},
-									"model": {
-										"$ref": "AAAAAAF4bjI7OU1o+pM="
-									},
-									"visible": false,
-									"font": "Arial;13;0",
-									"left": 302,
-									"top": 201,
-									"height": 13,
-									"alpha": 1.5707963267948966,
-									"distance": 15,
-									"hostEdge": {
-										"$ref": "AAAAAAF4bjI7Ok1qYZE="
-									},
-									"edgePosition": 1
-								},
-								{
-									"_type": "EdgeLabelView",
-									"_id": "AAAAAAF4bjI7Ok1s/HY=",
-									"_parent": {
-										"$ref": "AAAAAAF4bjI7Ok1qYZE="
-									},
-									"model": {
-										"$ref": "AAAAAAF4bjI7OU1o+pM="
-									},
-									"visible": null,
-									"font": "Arial;13;0",
-									"left": 317,
-									"top": 201,
-									"height": 13,
-									"alpha": 1.5707963267948966,
-									"distance": 30,
-									"hostEdge": {
-										"$ref": "AAAAAAF4bjI7Ok1qYZE="
-									},
-									"edgePosition": 1
-								},
-								{
-									"_type": "EdgeLabelView",
-									"_id": "AAAAAAF4bjI7Ok1tEgk=",
-									"_parent": {
-										"$ref": "AAAAAAF4bjI7Ok1qYZE="
-									},
-									"model": {
-										"$ref": "AAAAAAF4bjI7OU1o+pM="
-									},
-									"visible": false,
-									"font": "Arial;13;0",
-									"left": 273,
-									"top": 202,
-									"height": 13,
-									"alpha": -1.5707963267948966,
-									"distance": 15,
-									"hostEdge": {
-										"$ref": "AAAAAAF4bjI7Ok1qYZE="
-									},
-									"edgePosition": 1
-								}
-							],
-							"font": "Arial;13;0",
-							"head": {
-								"$ref": "AAAAAAF4bjBw30Gotxw="
-							},
-							"tail": {
-								"$ref": "AAAAAAF4bge2pKhVmUU="
-							},
-							"points": "368:208;288:208;288:288",
-							"showVisibility": true,
-							"nameLabel": {
-								"$ref": "AAAAAAF4bjI7Ok1rr7o="
-							},
-							"stereotypeLabel": {
-								"$ref": "AAAAAAF4bjI7Ok1s/HY="
-							},
-							"propertyLabel": {
-								"$ref": "AAAAAAF4bjI7Ok1tEgk="
 							}
 						},
 						{
@@ -7083,7 +6885,7 @@
 							"_parent": {
 								"$ref": "AAAAAAF4bgLBtacTlEc="
 							},
-							"name": "zserio"
+							"name": "zserio PyPI package"
 						}
 					]
 				},
