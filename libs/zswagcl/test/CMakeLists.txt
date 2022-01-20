@@ -7,7 +7,7 @@ add_zserio_library(zswagcl-test-zs
 
 add_executable(zswagcl-test
   src/main.cpp
-  src/zsr-client.cpp
+  src/oaclient.cpp
   src/openapi-parameter-helper.cpp
   src/base64.cpp)
 

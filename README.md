@@ -408,7 +408,7 @@ The `add_executable` command above references the file `myapp/client.cpp`,
 which contains the code to actually use the zswag C++ client.
 
 ```cpp
-#include "zswagcl/zsr-client.hpp"
+#include "zswagcl/oaclient.hpp"
 #include <iostream>
 #include "myapp_services/services/MyService.h"
 

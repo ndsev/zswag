@@ -30,7 +30,7 @@ static auto makeConfig(std::string pathsReplacement, std::string source = TESTDA
     return parseOpenAPIConfig(ss);
 }
 
-TEST_CASE("HTTP-Service", "[zsr-client]") {
+TEST_CASE("HTTP-Service", "[oaclient]") {
     SECTION("Fetch Server Config") {
         httpcl::MockHttpClient configClient;
         configClient.getFun = [&](std::string_view uri) {
