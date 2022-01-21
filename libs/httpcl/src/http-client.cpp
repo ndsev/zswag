@@ -1,8 +1,6 @@
 #include "http-client.hpp"
 #include "uri.hpp"
 
-#include "httpcl/http-settings.hpp"
-
 #include <httplib.h>
 
 namespace

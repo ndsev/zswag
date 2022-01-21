@@ -33,11 +33,11 @@ if (NOT TARGET wheel)
   set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
   include(python-wheel)
   set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
-endif ()
+endif()
 
 if (NOT TARGET yaml-cpp)
   add_subdirectory(deps/yaml-cpp)
-endif ()
+endif()
 
 if (NOT TARGET stx)
   FetchContent_Declare(stx
@@ -55,9 +55,17 @@ if (NOT TARGET speedyj)
   FetchContent_MakeAvailable(speedyj)
 endif()
 
+if (NOT TARGET spdlog)
+  FetchContent_Declare(spdlog
+    GIT_REPOSITORY "https://github.com/gabime/spdlog.git"
+    GIT_TAG        "v1.x"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(spdlog)
+endif()
+
 if (NOT TARGET Catch2)
   add_subdirectory(deps/Catch2)
-endif ()
+endif()
 
 if (NOT TARGET httplib)
   add_subdirectory(deps/cpp-httplib)
@@ -65,20 +73,20 @@ if (NOT TARGET httplib)
     INTERFACE
     CPPHTTPLIB_OPENSSL_SUPPORT)
   target_link_libraries(httplib INTERFACE OpenSSL::SSL)
-endif ()
+endif()
 
 if (NOT TARGET keychain)
   add_subdirectory(deps/keychain)
-endif ()
+endif()
 
 if (NOT TARGET pybind11)
   add_subdirectory(deps/pybind11)
-endif ()
+endif()
 
 if (NOT TARGET ZserioCppRuntime)
   add_subdirectory(deps/zserio/compiler/extensions/cpp/runtime/src)
   set(ZSERIO_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/deps/zserio")
-endif ()
+endif()
 
 if (NOT TARGET zserio-cmake-helper)
   add_subdirectory(deps/zserio-cmake-helper)

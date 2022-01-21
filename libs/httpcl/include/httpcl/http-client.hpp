@@ -10,6 +10,7 @@
 
 #include "http-settings.hpp"
 #include "uri.hpp"
+#include "log.hpp"
 
 namespace httpcl
 {
@@ -36,7 +37,9 @@ public:
         Error(Result result, std::string const& message)
             : std::runtime_error(message)
             , result(std::move(result))
-        {}
+        {
+            log().error(message);
+        }
     };
 
     virtual ~IHttpClient() = default;

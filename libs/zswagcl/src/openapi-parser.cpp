@@ -5,7 +5,9 @@
 
 #include "yaml-cpp/yaml.h"
 #include "stx/format.h"
+#include "httpcl/log.hpp"
 #include <httplib.h>
+#include <future>
 
 #include <sstream>
 #include <string>
@@ -14,12 +16,12 @@ using namespace std::string_literals;
 
 namespace {
 
-struct Scope {
+struct YAMLScope {
     std::string name_;
-    Scope const* parent_ = nullptr;
+    YAMLScope const* parent_ = nullptr;
     YAML::Node node_;
 
-    explicit Scope(std::string name, YAML::Node const& n, Scope const* parent = nullptr)
+    explicit YAMLScope(std::string name, YAML::Node const& n, YAMLScope const* parent = nullptr)
         : name_(std::move(name)), node_(n), parent_(parent)
     {}
 
@@ -34,7 +36,7 @@ struct Scope {
     }
 
     std::runtime_error valueError(std::string const& value, std::vector<std::string> const& allowed) const {
-        return std::runtime_error(stx::format(
+        return httpcl::logRuntimeError(stx::format(
             "ERROR while parsing OpenAPI schema:\n"
             "    At {}:\n"
             "        Unsupported value `{}`.\n"
@@ -46,7 +48,7 @@ struct Scope {
     }
 
     std::runtime_error contextualValueError(std::string const& reason, std::string const& value, std::vector<std::string> const& allowed) const {
-        return std::runtime_error(stx::format(
+        return httpcl::logRuntimeError(stx::format(
             "ERROR while parsing OpenAPI schema:\n"
             "    At {}:\n"
             "        Because {}: Value `{}` is not allowed.\n"
@@ -59,7 +61,7 @@ struct Scope {
     }
 
     std::runtime_error missingFieldError(std::string const& field) const {
-        return std::runtime_error(stx::format(
+        return httpcl::logRuntimeError(stx::format(
             "ERROR while parsing OpenAPI schema:\n"
             "    At {}:\n"
             "        Mandatory field `{}` is missing.\n",
@@ -71,16 +73,16 @@ struct Scope {
         return node_.operator bool();
     }
 
-    Scope operator[] (char const* name) const {
+    YAMLScope operator[] (char const* name) const {
         auto child = node_[name];
-        return Scope(name, child, this);
+        return YAMLScope(name, child, this);
     }
 
-    Scope operator[] (std::string const& name) const {
+    YAMLScope operator[] (std::string const& name) const {
         return operator[](name.c_str());
     }
 
-    Scope mandatoryChild(std::string const& name) const {
+    YAMLScope mandatoryChild(std::string const& name) const {
         auto result = operator[](name);
         if (!result)
             throw missingFieldError(name);
@@ -92,15 +94,15 @@ struct Scope {
         return node_.as<T>();
     }
 
-    void forEach(std::function<void(Scope const& child)> const& fun) {
+    void forEach(std::function<void(YAMLScope const& child)> const& fun) {
         if (!node_ || !fun || !(node_.IsMap() || node_.IsSequence()))
             return;
         size_t i = 0;
         for (auto const& child : node_) {
             if (node_.IsMap())
-                fun(Scope(child.first.as<std::string>(), child.second, this));
+                fun(YAMLScope(child.first.as<std::string>(), child.second, this));
             else
-                fun(Scope(stx::to_string(i), child, this));
+                fun(YAMLScope(stx::to_string(i), child, this));
             ++i;
         }
     }
@@ -111,7 +113,7 @@ struct Scope {
 namespace zswagcl
 {
 
-static auto parseParameterLocation(Scope const& inNode)
+static auto parseParameterLocation(YAMLScope const& inNode)
 {
     auto str = inNode.as<std::string>();
     if (str == "query")
@@ -128,7 +130,7 @@ static auto parseParameterLocation(Scope const& inNode)
  * JSON schema is _not_ supported. The only field that is respected is
  * the 'format' field.
  */
-static auto parseParameterSchema(Scope const& schemaNode)
+static auto parseParameterSchema(YAMLScope const& schemaNode)
 {
     if (auto formatNode = schemaNode["format"]) {
         auto format = formatNode.as<std::string>();
@@ -163,7 +165,7 @@ static auto parseParameterSchema(Scope const& schemaNode)
  *
  * Documentation: https://swagger.io/specification/#parameter-style
  */
-static void parseParameterStyle(Scope const& styleNode,
+static void parseParameterStyle(YAMLScope const& styleNode,
                                 OpenAPIConfig::Parameter& parameter)
 {
     /* Set default style for parameter location */
@@ -208,7 +210,7 @@ static void parseParameterStyle(Scope const& styleNode,
     }
 }
 
-static void parseParameterExplode(Scope const& explodeNode,
+static void parseParameterExplode(YAMLScope const& explodeNode,
                                   OpenAPIConfig::Parameter& parameter)
 {
     if (explodeNode) {
@@ -229,7 +231,7 @@ static void parseParameterExplode(Scope const& explodeNode,
     }
 }
 
-static void parseMethodParameter(Scope const& parameterNode,
+static void parseMethodParameter(YAMLScope const& parameterNode,
                                  OpenAPIConfig::Path& path)
 {
     auto nameNode = parameterNode.mandatoryChild("name");
@@ -250,7 +252,7 @@ static void parseMethodParameter(Scope const& parameterNode,
     parseParameterExplode(parameterNode["explode"], parameter);
 }
 
-static void parseMethodBody(Scope const& methodNode,
+static void parseMethodBody(YAMLScope const& methodNode,
                             OpenAPIConfig::Path& path)
 {
     if (auto bodyNode = methodNode["requestBody"]) {
@@ -266,7 +268,7 @@ static void parseMethodBody(Scope const& methodNode,
 }
 
 static OpenAPIConfig::SecurityAlternatives parseSecurity(
-        Scope const& securityNode,
+        YAMLScope const& securityNode,
         OpenAPIConfig const& config)
 {
     OpenAPIConfig::SecurityAlternatives result;
@@ -297,7 +299,7 @@ static OpenAPIConfig::SecurityAlternatives parseSecurity(
 }
 
 static void parseMethod(const std::string& method,
-                        const Scope& pathNode,
+                        const YAMLScope& pathNode,
                         OpenAPIConfig& config)
 {
     if (auto methodNode = pathNode[method]) {
@@ -323,7 +325,7 @@ static void parseMethod(const std::string& method,
 }
 
 static void parseSecurityScheme(
-    const Scope& schemeNode,
+    const YAMLScope& schemeNode,
     OpenAPIConfig& config)
 {
     auto& name = schemeNode.name_;
@@ -362,7 +364,7 @@ static void parseSecurityScheme(
     config.securitySchemes[name] = newScheme;
 }
 
-static void parsePath(const Scope& pathNode,
+static void parsePath(const YAMLScope& pathNode,
                       OpenAPIConfig& config)
 {
     static const char* supportedMethods[] = {
@@ -374,7 +376,7 @@ static void parsePath(const Scope& pathNode,
     }
 }
 
-static void parseServer(const Scope& serverNode,
+static void parseServer(const YAMLScope& serverNode,
                         OpenAPIConfig& config)
 {
     if (auto urlNode = serverNode["url"]) {
@@ -394,11 +396,11 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& s)
     OpenAPIConfig config;
 
     auto doc = YAML::Load(s);
-    Scope docScope{"", doc};
+    YAMLScope docScope{"", doc};
     docScope["servers"].forEach([&](auto const& serverNode){
         try { parseServer(serverNode, config); }
         catch (const httpcl::URIError& e) {
-            throw std::runtime_error(
+            throw httpcl::logRuntimeError(
                 stx::format("OpenAPI spec contains invalid server entry:\n    {}", e.what()));
         }
     });
@@ -424,17 +426,29 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
                                  httpcl::IHttpClient& client,
                                  httpcl::Config httpConfig)
 {
+    std::string debugContext = stx::format("[fetchOpenAPIConfig({})]", url);
+
     // Add persistent configuration
+    httpcl::log().debug("{} Applying HTTP settings ...", debugContext);
     httpConfig |= httpcl::Settings()[url];
 
     // Load client config content.
+    httpcl::log().debug("{} Parsing URL ...", debugContext);
     auto uriParts = httpcl::URIComponents::fromStrRfc3986(url);
-    auto res = client.get(uriParts.build(), httpConfig);
+    httpcl::log().debug("{} Executing HTTP GET ...", debugContext);
+    auto resFuture = std::async(std::launch::async, [uriParts, httpConfig, &client] {
+        return client.get(uriParts.build(), httpConfig);
+    });
+    while (resFuture.wait_for(std::chrono::seconds{1}) != std::future_status::ready)
+        httpcl::log().debug("{} Waiting for response ...", debugContext);
+    auto res = resFuture.get();
+    httpcl::log().debug("{} Got HTTP status {}, {} bytes.", debugContext, res.status, res.content.size());
 
-    // Create client from loaded config JSON.
+    // Parse loaded JSON
     if (res.status >= 200 && res.status < 300) {
         std::stringstream ss(res.content, std::ios_base::in);
 
+        httpcl::log().debug("{} Parsing OpenAPI spec", debugContext);
         auto config = parseOpenAPIConfig(ss);
         if (config.uri.scheme.empty())
             config.uri.scheme = uriParts.scheme;
@@ -442,12 +456,11 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
             config.uri.host = uriParts.host;
             config.uri.port = uriParts.port;
         }
+        httpcl::log().debug("{} Parsed spec has {} methods.", debugContext, config.methodPath.size());
 
         return config;
     }
 
-    // FIXME: Python code is parsing the HTTP status from exception message!
-    //        Pybind11 does not support custom exception types yet.
     throw httpcl::IHttpClient::Error(
         res,
         stx::format(
