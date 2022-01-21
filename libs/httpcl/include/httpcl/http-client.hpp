@@ -63,6 +63,8 @@ public:
 class HttpLibHttpClient : public IHttpClient
 {
 public:
+    HttpLibHttpClient();
+
     Result get(const std::string& uri,
                const Config& config) override;
     Result post(const std::string& uri,
@@ -77,6 +79,9 @@ public:
     Result patch(const std::string& uri,
                  const OptionalBodyAndContentType& body,
                  const Config& config) override;
+private:
+    time_t timeoutSecs_ = 60.;
+    bool sslCertStrict_ = false;
 };
 
 class MockHttpClient : public IHttpClient

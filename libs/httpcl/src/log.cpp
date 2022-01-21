@@ -40,7 +40,12 @@ spdlog::logger& httpcl::log()
         if (!logFile.empty()) {
             std::cerr << "Logging OpenAPI HTTP events to '" << logFile << "'!" << std::endl;
             if (!logFileMaxSize.empty()) {
-                logFileMaxSizeInt = std::stoul(logFileMaxSize);
+                try {
+                    logFileMaxSizeInt = std::stoull(logFileMaxSize);
+                }
+                catch (std::exception& e) {
+                    std::cerr << "Could not parse value of HTTP_LOG_FILE_MAXSIZE." << std::endl;
+                }
             }
             std::cerr << "Maximum logfile size is " << logFileMaxSizeInt << " bytes!" << std::endl;
             httpLogger = spdlog::rotating_logger_mt("openapi-http", logFile, logFileMaxSizeInt, 2);
