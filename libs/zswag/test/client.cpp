@@ -25,23 +25,23 @@ int main (int argc, char* argv[]) {
         spdlog::info("[cpp-test-client] Executing test #{}: {} ...", testCounter, aspect);
         try
         {
-            spdlog::info("[cpp-test-client]   → Instantiating client.");
+            spdlog::info("[cpp-test-client]   => Instantiating client.");
             auto httpClient = std::make_unique<HttpLibHttpClient>();
             auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
             httpcl::Config authHttpConf;
             authFun(authHttpConf);
             auto oaClient = OAClient(openApiConfig, std::move(httpClient), authHttpConf);
-            spdlog::info("[cpp-test-client]   → Running request.");
+            spdlog::info("[cpp-test-client]   => Running request.");
             calculator::Calculator::Client calcClient(oaClient);
             auto response = fn(calcClient);
             if (response.getValue() == expect)
-                spdlog::info("[cpp-test-client]   → Success.");
+                spdlog::info("[cpp-test-client]   => Success.");
             else
                 throw std::runtime_error(stx::format("Expected {}, got {}!", expect, response.getValue()));
         }
         catch(std::exception const& e) {
             ++failureCounter;
-            spdlog::error("[cpp-test-client]   → ERROR: {}", e.what());
+            spdlog::error("[cpp-test-client]   => ERROR: {}", e.what());
         }
     };
 
