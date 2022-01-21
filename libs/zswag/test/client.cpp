@@ -31,9 +31,9 @@ int main (int argc, char* argv[]) {
             auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
             httpcl::Config authHttpConf;
             authFun(authHttpConf);
-            auto zsrClient = OAClient(openApiConfig, std::move(httpClient), authHttpConf);
+            auto oaClient = OAClient(openApiConfig, std::move(httpClient), authHttpConf);
             std::cout << "[cpp-test-client]   → Running request." << std::endl;
-            calculator::Calculator::Client calcClient(zsrClient);
+            calculator::Calculator::Client calcClient(oaClient);
             auto response = fn(calcClient);
             if (response.getValue() == expect)
                 std::cout << "[cpp-test-client]   → Success." << std::endl;
