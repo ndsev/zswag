@@ -6,7 +6,7 @@
 #include <variant>
 #include <optional>
 
-#include "export.hpp"
+#include "zswagcl/export.hpp"
 #include "httpcl/uri.hpp"
 #include "httpcl/http-settings.hpp"
 

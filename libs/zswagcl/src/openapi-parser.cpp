@@ -1,4 +1,4 @@
-#include "openapi-parser.hpp"
+#include "private/openapi-parser.hpp"
 
 #include "httpcl/http-settings.hpp"
 #include "httpcl/uri.hpp"
@@ -229,7 +229,7 @@ static void parseParameterExplode(Scope const& explodeNode,
     }
 }
 
-static bool parseMethodParameter(Scope const& parameterNode,
+static void parseMethodParameter(Scope const& parameterNode,
                                  OpenAPIConfig::Path& path)
 {
     auto nameNode = parameterNode.mandatoryChild("name");
@@ -240,10 +240,7 @@ static bool parseMethodParameter(Scope const& parameterNode,
         parameter.location = parseParameterLocation(inNode);
     }
 
-    if (auto zserioRequestPartNode = parameterNode["x-zserio-request-part"])
-        parameter.field = zserioRequestPartNode.as<std::string>();
-    else
-        return false;
+    parameter.field = parameterNode.mandatoryChild(ZSERIO_REQUEST_PART).as<std::string>();
 
     if (auto schemaNode = parameterNode["schema"]) {
         parameter.format = parseParameterSchema(schemaNode);
@@ -251,8 +248,6 @@ static bool parseMethodParameter(Scope const& parameterNode,
 
     parseParameterStyle(parameterNode["style"], parameter);
     parseParameterExplode(parameterNode["explode"], parameter);
-
-    return true;
 }
 
 static void parseMethodBody(Scope const& methodNode,

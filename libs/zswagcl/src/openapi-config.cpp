@@ -1,6 +1,6 @@
 #include <regex>
 
-#include "openapi-config.hpp"
+#include "zswagcl/private/openapi-config.hpp"
 #include "stx/format.h"
 
 namespace zswagcl

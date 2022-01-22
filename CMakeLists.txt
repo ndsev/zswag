@@ -6,10 +6,11 @@ endif()
 
 project(zswag)
 enable_testing()
+include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.1.0)
+set(ZSWAG_VERSION 1.2.0)
 
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -32,10 +33,6 @@ if (NOT TARGET wheel)
   set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
   include(python-wheel)
   set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
-
-  # Add wheel target to `all` such that the ctest integration tests work
-  add_custom_target(wheel-all ALL)
-  add_dependencies(wheel-all wheel)
 endif ()
 
 if (NOT TARGET yaml-cpp)
@@ -43,8 +40,20 @@ if (NOT TARGET yaml-cpp)
 endif ()
 
 if (NOT TARGET stx)
-  add_subdirectory(deps/stx)
-endif ()
+  FetchContent_Declare(stx
+    GIT_REPOSITORY "https://github.com/Klebert-Engineering/stx.git"
+    GIT_TAG        "main"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(stx)
+endif()
+
+if (NOT TARGET speedyj)
+  FetchContent_Declare(speedyj
+    GIT_REPOSITORY "https://github.com/Klebert-Engineering/speedyj.git"
+    GIT_TAG        "master"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(speedyj)
+endif()
 
 if (NOT TARGET Catch2)
   add_subdirectory(deps/Catch2)
@@ -68,11 +77,12 @@ endif ()
 
 if (NOT TARGET ZserioCppRuntime)
   add_subdirectory(deps/zserio/compiler/extensions/cpp/runtime/src)
+  set(ZSERIO_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/deps/zserio")
 endif ()
 
-if (NOT TARGET zsr)
-  add_subdirectory(deps/zsr)
-endif ()
+if (NOT TARGET zserio-cmake-helper)
+  add_subdirectory(deps/zserio-cmake-helper)
+endif()
 
 ##############
 # libs

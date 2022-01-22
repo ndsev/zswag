@@ -2,7 +2,7 @@
 
 #include <istream>
 
-#include "zswagcl/openapi-config.hpp"
+#include "zswagcl/private/openapi-config.hpp"
 #include "httpcl/http-client.hpp"
 #include "httpcl/http-settings.hpp"
 

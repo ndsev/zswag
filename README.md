@@ -42,17 +42,18 @@ The following UML diagram provides a more in-depth overview:
 
 Here are some brief descriptions of the main components:
 
-* `zswagcl` is a C++ Library which exposes the zserio OpenAPI service client `ZsrClient`
-  as well as the more generic `OpenApiClient` and `OpenApiConfig` classes
-  which are reused in Python.
+* `zswagcl` is a C++ Library which exposes the zserio OpenAPI service client `OAClient`
+  as well as the more generic `OpenApiClient` and `OpenApiConfig` classes.
+  The latter two are reused for the Python client library.
 * `zswag` is a Python Library which provides both a zserio Python service client
   (`OAClient`) as well as a zserio-OpenAPI server layer based on Flask/Connexion
   (`OAServer`). It also contains the command-line tool `zswag.gen`, which can be
   used to generate an OpenAPI specification from a zserio Python service class.
 * `pyzswagcl` is a binding library which exposes the C++-based OpenApi
-  parsing/request functionality to Python. Please consider it "internal".
-* `httpcl` is a wrapper around the [cpp-httplib](https://github.com/yhirose/cpp-httplib),
-  and http request configuration and secret injection abilities.
+  parsing/request functionality to Python. **Please consider it "internal".**
+* `httpcl` is a wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib),
+  HTTP request configuration and OS secret storage abilities based on
+  the [keychain](https://github.com/hrantzsch/keychain) library.
   
 ## Setup
 
@@ -368,9 +369,9 @@ for zserio to use as the service client's transport implementation.
 ## C++ Client
 
 The generic C++ client talks to any zserio service that is running
-via HTTP/REST, and provides an OpenAPI specification of it's interface.
-The C++ client is based on the [ZSR zserio C++ reflection](https://github.com/klebert-engineering/zsr)
-extension.
+via HTTP/REST, and provides an OpenAPI specification of its interface.
+When using the C++ `OAClient` with your zserio schema, make sure
+that the flag `-withTypeInfoCode` is passed to the zserio C++ emitter.
 
 ### Integration Example
 
@@ -389,34 +390,33 @@ project(myapp)
 # and its dependencies, such as zserio.
 add_subdirectory(zswag)
 
-# This command is provided by ZSR to easily create
+# This command is provided by zswag to easily create
 # a CMake C++ reflection library from zserio code.
-add_zserio_module(${PROJECT_NAME}-cpp
+add_zserio_library(${PROJECT_NAME}-zserio-cpp
+  WITH_REFLECTION
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}"
   ENTRY services.zs
-  TOP_LEVEL_PKG services
-  SUBDIR_DEPTH 0)
+  TOP_LEVEL_PKG myapp_services)
 
 # We create a myapp client executable which links to
-# the generated zserio C++ library, the zswag client
-# library and the ZSR reflection runtime.
+# the generated zserio C++ library and the zswag client
+# library.
 add_executable(${PROJECT_NAME} client.cpp)
 target_link_libraries(${PROJECT_NAME}
-    ${PROJECT_NAME}-cpp-reflection zswagcl zsr)
+    ${PROJECT_NAME}-zserio-cpp zswagcl)
 ```
 
 The `add_executable` command above references the file `myapp/client.cpp`,
 which contains the code to actually use the zswag C++ client.
 
 ```cpp
-#include "zswagcl/zsr-client.hpp"
+#include "zswagcl/oaclient.hpp"
 #include <iostream>
-#include <zsr/types.hpp>
-#include <zsr/find.hpp>
-#include <zsr/getset.hpp>
+#include "myapp_services/services/MyService.h"
 
 using namespace zswagcl;
 using namespace httpcl;
+using MyService = myapp_services::services::MyService;
 
 int main (int argc, char* argv[])
 {
@@ -431,35 +431,27 @@ int main (int argc, char* argv[])
     
     // Create a Zserio reflection-based OpenAPI client that
     // uses the OpenAPI configuration we just retrieved.
-    auto zsrClient = ZsrClient(openApiConfig, std::move(httpClient));
+    auto openApiClient = OAClient(openApiConfig, std::move(httpClient));
         
-    // Use reflection to find the service method that we want to call.
-    auto serviceMethod = zsr::find<zsr::ServiceMethod>("services.MyService.my_api");
+    // Create a MyService client based on the OpenApi-Client
+    // implementation of the zserio::IServiceClient interface.
+    auto myServiceClient = MyService::Client(openApiClient);
     
-    // Use reflection to create the request object
-    auto request = zsr::make(zsr::packages(), "services.Request", {{"value", 2}});
+    // Create the request object
+    auto request = myapp_services::services::Request(2);
 
     // Invoke the REST endpoint
-    auto response = serviceMethod->call(zsrClient, request);
-    
-    // Unpack the response variant as an introspectable struct 
-    auto unpackedResponse = response.get<zsr::Introspectable>().value();
-    
-    // Use reflection to read the response's value member
-    auto responseValue = zsr::get(unpackedResponse, "value").get<int>().value();
+    auto response = myServiceClient.my_api(request);
     
     // Print the response
-    std::cout << "Got " << responseValue << std::endl;
+    std::cout << "Got " << response.getValue() << std::endl;
 }
 ```
-
-Unlike the Python client, the C++ OpenAPI client (`ZsrClient`) is passed directly to
-the endpoint method invocation, not to an intermediate zserio Client object.
 
 **Note:** While connecting, `HttpLibHttpClient` will also use ...
 1. [Persistent HTTP configuration](#persistent-http-headers-proxy-cookie-and-authentication).
 2. Additional HTTP query/header/cookie/proxy/basic-auth configs passed
-   into the `ZsrClient` constructor using an instance of `httpcl::Config`.
+   into the `OAClient` constructor using an instance of `httpcl::Config`.
    You can include this class via `#include "httpcl/http-settings.hpp"`.
    The additional `Config` will only enrich, not overwrite the
    default persistent configuration. If you would like to prevent persistent
@@ -674,17 +666,14 @@ specifiers.
 
 ### URL Compound Parameter
 
-In this case, `x-zserio-request-part` points to a zserio compound struct.
-The OpenAPI schema options are the same as for arrays. All fields
-of the designated struct which have a scalar type are exposed
-as key-value pairs. We strongly discourage using this OpenAPI feature, and
-tool support is very limited.
+In this case, `x-zserio-request-part` points to a zserio compound struct
+instead of a field with a scalar value. **This is currently not supported.**
 
 #### Component Support
 
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
-| `x-zserio-request-part: <[parent.]*array_member>`  | ✔️ | ❌️ | ❌️ | ❌️ |
+| `x-zserio-request-part: <[parent.]*compound_member>`  | ❌️ | ❌️ | ❌️ | ❌️ |
 
 ### Server URL Base Path
 
@@ -734,7 +723,7 @@ Zswag currently understands the following authentication schemes:
 
 **Note**: If you don't want to pass your Basic-Auth/Bearer/Query/Cookie/Header
 credential through your [persistent config](#persistent-http-headers-proxy-cookie-and-authentication),
-you can pass a `httpcl::Config`/[`HTTPConfig`](#using-the-python-client) object to the `ZsrClient`/[`OAClient`](#using-the-python-client).
+you can pass a `httpcl::Config`/[`HTTPConfig`](#using-the-python-client) object to the `OAClient`/[`OAClient`](#using-the-python-client).
 constructor in C++/Python with the relevant detail.
 
 #### Component Support

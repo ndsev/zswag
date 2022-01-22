@@ -4,7 +4,7 @@
 #include <pybind11/functional.h>
 #include <fstream>
 
-#include "zswagcl/openapi-parser.hpp"
+#include "zswagcl/private/openapi-parser.hpp"
 #include "httpcl/http-settings.hpp"
 #include "py-openapi-client.h"
 #include "stx/format.h"

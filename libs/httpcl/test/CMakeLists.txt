@@ -7,7 +7,6 @@ add_executable(httpcl-test
 target_link_libraries(httpcl-test
   PUBLIC
     httpcl
-    zsr
     Catch2::Catch2)
 
 if (ZSWAG_ENABLE_TESTING)

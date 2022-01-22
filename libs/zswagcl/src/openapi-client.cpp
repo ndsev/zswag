@@ -1,4 +1,4 @@
-#include "openapi-client.hpp"
+#include "private/openapi-client.hpp"
 
 #include <cassert>
 #include <variant>

@@ -5,30 +5,23 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_library(zswagcl SHARED
   src/base64.hpp
-  include/zswagcl/openapi-client.hpp
-  include/zswagcl/openapi-config.hpp
-  include/zswagcl/openapi-parameter-helper.hpp
-  include/zswagcl/openapi-parser.hpp
-  include/zswagcl/zsr-client.hpp
+  include/zswagcl/private/openapi-client.hpp
+  include/zswagcl/private/openapi-config.hpp
+  include/zswagcl/private/openapi-parameter-helper.hpp
+  include/zswagcl/private/openapi-parser.hpp
+  include/zswagcl/oaclient.hpp
 
   src/base64.cpp
-  src/base64.hpp
   src/openapi-client.cpp
-  include/zswagcl/openapi-client.hpp
   src/openapi-config.cpp
-  include/zswagcl/openapi-config.hpp
   src/openapi-parameter-helper.cpp
-  include/zswagcl/openapi-parameter-helper.hpp
   src/openapi-parser.cpp
-  include/zswagcl/openapi-parser.hpp
-  src/zsr-client.cpp
-  include/zswagcl/zsr-client.hpp)
+  src/oaclient.cpp)
 
 target_link_libraries(zswagcl
   PUBLIC
     stx
     httpcl
-    zsr
     speedyj
     httplib::httplib
     yaml-cpp

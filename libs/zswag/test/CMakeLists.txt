@@ -1,31 +1,27 @@
 project(zswag-cpp-calc-test)
 
-add_zserio_module(${PROJECT_NAME}-zsr
+add_zserio_library(${PROJECT_NAME}-zserio
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}/calc"
   ENTRY calculator.zs
-  TOP_LEVEL_PKG calculator
-  SUBDIR_DEPTH 0)
+  WITH_REFLECTION)
 
 add_executable(${PROJECT_NAME} client.cpp)
 
 target_link_libraries(${PROJECT_NAME}
-  ${PROJECT_NAME}-zsr-reflection zswagcl stx zsr)
+  ${PROJECT_NAME}-zserio zswagcl stx)
 
 # The integration tests are flaky on macOS in Github CI,
 # and running them on macOS is not required. So we save
 # ourselves some build minutes and workflow headache.
 if (ZSWAG_ENABLE_TESTING AND NOT APPLE)
-  add_test(
-    NAME
-      zswag-server-integration
+  add_wheel_test(zswag-server-integration
     WORKING_DIRECTORY
       "${CMAKE_CURRENT_SOURCE_DIR}"
-    COMMAND
-      bash "test_integration.bash"
-        -w "${WHEEL_DEPLOY_DIRECTORY}"
-        -b "python -m zswag.test.calc server 127.0.0.1:16161"
-        -f "$<TARGET_FILE:${PROJECT_NAME}> http://127.0.0.1:16161/openapi.json"
-        -f "python -m zswag.test.calc client 127.0.0.1:16161")
+    COMMANDS
+      -f "pip install ${WHEEL_DEPLOY_DIRECTORY}/zswag-*.whl"
+      -b "python -m zswag.test.calc server 127.0.0.1:16161"
+      -f "$<TARGET_FILE:${PROJECT_NAME}> http://127.0.0.1:16161/openapi.json"
+      -f "python -m zswag.test.calc client 127.0.0.1:16161")
 
   add_test(
     NAME
