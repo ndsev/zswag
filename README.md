@@ -185,7 +185,7 @@ struct Response {
 };
 
 service MyService {
-  Response my_api(Request);
+  Response myApi(Request);
 };
 ```
 
@@ -440,8 +440,9 @@ int main (int argc, char* argv[])
     // Create the request object
     auto request = myapp_services::services::Request(2);
 
-    // Invoke the REST endpoint
-    auto response = myServiceClient.my_api(request);
+    // Invoke the REST endpoint. Mind that your method-
+    // name from the schema is appended with a "...Method" suffix.
+    auto response = myServiceClient.myApiMethod(request);
     
     // Print the response
     std::cout << "Got " << response.getValue() << std::endl;
@@ -457,6 +458,20 @@ int main (int argc, char* argv[])
    default persistent configuration. If you would like to prevent persistent
    config from being considered at all, set `HTTP_SETTINGS_FILE` to empty,
    e.g. via `setenv`.
+
+## Client Environment Settings
+
+Both the Python and C++ Clients can be configured using the following
+environment variables:
+
+| Variable Name | Details   |
+| ------------- | --------- |
+| `HTTP_SETTINGS_FILE` | Path to settings file for HTTP proxies and authentication, see [next section](#persistent-http-headers-proxy-cookie-and-authentication) |
+| `HTTP_LOG_LEVEL` | Verbosity level for console/log output. Set to `debug` for detailed output. |
+| `HTTP_LOG_FILE` | Logfile-path (including filename) to redirect console output. The log will rotate with three files (`HTTP_LOG_FILE`, `HTTP_LOG_FILE-1`, `HTTP_LOG_FILE-2`). |
+| `HTTP_LOG_FILE_MAXSIZE` | Maximum size of the logfile, in bytes. Defaults to 1GB. |
+| `HTTP_TIMEOUT` | Timeout for HTTP requests (connection+transfer) in seconds. Defaults to 60s. |
+| `HTTP_SSL_STRICT` | Set to any nonempty value for strict SSL certificate validation. |
 
 ## Persistent HTTP Headers, Proxy, Cookie and Authentication
 

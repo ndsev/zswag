@@ -10,6 +10,7 @@
 
 #include "http-settings.hpp"
 #include "uri.hpp"
+#include "log.hpp"
 
 namespace httpcl
 {
@@ -36,7 +37,9 @@ public:
         Error(Result result, std::string const& message)
             : std::runtime_error(message)
             , result(std::move(result))
-        {}
+        {
+            log().error(message);
+        }
     };
 
     virtual ~IHttpClient() = default;
@@ -60,6 +63,8 @@ public:
 class HttpLibHttpClient : public IHttpClient
 {
 public:
+    HttpLibHttpClient();
+
     Result get(const std::string& uri,
                const Config& config) override;
     Result post(const std::string& uri,
@@ -74,6 +79,9 @@ public:
     Result patch(const std::string& uri,
                  const OptionalBodyAndContentType& body,
                  const Config& config) override;
+private:
+    time_t timeoutSecs_ = 60.;
+    bool sslCertStrict_ = false;
 };
 
 class MockHttpClient : public IHttpClient

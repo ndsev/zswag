@@ -4,6 +4,9 @@
 #include <cstring>
 #include <cctype>
 
+#include "httpcl/log.hpp"
+#include "stx/format.h"
+
 namespace httpcl
 {
 
@@ -228,9 +231,8 @@ URIComponents URIComponents::fromStrRfc3986(std::string const& uri)
     if (!parsePath(c, &result.path)) error = "Error parsing path";
     if (*c == '?' && !parseQuery(++c, &result.query)) error = "Error parsing query";
 
-    if (!error.empty()){
-        error += " of URI '" + uri + "'";
-        throw URIError(std::move(error));
+    if (!error.empty()) {
+        throw logRuntimeError<URIError>(stx::format("[URIComponents::fromStrRfc3986] {} of URI '{}'", error, uri));
     }
 
     return result;
@@ -241,11 +243,13 @@ URIComponents URIComponents::fromStrPath(std::string const& pathAndQueryString) 
     const auto* c = pathAndQueryString.c_str();
 
     if (!parsePath(c, &result.path))
-        throw URIError("Error parsing path");
+        throw logRuntimeError<URIError>(
+            stx::format("[URIComponents::fromStrPath] Error parsing path from '{}'", pathAndQueryString));
 
     if (*c == '?')
         if (!parseQuery(++c, &result.query))
-            throw URIError("Error parsing query");
+            throw logRuntimeError<URIError>(
+                stx::format("[URIComponents::fromStrPath] Error parsing query from '{}'", pathAndQueryString));
 
     return result;
 }
@@ -303,10 +307,10 @@ std::string URIComponents::build() const
 std::string URIComponents::buildHost() const
 {
     if (scheme.empty())
-        throw URIError("Missing scheme");
+        throw logRuntimeError<URIError>("[URIComponents::buildHost] Missing scheme");
 
     if (host.empty())
-        throw URIError("Missing host");
+        throw logRuntimeError<URIError>("[URIComponents::buildHost] Missing host");
 
     return scheme + "://" +
            host +

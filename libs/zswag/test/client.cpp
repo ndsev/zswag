@@ -1,7 +1,6 @@
 #include "zswagcl/oaclient.hpp"
 #include "stx/format.h"
-
-#include <iostream>
+#include "spdlog/spdlog.h"
 
 #include "calculator/Calculator.h"
 
@@ -10,7 +9,7 @@ using namespace httpcl;
 
 int main (int argc, char* argv[]) {
     if(argc <= 1) {
-        std::cerr << "[cpp-test-client] ERROR: The first argument must be the OpenAPI spec URL." << std::endl;
+        spdlog::error("[cpp-test-client] ERROR: The first argument must be the OpenAPI spec URL.");
         exit(1);
     }
 
@@ -18,31 +17,31 @@ int main (int argc, char* argv[]) {
     auto testCounter = 0;
     auto failureCounter = 0;
 
-    std::cout << "[cpp-test-client] Starting integration tests with " << specUrl << "\n";
+    spdlog::info("[cpp-test-client] Starting integration tests with {}", specUrl);
 
     auto runTest = [&] (auto const& fn, auto expect, std::string const& aspect, std::function<void(httpcl::Config&)> const& authFun)
     {
         ++testCounter;
-        std::cout << stx::format("[cpp-test-client] Executing test #{}: {} ...", testCounter, aspect) << std::endl;
+        spdlog::info("[cpp-test-client] Executing test #{}: {} ...", testCounter, aspect);
         try
         {
-            std::cout << "[cpp-test-client]   → Instantiating client." << std::endl;
+            spdlog::info("[cpp-test-client]   => Instantiating client.");
             auto httpClient = std::make_unique<HttpLibHttpClient>();
             auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
             httpcl::Config authHttpConf;
             authFun(authHttpConf);
             auto oaClient = OAClient(openApiConfig, std::move(httpClient), authHttpConf);
-            std::cout << "[cpp-test-client]   → Running request." << std::endl;
+            spdlog::info("[cpp-test-client]   => Running request.");
             calculator::Calculator::Client calcClient(oaClient);
             auto response = fn(calcClient);
             if (response.getValue() == expect)
-                std::cout << "[cpp-test-client]   → Success." << std::endl;
+                spdlog::info("[cpp-test-client]   => Success.");
             else
                 throw std::runtime_error(stx::format("Expected {}, got {}!", expect, response.getValue()));
         }
         catch(std::exception const& e) {
             ++failureCounter;
-            std::cout << stx::format("[cpp-test-client]   → ERROR: {}", e.what()) << std::endl;
+            spdlog::error("[cpp-test-client]   => ERROR: {}", e.what());
         }
     };
 
@@ -127,8 +126,8 @@ int main (int argc, char* argv[]) {
     });
 
     if (failureCounter > 0) {
-        std::cout << stx::format("[cpp-test-client] Done, {} test(s) failed!", failureCounter);
+        spdlog::error("[cpp-test-client] Done, {} test(s) failed!", failureCounter);
         exit(1);
     }
-    std::cout << stx::format("[cpp-test-client] All tests succeeded.", failureCounter);
+    spdlog::info("[cpp-test-client] All tests succeeded.");
 }

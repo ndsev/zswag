@@ -1,12 +1,13 @@
 #include "http-settings.hpp"
+#include "log.hpp"
 
 #include <keychain/keychain.h>
 #include <yaml-cpp/yaml.h>
 
-#include <iostream>
 #include <cstdlib>
 #include <regex>
 #include <future>
+#include <spdlog/spdlog.h>
 
 using namespace httpcl;
 using namespace std::string_literals;
@@ -112,6 +113,7 @@ std::string secret::load(
         const std::string &service,
         const std::string &user)
 {
+    log().debug("Loading secret (service={}, user={}) ...", service, user);
     auto result = std::async(std::launch::async, [=]() {
         keychain::Error error;
         auto password = keychain::getPassword(
@@ -125,9 +127,12 @@ std::string secret::load(
         return password;
     });
 
-    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
+    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout) {
+        log().warn("  ... Keychain timed out.");
         return {};
+    }
 
+    log().debug("  ...OK.");
     return result.get();
 }
 
@@ -148,6 +153,8 @@ std::string secret::store(
                       ? "service password "s + randServiceId()
                       : service;
 
+    log().debug("Storing secret (service={}, user={}) ...", newService, user);
+
     auto result = std::async(std::launch::async, [=]() {
         keychain::Error error;
         keychain::setPassword(KEYCHAIN_PACKAGE,
@@ -160,9 +167,12 @@ std::string secret::store(
             throw std::runtime_error(error.message);
     });
 
-    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
+    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout) {
+        log().warn("  ... Keychain timed out!");
         return {};
+    }
 
+    log().debug("  ...OK.");
     return newService;
 }
 
@@ -170,6 +180,8 @@ bool secret::remove(
         const std::string &service,
         const std::string &user)
 {
+    log().debug("Deleting secret (service={}, user={}) ...", service, user);
+
     auto result = std::async(std::launch::async, [=]() {
         keychain::Error error;
         keychain::deletePassword(KEYCHAIN_PACKAGE,
@@ -180,9 +192,12 @@ bool secret::remove(
         return error;
     });
 
-    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout)
+    if (result.wait_for(KEYCHAIN_TIMEOUT) == std::future_status::timeout) {
+        log().warn("  ... Keychain timeout!");
         return false;
+    }
 
+    log().debug("  ...OK.");
     return result.get();
 }
 
@@ -196,10 +211,13 @@ void Settings::load()
     settings.clear();
 
     auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
-    if (!cookieJar || strcmp(cookieJar, "") == 0)
+    if (!cookieJar || strcmp(cookieJar, "") == 0) {
+        log().debug("HTTP_SETTINGS_FILE environment variable is empty.");
         return;
+    }
 
     try {
+        log().debug("Loading HTTP settings from '{}'...", cookieJar);
         auto node = YAML::LoadFile(cookieJar);
         uint32_t idx = 0;
 
@@ -239,19 +257,22 @@ void Settings::load()
             settings[urlPattern] = std::move(conf);
             ++idx;
         }
-    } catch (const YAML::BadFile&) {
-        /* Ignore: Could not read file. */
+
+        log().debug("  ...Done.");
+    } catch (const YAML::BadFile& e) {
+        log().error("Failed to parse HTTP settings at '{}': {}", cookieJar, e.what());
     } catch (const std::exception& e) {
-        std::cerr << "Failed to read http-settings from '"
-                  << cookieJar << "': " << e.what() << std::endl;
+        log().error("Failed to read http-settings from '{}': {}", cookieJar, e.what());
     }
 }
 
 void Settings::store()
 {
     auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
-    if (!cookieJar)
+    if (!cookieJar) {
+        log().warn("HTTP_SETTINGS_FILE is not set, cannot save HTTP settings.");
         return;
+    }
 
     try {
         auto node = YAML::Node();
@@ -285,11 +306,12 @@ void Settings::store()
             node.push_back(settingsNode);
         }
 
+        log().debug("Saving HTTP settings to '{}'...", cookieJar);
         std::ofstream os(cookieJar);
         os << node;
+        log().debug("  ...Done.", cookieJar);
     } catch (const std::exception& e) {
-        std::cerr << "Failed to write http-settings to '"
-                  << cookieJar << "': " << e.what() << "\n";
+        log().error("Failed to write http-settings to '{}': {}", cookieJar, e.what());
     }
 }
 

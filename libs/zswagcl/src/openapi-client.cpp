@@ -2,8 +2,11 @@
 
 #include <cassert>
 #include <variant>
+#include <future>
 
 #include "stx/format.h"
+#include "spdlog/spdlog.h"
+#include "httpcl/log.hpp"
 
 namespace zswagcl
 {
@@ -119,6 +122,7 @@ OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
     , client_(std::move(client))
     , httpConfig_(httpConfig)
 {
+    httpcl::log().debug("Instantiating OpenApiClient for node at '{}'", config_.uri.build());
     assert(client_);
 }
 
@@ -132,31 +136,43 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
 {
     auto methodIter = config_.methodPath.find(methodIdent);
     if (methodIter == config_.methodPath.end())
-        throw std::runtime_error(stx::format("The method '{}' is not part of the used OpenAPI specification", methodIdent));
+        throw httpcl::logRuntimeError(stx::format("The method '{}' is not part of the used OpenAPI specification", methodIdent));
 
     const auto& method = methodIter->second;
 
     httpcl::URIComponents uri(config_.uri);
     uri.appendPath(resolvePath(method, paramCb));
+    std::string builtUri = uri.build();
+    std::string debugContext = stx::format("[{} {}]", method.httpMethod, uri.buildPath());
+    httpcl::log().debug("{} Calling endpoint {} ...", debugContext, builtUri);
 
-    auto httpConfig = settings_[uri.build()];
+    auto httpConfig = settings_[builtUri];
     httpConfig |= httpConfig_;
+    httpcl::log().debug("{} Resolving query/path parameters ...", debugContext);
     resolveHeaderAndQueryParameters(httpConfig, method, paramCb);
 
     // Check whether the given config fulfills the required security schemes.
     // Throws if the http config does not fulfill any allowed scheme.
-    if (method.security)
+    if (method.security) {
+        httpcl::log().debug("{} Checking required security schemes for method ...", debugContext);
         checkSecurityAlternativesAndApplyApiKey(*method.security, httpConfig);
-    else
+    }
+    else {
+        httpcl::log().debug("{} Checking default security scheme ...", debugContext);
         checkSecurityAlternativesAndApplyApiKey(config_.defaultSecurityScheme, httpConfig);
+    }
 
     const auto& httpMethod = method.httpMethod;
-    auto result = ([&]() {
+    std::future<httpcl::IHttpClient::Result> resultFuture = ([&]() {
         if (httpMethod == "GET") {
-            return client_->get(uri.build(), httpConfig);
+            httpcl::log().debug("{} Executing request ...", debugContext);
+            return std::async(std::launch::async, [builtUri, httpConfig, this]{
+                return client_->get(builtUri, httpConfig);
+            });
         } else {
             httpcl::OptionalBodyAndContentType body;
             if (method.bodyRequestObject) {
+                httpcl::log().debug("{} Fetching body request body ...", debugContext);
                 body = httpcl::BodyAndContentType{
                     "", ZSERIO_OBJECT_CONTENT_TYPE
                 };
@@ -169,31 +185,44 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
                 body->body = paramCb("", ZSERIO_REQUEST_PART_WHOLE, bodyHelper).bodyStr();
             }
 
+            httpcl::log().debug("{} Executing request ...", debugContext);
             if (httpMethod == "POST")
-                return client_->post(uri.build(), body, httpConfig);
+                return std::async(std::launch::async, [builtUri, body, httpConfig, this]{
+                    return client_->post(builtUri, body, httpConfig);
+                });
             if (httpMethod == "PUT")
-                return client_->put(uri.build(), body, httpConfig);
+                return std::async(std::launch::async, [builtUri, body, httpConfig, this]{
+                    return client_->put(builtUri, body, httpConfig);
+                });
             if (httpMethod == "PATCH")
-                return client_->patch(uri.build(), body, httpConfig);
+                return std::async(std::launch::async, [builtUri, body, httpConfig, this]{
+                    return client_->patch(builtUri, body, httpConfig);
+                });
             if (httpMethod == "DELETE")
-                return client_->del(uri.build(), body, httpConfig);
+                return std::async(std::launch::async, [builtUri, body, httpConfig, this]{
+                    return client_->del(builtUri, body, httpConfig);
+                });
 
-            throw std::runtime_error(stx::format(
-                "Unsupported HTTP method '{}' (uri: {})",
-                httpMethod,
-                uri.build()));
+            throw httpcl::logRuntimeError(stx::format(
+                "{} Unsupported HTTP method!", debugContext));
         }
     }());
+
+    // Wait for resultFuture
+    while (resultFuture.wait_for(std::chrono::seconds{1}) != std::future_status::ready)
+        httpcl::log().debug("{} Waiting for response ...", debugContext);
+    auto result = resultFuture.get();
+    httpcl::log().debug("{} Response received (code {}, content length {} bytes).", debugContext, result.status, result.content.size());
 
     if (result.status >= 200 && result.status < 300) {
         return std::move(result.content);
     }
 
-    throw httpcl::IHttpClient::Error(result, stx::format(
-        "HTTP status code {} (method: {}, path: {}, uri: {})",
-        result.status,
-        httpMethod,
-        uri.buildPath(),
-        uri.build()));
+    // Throw due to bad response code
+    std::string errorStr = stx::format(
+        "{} Got HTTP status: {}",
+        debugContext,
+        result.status);
+    throw httpcl::IHttpClient::Error(result, errorStr);
 }
 }

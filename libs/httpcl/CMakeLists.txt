@@ -7,9 +7,11 @@ add_library(httpcl STATIC
   include/httpcl/http-client.hpp
   include/httpcl/http-settings.hpp
   include/httpcl/uri.hpp
+  include/httpcl/log.hpp
   src/http-client.cpp
   src/http-settings.cpp
-  src/uri.cpp)
+  src/uri.cpp
+  src/log.cpp)
 
 target_compile_features(httpcl
   INTERFACE
@@ -19,6 +21,7 @@ target_link_libraries(httpcl
   PRIVATE
     stx
   PUBLIC
+    spdlog
     keychain
     httplib::httplib
     yaml-cpp
