@@ -100,7 +100,7 @@ def cached_type_info(zserio_t) -> Optional[TypeInfo]:
 # names. The first output tuple entry is the pythonic conversion
 # ("my_field_1.my_field_2").
 def find_field(t: TypeInfo, field: str, offset: int = 0, py_path="") -> Tuple[str, Optional[MemberInfo]]:
-    next_dot = field.index(".", offset)
+    next_dot = field.find(".", offset)
     subfield = field[offset:next_dot] if next_dot >= 0 else field[offset:]
     for _, member_info in members(t):
         if member_info.schema_name == subfield:
@@ -109,7 +109,7 @@ def find_field(t: TypeInfo, field: str, offset: int = 0, py_path="") -> Tuple[st
             py_path += member_info.attributes[MemberAttribute.PROPERTY_NAME]
             if next_dot < 0:
                 return py_path, member_info
-            return find_field(t, field, next_dot+1, py_path)
+            return find_field(member_info.type_info, field, next_dot+1, py_path)
     return "", None
 
 
@@ -128,11 +128,12 @@ def members(t: TypeInfo, recursive=False, field_prefix="") -> Iterator[MemberInf
 # It (or a subtype) might take extra parameters, or be
 # an array of non-scalar types.
 def check_uninstantiable(t: TypeInfo, field_name="", recursive=False) -> Optional[NotInstantiableReason]:
-    if t.attributes[TypeAttribute.PARAMETERS]:
+    if TypeAttribute.PARAMETERS in t.attributes and t.attributes[TypeAttribute.PARAMETERS]:
         return NotInstantiableReason(field_name, t.schema_name)
+    member_info: MemberInfo
     for _, member_info in members(t):
         subfield_name = f"{field_name}.{member_info.schema_name}" if field_name else member_info.schema_name
-        if MemberAttribute.ARRAY_LENGTH in member_info.attributes:
+        if MemberAttribute.ARRAY_LENGTH in member_info.attributes and member_info.type_info.py_type not in SCALAR_T:
             return NotInstantiableReason(subfield_name, t.schema_name+"[]")
         if recursive:
             if reason := check_uninstantiable(member_info.type_info, subfield_name, recursive):
@@ -150,8 +151,9 @@ def instantiate(t: Type) -> Any:
         field_name: str = member_info.attributes[MemberAttribute.PROPERTY_NAME]
         member_type_info = member_info.type_info
         if hasattr(member_type_info.py_type, "type_info"):
-            compound_field_value = instantiate(member_type_info.py_type)
-            setattr(result_instance, f"_{field_name}_", compound_field_value)
+            if not issubclass(member_type_info.py_type, Enum):
+                compound_field_value = instantiate(member_type_info.py_type)
+                setattr(result_instance, f"_{field_name}_", compound_field_value)
     return result_instance
 
 
@@ -225,6 +227,8 @@ def request_object_blob(*, req_t: Type, headers: Dict[str, Any], spec: OAMethod,
             req = instantiate(req_t)
         # Convert string value to correct type
         pythonic_field_path, target_type = find_field(req_t_info, param.field)
+        if not target_type:
+            raise RuntimeError(f"Could not find field {param.field}!")
         if MemberAttribute.ARRAY_LENGTH in target_type.attributes:
             converted_value = parse_param_values(param, target_type.type_info.py_type, value)
         else:
