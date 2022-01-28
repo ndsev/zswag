@@ -96,15 +96,21 @@ class OpenApiSchemaGenerator:
                  path: str,
                  package: Optional[str] = None,
                  config: Optional[List[str]] = None,
-                 output: IO):
+                 output: IO,
+                 base_config: Optional[IO]):
+
+        # Process service name and package path
         self.service_name = service
         self.zs_pkg_path = None
         service_name_parts = service.split(".") + ["Service"]
         python_module = None
         if os.path.isdir(path):
+            # Generate OpenAPI from existing Python code
             sys.path.append(path)
             python_module = importlib.import_module(f"{service_name_parts[0]}.api")
         elif os.path.isfile(path):
+            # Generate OpenAPI from zserio code. Must generate
+            # intermediate Python source to inspect service.
             self.zs_pkg_path = os.path.abspath(os.path.dirname(path))
             try:
                 python_module = zserio.generate(
@@ -113,56 +119,104 @@ class OpenApiSchemaGenerator:
                     top_level_package=package,
                     gen_dir=tempfile.mkdtemp("zswag.gen"))
             except CalledProcessError as e:
-                print(f"Failed to parse zserio sources:\n{e.stderr}")
-                exit(1)
+                raise OpenApiGenError(f"Failed to parse zserio sources:\n{e.stderr}")
         if not python_module:
-            print(f"ERROR: Could not import {service_name_parts[0]}.api!")
-            exit(1)
+            raise OpenApiGenError(f"Could not import {service_name_parts[0]}.api!")
         self.service_type = rgetattr(python_module, ".".join(service_name_parts[1:]))
         self.service_instance = self.service_type()
-        self.config: Dict[str, Tuple[str, Optional[OAParamLocation], bool]] = dict()
-        self.config["*"] = default_entry = ("post", None, False)
+
+        # Process method config tags ...
+        self.config: Dict[str, MethodConfig] = dict()
+        self.config[WILDCARD_CONFIG] = default_entry = MethodConfig(WILDCARD_CONFIG)
         self.output = output
+        self.base_config = dict()
+        # ... first load base-config.
+        if base_config:
+            self.base_config = yaml.load(base_config, yaml.Loader)
+        if methods_base_config := self.base_config.get("methods", None):
+            # If there are wildcard base-config tags, process them first.
+            if default_config_tags := methods_base_config.get(WILDCARD_CONFIG, None):
+                default_entry = self.add_method_config_from_tags(WILDCARD_CONFIG, default_config_tags, default_entry)
+            # Then process tags for other methods from the base-config.
+            for method_name, tags in ((m, t) for m, t in methods_base_config if m != WILDCARD_CONFIG):
+                self.add_method_config_from_tags(method_name, tags, default_entry)
+        # ... then process additional tags from the command line.
         if config:
             for entry in config:
-                entry_http_method, entry_param_loc, entry_flatten = default_entry
-                method_name = "*"
+                method_name = WILDCARD_CONFIG
                 parts = entry.split(":")
                 if len(parts) > 1:
                     method_name = parts[0]
-                tag_list = [tag.strip() for tag in parts[-1].lower().split(",")]
-                for tag in tag_list:
-                    if tag in HTTP_METHOD_TAGS:
-                        entry_http_method = tag
-                    elif tag == PARAM_LOCATION_PATH_TAG:
-                        entry_param_loc = OAParamLocation.PATH
-                    elif tag == PARAM_LOCATION_QUERY_TAG:
-                        entry_param_loc = OAParamLocation.QUERY
-                    elif tag == PARAM_LOCATION_BODY_TAG:
-                        entry_param_loc = None
-                        if entry_http_method == "get":
-                            print(f"WARNING: Changing HTTP method from get to post due to `body` tag.")
-                            entry_http_method = "post"
-                    elif tag == FLATTEN_TAG:
-                        entry_flatten = True
-                    elif tag == BLOB_TAG:
-                        entry_flatten = False
-                entry = (entry_http_method, entry_param_loc, entry_flatten)
-                if method_name == "*":
-                    default_entry = entry
-                self.config[method_name] = entry
+                tag_list = [tag.strip() for tag in parts[-1].split(",")]
+                default_entry = self.add_method_config_from_tags(method_name, tag_list, default_entry)
 
-    def config_for_method(self, method_name: str) -> Tuple[str, OAParamLocation, bool]:
+    def add_method_config_from_tags(
+            self,
+            method_name: str,
+            tag_list: List[str],
+            default_entry: MethodConfig) -> MethodConfig:
+        new_config = deepcopy(default_entry)
+        new_config.name = method_name
+        # Make sure that HTTP method tags are always processed first!
+        tag_list.sort(key=lambda x: x in HTTP_METHOD_TAGS, reverse=True)
+        for tag in tag_list:
+            if tag in HTTP_METHOD_TAGS:
+                new_config.http_method = tag
+            elif any(tag == loc.value for loc in HttpParamLocation):
+                new_config.param_loc = HttpParamLocation(tag)
+                if new_config.param_loc == HttpParamLocation.BODY and new_config.http_method == "get":
+                    raise OpenApiGenError(f"Cannot use `body` tag with HTTP GET.")
+            elif tag == FLATTEN_TAG:
+                new_config.flatten = True
+            elif tag == BLOB_TAG:
+                new_config.flatten = False
+            elif tag.startswith(SECURITY_ASSIGNMENT_TAG):
+                new_config.security = tag[len(SECURITY_ASSIGNMENT_TAG):]
+            elif tag.startswith(PATH_ASSIGNMENT_TAG):
+                if method_name == WILDCARD_CONFIG:
+                    raise OpenApiGenError(f"Refusing to apply '{tag}' to ALL methods. Likely not on purpose.")
+                else:
+                    new_config.path = tag[len(PATH_ASSIGNMENT_TAG):]
+            elif "?" in tag:
+                try:
+                    request_part, specifiers_part = tag.split("?")
+                    spec = dict(specifier.split("=") for specifier in specifiers_part.split("&"))
+                    par_loc = HttpParamLocation(spec.get("location"))
+                    if par_loc == HttpParamLocation.BODY:
+                        if new_config.http_method == "get":
+                            raise OpenApiGenError("Cannot use `location=body` with HTTP GET.")
+                        print(f"WARNING: In tag '{tag}': The name and format specifiers will be ignored.")
+                        par_format = OAParamFormat.BINARY
+                        par_name = "body"
+                    else:
+                        par_name, par_format = spec.get("name"), OAParamFormat(spec.get("format"))
+                    if any(par.name == par_name for par in new_config.param_specifiers):
+                        raise OpenApiGenError(f"Encountered duplicate use of parameter name '{par_name}' in the same method!")
+                    new_config.param_specifiers.append(ParamSpecifier(request_part, par_name, par_loc, par_format))
+                except (ValueError, IndexError) as e:
+                    raise OpenApiGenError(f"Encountered malformed parameter specifier tag '{tag}' ({e})!")
+                except KeyError as missing_key:
+                    raise OpenApiGenError(f"Parameter specifier tag {tag} has no value for '{missing_key}' key.")
+            else:
+                raise OpenApiGenError(f"Did not understand tag '{tag}'.")
+        if method_name in self.config and method_name != WILDCARD_CONFIG:
+            print(f"WARNING: Overwriting config for method {method_name}!")
+        self.config[method_name] = new_config
+        if method_name == WILDCARD_CONFIG:
+            default_entry = new_config
+        return default_entry
+
+    def config_for_method(self, method_name: str) -> MethodConfig:
         if method_name in self.config:
             return self.config[method_name]
         else:
-            return self.config["*"]
+            return self.config[WILDCARD_CONFIG]
 
     def generate(self):
         service_name_parts = self.service_instance.service_full_name.split(".")
         schema = {
             "openapi": "3.0.0",
-            "info": {
+            "info": self.base_config.get("info", {
                 "title": ".".join(service_name_parts[1:]),
                 "description": md_filter_definition(get_doc_str(
                     ident_type=IdentType.SERVICE,
