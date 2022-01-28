@@ -231,18 +231,18 @@ class OpenApiSchemaGenerator:
                     "name": "TODO"
                 },
                 "version": "TODO",
-            },
-            "servers": [],
+            }),
+            "servers": self.base_config.get("servers", []),
             "paths": {
                 method_info.path: {
                     method_info.http_method: {
-                        "summary": method_info.docstring,
-                        "description": method_info.docstring,
+                        "summary": method_info.openapi_docstring,
+                        "description": method_info.openapi_docstring,
                         "operationId": method_info.name,
-                        **method_info.parameters,
+                        **method_info.openapi_parameters,
                         "responses": {
                             "200": {
-                                "description": method_info.returndoc,
+                                "description": method_info.openapi_result_doc,
                                 "content": {
                                     ZSERIO_OBJECT_CONTENT_TYPE: {
                                         "schema": {
@@ -255,15 +255,22 @@ class OpenApiSchemaGenerator:
                         }
                     },
                 } for method_info in (
-                    self.generate_method_info(method_name)
+                    self.process_method_config(method_name)
                     for method_name in self.service_instance.method_names)
+            },
+            "components": {
+                "securitySchemes": self.base_config.get("securitySchemes", {}),
             }
         }
         yaml.dump(schema, self.output, default_flow_style=False)
 
-    def generate_method_info(self, method_name: str) -> MethodSchemaInfo:
-        result = MethodSchemaInfo(name=method_name)
-
+    def process_method_config(self, method_name: str) -> MethodConfig:
+        result = self.config_for_method(method_name)
+        req_t = service_method_request_type(self.service_instance, result.name)
+        req_t_info = cached_type_info(req_t)
+        if not result.path:
+            print(f"INFO: Auto-generating path for {method_name}")
+            result.path = f"/{method_name}"
         # Generate doc-strings
         if self.zs_pkg_path:
             doc_strings = get_doc_str(
@@ -271,26 +278,52 @@ class OpenApiSchemaGenerator:
                 pkg_path=self.zs_pkg_path,
                 ident=f"{self.service_instance.service_full_name}.{method_name}")
             if doc_strings:
-                result.docstring = doc_strings[0]
-                result.returntype = doc_strings[1]
-                result.argtype = doc_strings[2]
-                result.returndoc = md_filter_definition(get_doc_str(
+                result.openapi_docstring = doc_strings[0]
+                result.openapi_return_type = doc_strings[1]
+                result.openapi_arg_type = doc_strings[2]
+                result.openapi_result_doc = md_filter_definition(get_doc_str(
                     ident_type=IdentType.STRUCT,
                     pkg_path=self.zs_pkg_path,
-                    ident=result.returntype,
-                    fallback=[f"### struct {result.returntype}"])[0])
-                result.argdoc = md_filter_definition(get_doc_str(
+                    ident=result.openapi_return_type,
+                    fallback=[f"### struct {result.openapi_return_type}"])[0])
+                result.openapi_arg_doc = md_filter_definition(get_doc_str(
                     ident_type=IdentType.STRUCT,
                     pkg_path=self.zs_pkg_path,
-                    ident=result.argtype,
-                    fallback=[f"### struct {result.argtype}"])[0])
+                    ident=result.openapi_arg_type,
+                    fallback=[f"### struct {result.openapi_arg_type}"])[0])
+        # Convert simple legacy instructions into parameter specifiers
+        if not result.param_specifiers:
+            if result.param_loc == HttpParamLocation.BODY:
+                result.param_specifiers.append(
+                    ParamSpecifier(ZSERIO_REQUEST_PART_WHOLE, "", HttpParamLocation.BODY, OAParamFormat.BINARY))
+            elif result.flatten:
+                if not_instantiable_reason := check_uninstantiable(req_t_info):
+                    raise OpenApiGenError(str(not_instantiable_reason))
+                for field_name, member_info in zs_type_fields(req_t_info, True):
+                    result.param_specifiers.append(
+                        ParamSpecifier(
+                            field_name, field_name.replace(".", "__"),
+                            result.param_loc or HttpParamLocation.QUERY,
+                            OAParamFormat.STRING))
+            elif result.param_loc:
+                result.param_specifiers.append(
+                    ParamSpecifier(
+                        ZSERIO_REQUEST_PART_WHOLE, "requestBody", result.param_loc, OAParamFormat.BINARY))
+        # Convert MethodConfig.param_specifiers to MethodConfig.openapi_parameters
+        self.process_method_parameters(result)
+        return result
 
-        # Generate parameter passing scheme
-        result.http_method, param_loc, flatten = self.config_for_method(method_name)
-        if param_loc is None and result.http_method.lower() != "get":
-            result.parameters = {
-                "requestBody": {
-                    "description": result.argdoc,
+    def process_method_parameters(self, config: MethodConfig):
+        req_t = service_method_request_type(self.service_instance, config.name)
+        req_t_info = cached_type_info(req_t)
+        # Convert parameter specifiers to parameters-JSON
+        openapi_param_list = []
+        for param_specifier in config.param_specifiers:
+            # Easy - parameter only indicates binary transfer of the
+            # request object in the body
+            if param_specifier.location == HttpParamLocation.BODY:
+                config.openapi_parameters["requestBody"] = {
+                    "description": config.openapi_arg_doc,
                     "content": {
                         ZSERIO_OBJECT_CONTENT_TYPE: {
                             "schema": {
@@ -299,81 +332,44 @@ class OpenApiSchemaGenerator:
                         }
                     }
                 }
+                continue
+            # Fallthrough - the parameter has a name, a format and a request part
+            # Process type-info first and determine if the field even exists.
+            openapi_type_info = {
+                "type": "string",
+                "format": param_specifier.format.value,
             }
-            return result
-
-        if flatten:
-            if self.generate_method_info_parameters_flat(result, param_loc):
-                return result
-
-        param_loc_str = "query"
-        if param_loc is OAParamLocation.PATH:
-            param_loc_str = "path"
-            result.path += "/{requestData}"
-        result.parameters = {
-            "parameters": [{
-                "in": param_loc_str,
-                "name": "requestData",
-                "description": result.argdoc,
+            if param_specifier.request_part != ZSERIO_REQUEST_PART_WHOLE:
+                _, member_info = find_field(req_t_info, param_specifier.request_part)
+                if not member_info:
+                    raise OpenApiGenError(f"Could not find field '{param_specifier.request_part}' in {req_t_info.schema_name}!")
+                # If the member is an array, we must indicate this in OpenAPI
+                if MemberAttribute.ARRAY_LENGTH in member_info.attributes:
+                    openapi_type_info.update({
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    })
+            # If the parameter is to be placed in the path, make sure there's a placeholder
+            if param_specifier.location == HttpParamLocation.PATH:
+                placeholder = f"{{{param_specifier.name}}}"
+                if placeholder not in config.path:
+                    print(f"INFO: Appending /{placeholder} to path for {config.name}")
+                    config.path += f"/{placeholder}"
+            # Append the OpenAPI information for the new parameter
+            openapi_param_list.append({
+                "in": param_specifier.location.value.lower(),
+                "name": param_specifier.name,
+                "description": config.openapi_arg_doc,
                 "required": True,
-                ZSERIO_REQUEST_PART: ZSERIO_REQUEST_PART_WHOLE,
-                "schema": {
-                    "type": "string",
-                    "format": "byte"
-                }
-            }]
-        }
-        return result
+                ZSERIO_REQUEST_PART: param_specifier.request_part,
+                **({"allowEmptyValue": True} if param_specifier.location == HttpParamLocation.QUERY else {}),
+                **openapi_type_info
+            })
 
-    def generate_method_info_parameters_flat(self,
-                                             result: MethodSchemaInfo,
-                                             param_loc: Optional[OAParamLocation]) -> bool:
-        try:
-            _, field_type_info = make_instance_and_typeinfo(
-                service_method_request_type(
-                    self.service_instance, result.name))
-        except UnsupportedParameterError as e:
-            print(UnsupportedParameterError(e.member_name, e.member_type, result.name))
-            return False
-
-        param_loc_str = "query"
-        if param_loc is OAParamLocation.PATH:
-            param_loc_str = "path"
-            for field_name in field_type_info:
-                result.path += f"/{{{field_name.replace('.', '__')}}}"
-        result.parameters = {
-            "parameters": [
-                {
-                    "in": param_loc_str,
-                    "name": field_name.replace('.', '__'),
-                    "description": f"Member of {result.argtype}.",
-                    "required": True,
-                    **(
-                        {"allowEmptyValue": True} if param_loc is OAParamLocation.QUERY else {}
-                    ),
-                    ZSERIO_REQUEST_PART: field_name,
-                    "schema": {
-                        "format": "string",
-                        **(
-                            {
-                                "type": "array",
-                                "format": "string",
-                                "items": {
-                                    "type": "string"
-                                }
-                            }
-                            if type(field_type) is list else
-                            {
-                                "type": "string",
-                                "format": "string",
-                            }
-                        )
-                    }
-                }
-                for field_name, field_type in field_type_info.items()
-            ]
-        }
-        return True
+        # Set the finalized parameter list
+        config.openapi_parameters["parameters"] = openapi_param_list
 
 
 if __name__ == "__main__":
