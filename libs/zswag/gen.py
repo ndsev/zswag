@@ -8,28 +8,42 @@ import importlib
 from typing import Optional, Dict, Tuple, List, IO
 from argparse import ArgumentParser, FileType, RawTextHelpFormatter
 from subprocess import CalledProcessError
+import dataclasses as dc
+from copy import deepcopy
+from enum import Enum
+from zserio.typeinfo import MemberAttribute
 
 import zserio
 from pyzswagcl import \
     OAParamLocation, \
+    OAParamFormat, \
     ZSERIO_OBJECT_CONTENT_TYPE, \
     ZSERIO_REQUEST_PART_WHOLE, \
     ZSERIO_REQUEST_PART
 
 from .reflect import \
-    make_instance_and_typeinfo, \
     service_method_request_type, \
     rgetattr, \
-    UnsupportedParameterError
+    check_uninstantiable, \
+    cached_type_info, \
+    members as zs_type_fields, \
+    find_field
 from .doc import get_doc_str, IdentType, md_filter_definition
 
+
+class HttpParamLocation(Enum):
+    QUERY = "query"
+    BODY = "body"
+    PATH = "path"
+    HEADER = "header"
+
+
 HTTP_METHOD_TAGS = ("get", "put", "post", "delete")
-PARAM_LOCATION_QUERY_TAG = "query"
-PARAM_LOCATION_BODY_TAG = "body"
-PARAM_LOCATION_PATH_TAG = "path"
-PARAM_LOCATION_TAGS = (PARAM_LOCATION_QUERY_TAG, PARAM_LOCATION_PATH_TAG, PARAM_LOCATION_BODY_TAG)
 FLATTEN_TAG = "flat"
 BLOB_TAG = "blob"
+SECURITY_ASSIGNMENT_TAG = "security="
+PATH_ASSIGNMENT_TAG = "path="
+WILDCARD_CONFIG = "*"
 
 
 def argdoc(s: str):
@@ -40,20 +54,39 @@ def less_indent_formatter(prog):
     return RawTextHelpFormatter(prog, max_help_position=8, width=80)
 
 
-class MethodSchemaInfo:
-    """
-    (Private) Return value of Server._method_info()
-    """
-    def __init__(self, *, name):
-        self.name = name
-        self.docstring = ""
-        self.returntype = ""
-        self.argtype = "Unknown"
-        self.returndoc = ""
-        self.argdoc = ""
-        self.path = f"/{name}"
-        self.parameters = dict()
-        self.http_method = "post"
+@dc.dataclass
+class ParamSpecifier:
+    """"Can be used to annotate a method config with a desired
+    location, format and parameter name for a request-part field."""
+    request_part: str            # e.g. "request_member.subfield"
+    name: Optional[str]          # e.g. "subfieldParam"
+    location: HttpParamLocation  # e.g. QUERY
+    format: OAParamFormat        # e.g. BASE64
+
+
+@dc.dataclass
+class MethodConfig:
+    """User-specified set of parameters to control how a zserio service method
+    is converted into an OpenAPI-file entry."""
+    name: str
+    http_method: str = "post"
+    param_loc: Optional[HttpParamLocation] = None  # None -> Whole request blob in body
+    flatten: bool = False
+    param_specifiers: Optional[List[ParamSpecifier]] = None
+    security: Optional[str] = None
+    path: Optional[str] = None
+    openapi_docstring: str = ""
+    openapi_return_type: str = ""
+    openapi_arg_type: str = "Unknown"
+    openapi_result_doc: str = ""
+    openapi_arg_doc: str = ""
+    openapi_parameters: dict = dc.field(default_factory=dict)
+
+
+class OpenApiGenError(RuntimeError):
+    """Raised by OpenApiSchemaGenerator when something goes wrong."""
+    def __init__(self, what: str):
+        super(OpenApiGenError, self).__init__(what)
 
 
 class OpenApiSchemaGenerator:
