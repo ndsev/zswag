@@ -407,34 +407,86 @@ if __name__ == "__main__":
                         Configuration tags for a specific or all methods.
                         The argument syntax follows this pattern:
                             
-                            [(service-method-name):](comma-separated-tags)
+                           [(service-method-name):](comma-separated-tags)
                             
                         Note: The -c argument may be applied multiple times.
                         The `comma-separated-tags` must be a list of tags
-                        which indicate OpenApi method generator preferences:
+                        which indicate OpenApi method generator preferences.
+                        The following tags are supported:
                         
                         get|put|post|delete : HTTP method tags
-                            query|path|body : Parameter location tags
+                                query|path| : Parameter location tags
+                                header|body 
                                   flat|blob : Flatten request object,
                                               or pass it as whole blob.
-                                                    
+                          (param-specifier) : Specify parameter name, format
+                                              and location for a specific
+                                              request-part. See below.
+                            security=(name) : Set a particular security
+                                              scheme to be used. The scheme
+                                              details must be provided through
+                                              the --base-config-yaml.
+                         path=(method-path) : Set a particular method path.
+                                              May contain placeholders for
+                                              path params.
+                                                   
+                        A (param-specifier) tag has the following schema:
+                        
+                            (field?name=...&
+                                   location=[path|body|query|header]&
+                                   format=[binary|base64|hex])
+                        
+                        Examples:
+                        
+                          Expose all methods as POST, but `getLayerByTileId`
+                          as GET with flat path-parameters:
+                          
+                            `-c post getLayerByTileId:get,flat,path`
+                            
+                          For myMethod, put the whole request blob into the a
+                          query "data" parameter as base64:
+                          
+                            `-c myMethod:*?name=data&location=query&format=base64`
+                            
+                          For myMethod, set the "AwesomeAuth" auth scheme:
+                          
+                            `-c myMethod:security=AwesomeAuth`
+                            
+                          For myMethod, provide the path and place myField
+                          explicitely in a path placeholder:
+                          
+                            `-c 'myMethod:path=/my-method/{param},...
+                                 myField?name=param&location=path&format=string'`
+                            
                         Note:
-                            * The http method defaults to `post`.
+                            * The HTTP-method defaults to `post`.
                             * The parameter location defaults to `query` for
                               `get`, `body` otherwise.
+                            * If a method uses a parameter specifier, the
+                              `flat`, `body`, `query`, `path`, `header` and
+                              `body`-tags are ignored.
                             * The `flat` tag is only meaningful in conjunction
                               with `query` or `path`.
                             * An unspecific tag list (no service-method-name)
                               affects the defaults only for following, not
                               preceding specialized tag assignments.
-                              
-                        Example:
-                            -c post getLayerByTileId:get,flat,path
                         """))
     parser.add_argument("-o", "--output", nargs=1, type=FileType("w"), default=[sys.stdout],
                         metavar="output", help=argdoc("""
                         Output file path. If not specified, the output will be
                         written to stdout.
+                        """))
+    parser.add_argument("-b", "--base-config-yaml", nargs=1, type=FileType("w"), required=False,
+                        metavar="base_config", help=argdoc("""
+                        Base configuration file. Can be used to fully or partially
+                        substitute --config arguments, and to provide additional
+                        OpenAPI information. The YAML file must look like this:
+                        
+                          method: # Optional method tags dictionary
+                            <method-name|*>: <list of config tags>
+                          securitySchemes: ... # Optional OpenAPI securitySchemes
+                          info: ...            # Optional OpenAPI info section
+                          servers: ...         # Optional OpenAPI servers section
                         """))
 
     args = parser.parse_args(sys.argv[1:])
@@ -443,4 +495,5 @@ if __name__ == "__main__":
         path=args.input[0] if args.input else None,
         package=args.package[0] if args.package else None,
         config=[arg for args in args.config for arg in args] if args.config else [],
-        output=args.output[0]).generate()
+        output=args.output[0],
+        base_config=args.base_config[0] if args.base_config else None).generate()
