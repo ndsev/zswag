@@ -534,8 +534,8 @@ if __name__ == "__main__":
                         Output file path. If not specified, the output will be
                         written to stdout.
                         """))
-    parser.add_argument("-b", "--base-config-yaml", nargs=1, type=FileType("w"), required=False,
-                        metavar="base_config", help=argdoc("""
+    parser.add_argument("-b", "--base-config-yaml", nargs=1, type=FileType("r"), required=False, default=[None],
+                        help=argdoc("""
                         Base configuration file. Can be used to fully or partially
                         substitute --config arguments, and to provide additional
                         OpenAPI information. The YAML file must look like this:
