@@ -127,11 +127,13 @@ class OpenApiSchemaGenerator:
             # intermediate Python source to inspect service.
             self.zs_pkg_path = os.path.abspath(os.path.dirname(path))
             try:
+                gen_dir = tempfile.mkdtemp("zswag.gen")
                 python_module = zserio.generate(
                     zs_dir=self.zs_pkg_path,
                     main_zs_file=os.path.basename(path),
                     top_level_package=package,
-                    gen_dir=tempfile.mkdtemp("zswag.gen"))
+                    gen_dir=gen_dir,
+                    extra_args=["-withTypeInfoCode"])
             except CalledProcessError as e:
                 raise OpenApiGenError(f"Failed to parse zserio sources:\n{e.stderr}")
         if not python_module:
