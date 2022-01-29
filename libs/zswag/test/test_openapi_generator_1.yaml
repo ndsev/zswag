@@ -15,6 +15,7 @@ paths:
     post:
       description: ''
       operationId: bitMul
+      parameters: []
       requestBody:
         content:
           application/x-zserio-object:
@@ -30,17 +31,18 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /byteSum/{values}:
+  /byte_sum_endpoint:
     get:
       description: ''
       operationId: byteSum
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: values
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
+            format: base64
             items:
               type: string
             type: array
@@ -59,7 +61,7 @@ paths:
       description: ''
       operationId: concat
       parameters:
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: values
           required: true
@@ -83,7 +85,7 @@ paths:
       description: ''
       operationId: floatMul
       parameters:
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: values
           required: true
@@ -107,7 +109,7 @@ paths:
       description: ''
       operationId: identity
       parameters:
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: value
           required: true
@@ -129,7 +131,7 @@ paths:
       description: ''
       operationId: intMul
       parameters:
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: values
           required: true
@@ -153,7 +155,7 @@ paths:
       description: ''
       operationId: intSum
       parameters:
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: values
           required: true
@@ -177,7 +179,7 @@ paths:
       description: ''
       operationId: name
       parameters:
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: value
           required: true
@@ -199,7 +201,7 @@ paths:
       description: ''
       operationId: power
       parameters:
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: base__value
           required: true
@@ -207,7 +209,7 @@ paths:
             format: string
             type: string
           x-zserio-request-part: base.value
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: exponent__value
           required: true
@@ -215,7 +217,7 @@ paths:
             format: string
             type: string
           x-zserio-request-part: exponent.value
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: unused1
           required: true
@@ -223,7 +225,7 @@ paths:
             format: string
             type: string
           x-zserio-request-part: unused1
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: unused2
           required: true
@@ -231,7 +233,7 @@ paths:
             format: string
             type: string
           x-zserio-request-part: unused2
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: unused3
           required: true
@@ -239,7 +241,7 @@ paths:
             format: string
             type: string
           x-zserio-request-part: unused3
-        - description: Member of Unknown.
+        - description: ''
           in: path
           name: unused5
           required: true
