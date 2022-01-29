@@ -83,6 +83,12 @@ def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"
     return s.lower()
 
 
+# Returns true if t is atomic (not a compound struct),
+# false otherwise.
+def is_scalar(t: TypeInfo):
+    return t.py_type in SCALAR_T or issubclass(t.py_type, Enum)
+
+
 # Retrieve zserio type info for a schema class -
 # result is cached for maximum performance.
 def cached_type_info(zserio_t) -> Optional[TypeInfo]:
@@ -133,7 +139,7 @@ def check_uninstantiable(t: TypeInfo, field_name="", recursive=False) -> Optiona
     member_info: MemberInfo
     for _, member_info in members(t):
         subfield_name = f"{field_name}.{member_info.schema_name}" if field_name else member_info.schema_name
-        if MemberAttribute.ARRAY_LENGTH in member_info.attributes and member_info.type_info.py_type not in SCALAR_T:
+        if MemberAttribute.ARRAY_LENGTH in member_info.attributes and not is_scalar(member_info.type_info):
             return NotInstantiableReason(subfield_name, t.schema_name+"[]")
         if recursive:
             if reason := check_uninstantiable(member_info.type_info, subfield_name, recursive):
@@ -150,10 +156,9 @@ def instantiate(t: Type) -> Any:
     for _, member_info in members(type_info):
         field_name: str = member_info.attributes[MemberAttribute.PROPERTY_NAME]
         member_type_info = member_info.type_info
-        if hasattr(member_type_info.py_type, "type_info"):
-            if not issubclass(member_type_info.py_type, Enum):
-                compound_field_value = instantiate(member_type_info.py_type)
-                setattr(result_instance, f"_{field_name}_", compound_field_value)
+        if not is_scalar(member_type_info):
+            compound_field_value = instantiate(member_type_info.py_type)
+            setattr(result_instance, f"_{field_name}_", compound_field_value)
     return result_instance
 
 

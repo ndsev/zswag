@@ -1,5 +1,7 @@
+import copy
 import os
 
+import openapi_spec_validator.exceptions
 import yaml
 import sys
 import inspect
@@ -12,22 +14,23 @@ import dataclasses as dc
 from copy import deepcopy
 from enum import Enum
 from zserio.typeinfo import MemberAttribute
+from openapi_spec_validator import validate_spec
 
 import zserio
 from pyzswagcl import \
-    OAParamLocation, \
-    OAParamFormat, \
     ZSERIO_OBJECT_CONTENT_TYPE, \
     ZSERIO_REQUEST_PART_WHOLE, \
-    ZSERIO_REQUEST_PART
+    ZSERIO_REQUEST_PART, \
+    parse_openapi_config
 
 from .reflect import \
     service_method_request_type, \
     rgetattr, \
     check_uninstantiable, \
     cached_type_info, \
-    members as zs_type_fields, \
-    find_field
+    members as type_members, \
+    find_field, \
+    is_scalar
 from .doc import get_doc_str, IdentType, md_filter_definition
 
 
@@ -36,6 +39,15 @@ class HttpParamLocation(Enum):
     BODY = "body"
     PATH = "path"
     HEADER = "header"
+
+
+class HttpParamFormat(Enum):
+    STRING = "string"
+    BINARY = "binary"
+    BYTE = "byte"
+    BASE64 = "base64"
+    BASE64URL = "base64url"
+    HEX = "hex"
 
 
 HTTP_METHOD_TAGS = ("get", "put", "post", "delete")
@@ -61,7 +73,9 @@ class ParamSpecifier:
     request_part: str            # e.g. "request_member.subfield"
     name: Optional[str]          # e.g. "subfieldParam"
     location: HttpParamLocation  # e.g. QUERY
-    format: OAParamFormat        # e.g. BASE64
+    format: HttpParamFormat        # e.g. BASE64
+    style: Optional[str] = None
+    explode: Optional[str] = None
 
 
 @dc.dataclass
@@ -72,7 +86,7 @@ class MethodConfig:
     http_method: str = "post"
     param_loc: Optional[HttpParamLocation] = None  # None -> Whole request blob in body
     flatten: bool = False
-    param_specifiers: Optional[List[ParamSpecifier]] = None
+    param_specifiers: Optional[List[ParamSpecifier]] = dc.field(default_factory=list)
     security: Optional[str] = None
     path: Optional[str] = None
     openapi_docstring: str = ""
@@ -138,7 +152,7 @@ class OpenApiSchemaGenerator:
             if default_config_tags := methods_base_config.get(WILDCARD_CONFIG, None):
                 default_entry = self.add_method_config_from_tags(WILDCARD_CONFIG, default_config_tags, default_entry)
             # Then process tags for other methods from the base-config.
-            for method_name, tags in ((m, t) for m, t in methods_base_config if m != WILDCARD_CONFIG):
+            for method_name, tags in ((m, t) for m, t in methods_base_config.items() if m != WILDCARD_CONFIG):
                 self.add_method_config_from_tags(method_name, tags, default_entry)
         # ... then process additional tags from the command line.
         if config:
@@ -181,18 +195,22 @@ class OpenApiSchemaGenerator:
                 try:
                     request_part, specifiers_part = tag.split("?")
                     spec = dict(specifier.split("=") for specifier in specifiers_part.split("&"))
-                    par_loc = HttpParamLocation(spec.get("location"))
+                    par_loc = HttpParamLocation(spec.get("in"))
                     if par_loc == HttpParamLocation.BODY:
                         if new_config.http_method == "get":
                             raise OpenApiGenError("Cannot use `location=body` with HTTP GET.")
-                        print(f"WARNING: In tag '{tag}': The name and format specifiers will be ignored.")
-                        par_format = OAParamFormat.BINARY
+                        par_format = HttpParamFormat.BINARY
                         par_name = "body"
                     else:
-                        par_name, par_format = spec.get("name"), OAParamFormat(spec.get("format"))
+                        par_name, par_format = spec.get("name"), HttpParamFormat(spec.get("format", "string"))
                     if any(par.name == par_name for par in new_config.param_specifiers):
                         raise OpenApiGenError(f"Encountered duplicate use of parameter name '{par_name}' in the same method!")
                     new_config.param_specifiers.append(ParamSpecifier(request_part, par_name, par_loc, par_format))
+                    # Process style and explode entries
+                    if style := spec.get("style", None):
+                        new_config.param_specifiers[-1].style = style.lower()
+                    if explode := spec.get("explode", None):
+                        new_config.param_specifiers[-1].explode = explode.lower()
                 except (ValueError, IndexError) as e:
                     raise OpenApiGenError(f"Encountered malformed parameter specifier tag '{tag}' ({e})!")
                 except KeyError as missing_key:
@@ -200,7 +218,7 @@ class OpenApiSchemaGenerator:
             else:
                 raise OpenApiGenError(f"Did not understand tag '{tag}'.")
         if method_name in self.config and method_name != WILDCARD_CONFIG:
-            print(f"WARNING: Overwriting config for method {method_name}!")
+            print(f"[WARNING] Overwriting config for method {method_name}!")
         self.config[method_name] = new_config
         if method_name == WILDCARD_CONFIG:
             default_entry = new_config
@@ -365,9 +383,16 @@ class OpenApiSchemaGenerator:
                 "required": True,
                 ZSERIO_REQUEST_PART: param_specifier.request_part,
                 **({"allowEmptyValue": True} if param_specifier.location == HttpParamLocation.QUERY else {}),
-                **openapi_type_info
+                "schema": openapi_schema_info
             })
-
+            # Add style and explode hints
+            if param_specifier.style:
+                openapi_param_list[-1]["style"] = param_specifier.style
+            if param_specifier.explode:
+                openapi_param_list[-1]["explode"] = param_specifier.explode == "true"
+        # Process security scheme
+        if config.security:
+            config.openapi_parameters["security"] = [{config.security: []}]
         # Set the finalized parameter list
         config.openapi_parameters["parameters"] = openapi_param_list
 
@@ -432,9 +457,11 @@ if __name__ == "__main__":
                                                    
                         A (param-specifier) tag has the following schema:
                         
-                            (field?name=...&
-                                   location=[path|body|query|header]&
-                                   format=[binary|base64|hex])
+                            (field?name=...
+                                  &in=[path|body|query|header]
+                                  &format=[binary|base64|hex]
+                                  [&style=...]
+                                  [&explode=...])
                         
                         Examples:
                         
@@ -446,7 +473,7 @@ if __name__ == "__main__":
                           For myMethod, put the whole request blob into the a
                           query "data" parameter as base64:
                           
-                            `-c myMethod:*?name=data&location=query&format=base64`
+                            `-c myMethod:*?name=data&in=query&format=base64`
                             
                           For myMethod, set the "AwesomeAuth" auth scheme:
                           
@@ -456,11 +483,11 @@ if __name__ == "__main__":
                           explicitely in a path placeholder:
                           
                             `-c 'myMethod:path=/my-method/{param},...
-                                 myField?name=param&location=path&format=string'`
+                                 myField?name=param&in=path&format=string'`
                             
                         Note:
                             * The HTTP-method defaults to `post`.
-                            * The parameter location defaults to `query` for
+                            * The parameter 'in' defaults to `query` for
                               `get`, `body` otherwise.
                             * If a method uses a parameter specifier, the
                               `flat`, `body`, `query`, `path`, `header` and
