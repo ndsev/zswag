@@ -230,7 +230,9 @@ class OpenApiSchemaGenerator:
         if method_name in self.config:
             return self.config[method_name]
         else:
-            return self.config[WILDCARD_CONFIG]
+            result = copy.deepcopy(self.config[WILDCARD_CONFIG])
+            result.name = method_name
+            return result
 
     def generate(self):
         service_name_parts = self.service_instance.service_full_name.split(".")
@@ -277,26 +279,52 @@ class OpenApiSchemaGenerator:
                 } for method_info in (
                     self.process_method_config(method_name)
                     for method_name in self.service_instance.method_names)
-            },
-            "components": {
-                "securitySchemes": self.base_config.get("securitySchemes", {}),
             }
         }
+        if security_schemes := self.base_config.get("securitySchemes", None):
+            schema["components"] = {
+                "securitySchemes": security_schemes
+            }
+        if security := self.base_config.get("security", None):
+            schema["security"] = security
+        print(f"[INFO] Validating with openapi-spec-validator ... ", end="")
+        try:
+            validate_spec(schema)
+        except openapi_spec_validator.exceptions.OpenAPIValidationError as e:
+            print()
+            raise OpenApiGenError(f"Spec is invalid: {e}")
+        print("OK")
+        print(f"[INFO] Writing to '{self.output.name}' ... ", end="")
         yaml.dump(schema, self.output, default_flow_style=False)
+        self.output.close()
+        print("OK")
+        if os.path.isfile(self.output.name):
+            print(f"[INFO] Validating with zswag parser ... ", end="")
+            try:
+                parse_openapi_config(self.output.name)
+            except RuntimeError as e:
+                print()
+                raise OpenApiGenError(f"Spec is invalid: {e}")
+            print("OK")
+        else:
+            print(f"[INFO] Skipping zswag parser validation.")
+        print(f"[INFO] Done.")
 
     def process_method_config(self, method_name: str) -> MethodConfig:
         result = self.config_for_method(method_name)
         req_t = service_method_request_type(self.service_instance, result.name)
         req_t_info = cached_type_info(req_t)
+        assert req_t_info
+        method_ident = f"{self.service_instance.service_full_name}.{method_name}"
         if not result.path:
-            print(f"INFO: Auto-generating path for {method_name}")
+            print(f"[INFO] Auto-generating path for `{method_ident}`.")
             result.path = f"/{method_name}"
         # Generate doc-strings
         if self.zs_pkg_path:
             doc_strings = get_doc_str(
                 ident_type=IdentType.RPC,
                 pkg_path=self.zs_pkg_path,
-                ident=f"{self.service_instance.service_full_name}.{method_name}")
+                ident=method_ident)
             if doc_strings:
                 result.openapi_docstring = doc_strings[0]
                 result.openapi_return_type = doc_strings[1]
@@ -313,22 +341,23 @@ class OpenApiSchemaGenerator:
                     fallback=[f"### struct {result.openapi_arg_type}"])[0])
         # Convert simple legacy instructions into parameter specifiers
         if not result.param_specifiers:
-            if result.param_loc == HttpParamLocation.BODY:
+            if result.param_loc == HttpParamLocation.BODY or (not result.param_loc and not result.flatten):
                 result.param_specifiers.append(
-                    ParamSpecifier(ZSERIO_REQUEST_PART_WHOLE, "", HttpParamLocation.BODY, OAParamFormat.BINARY))
+                    ParamSpecifier(ZSERIO_REQUEST_PART_WHOLE, "", HttpParamLocation.BODY, HttpParamFormat.BINARY))
             elif result.flatten:
                 if not_instantiable_reason := check_uninstantiable(req_t_info):
                     raise OpenApiGenError(str(not_instantiable_reason))
-                for field_name, member_info in zs_type_fields(req_t_info, True):
-                    result.param_specifiers.append(
-                        ParamSpecifier(
-                            field_name, field_name.replace(".", "__"),
-                            result.param_loc or HttpParamLocation.QUERY,
-                            OAParamFormat.STRING))
+                for field_name, member_info in type_members(req_t_info, True):
+                    if is_scalar(member_info.type_info):
+                        result.param_specifiers.append(
+                            ParamSpecifier(
+                                field_name, field_name.replace(".", "__"),
+                                result.param_loc or HttpParamLocation.QUERY,
+                                HttpParamFormat.STRING))
             elif result.param_loc:
                 result.param_specifiers.append(
-                    ParamSpecifier(
-                        ZSERIO_REQUEST_PART_WHOLE, "requestBody", result.param_loc, OAParamFormat.BINARY))
+                ParamSpecifier(
+                    ZSERIO_REQUEST_PART_WHOLE, "requestBody", result.param_loc, HttpParamFormat.BINARY))
         # Convert MethodConfig.param_specifiers to MethodConfig.openapi_parameters
         self.process_method_parameters(result)
         return result
@@ -355,9 +384,9 @@ class OpenApiSchemaGenerator:
                 continue
             # Fallthrough - the parameter has a name, a format and a request part
             # Process type-info first and determine if the field even exists.
-            openapi_type_info = {
+            openapi_schema_info = {
                 "type": "string",
-                "format": param_specifier.format.value,
+                "format": param_specifier.format.name.lower(),
             }
             if param_specifier.request_part != ZSERIO_REQUEST_PART_WHOLE:
                 _, member_info = find_field(req_t_info, param_specifier.request_part)
@@ -365,7 +394,7 @@ class OpenApiSchemaGenerator:
                     raise OpenApiGenError(f"Could not find field '{param_specifier.request_part}' in {req_t_info.schema_name}!")
                 # If the member is an array, we must indicate this in OpenAPI
                 if MemberAttribute.ARRAY_LENGTH in member_info.attributes:
-                    openapi_type_info.update({
+                    openapi_schema_info.update({
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -375,7 +404,7 @@ class OpenApiSchemaGenerator:
             if param_specifier.location == HttpParamLocation.PATH:
                 placeholder = f"{{{param_specifier.name}}}"
                 if placeholder not in config.path:
-                    print(f"INFO: Appending /{placeholder} to path for {config.name}")
+                    print(f"[INFO] Appending /{placeholder} to path for {config.name}")
                     config.path += f"/{placeholder}"
             # Append the OpenAPI information for the new parameter
             openapi_param_list.append({
@@ -516,13 +545,18 @@ if __name__ == "__main__":
                           securitySchemes: ... # Optional OpenAPI securitySchemes
                           info: ...            # Optional OpenAPI info section
                           servers: ...         # Optional OpenAPI servers section
+                          security: ...        # Optional OpenAPI global security
                         """))
 
     args = parser.parse_args(sys.argv[1:])
-    OpenApiSchemaGenerator(
-        service=args.service[0],
-        path=args.input[0] if args.input else None,
-        package=args.package[0] if args.package else None,
-        config=[arg for args in args.config for arg in args] if args.config else [],
-        output=args.output[0],
-        base_config=args.base_config[0] if args.base_config else None).generate()
+    try:
+        OpenApiSchemaGenerator(
+            service=args.service[0],
+            path=args.input[0] if args.input else None,
+            package=args.package[0] if args.package else None,
+            config=[arg for args in args.config for arg in args] if args.config else [],
+            output=args.output[0],
+            base_config=args.base_config_yaml[0] if args.base_config_yaml else None).generate()
+    except OpenApiGenError as e:
+        print(f"[ERROR] {e}")
+        exit(1)
