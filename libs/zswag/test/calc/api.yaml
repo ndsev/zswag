@@ -269,6 +269,7 @@ paths:
                 format: binary
                 type: string
           description: ''
+      security: []
       summary: ''
 security:
   - HeaderAuth: []

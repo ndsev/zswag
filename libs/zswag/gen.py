@@ -356,8 +356,8 @@ class OpenApiSchemaGenerator:
                                 HttpParamFormat.STRING))
             elif result.param_loc:
                 result.param_specifiers.append(
-                ParamSpecifier(
-                    ZSERIO_REQUEST_PART_WHOLE, "requestBody", result.param_loc, HttpParamFormat.BINARY))
+                    ParamSpecifier(
+                        ZSERIO_REQUEST_PART_WHOLE, "requestBody", result.param_loc, HttpParamFormat.BINARY))
         # Convert MethodConfig.param_specifiers to MethodConfig.openapi_parameters
         self.process_method_parameters(result)
         return result
@@ -422,8 +422,12 @@ class OpenApiSchemaGenerator:
             if param_specifier.explode:
                 openapi_param_list[-1]["explode"] = param_specifier.explode == "true"
         # Process security scheme
-        if config.security:
-            config.openapi_parameters["security"] = [{config.security: []}]
+        if config.security is not None:
+            if config.security == "":
+                print(f"[WARNING] {config.name} has explicit empty security setting.")
+                config.openapi_parameters["security"] = []
+            else:
+                config.openapi_parameters["security"] = [{config.security: []}]
         # Set the finalized parameter list
         config.openapi_parameters["parameters"] = openapi_param_list
 

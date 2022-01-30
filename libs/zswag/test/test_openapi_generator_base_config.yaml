@@ -10,6 +10,7 @@ methods:
   power:
   - get
   - path=/power/{base}
+  - security=  # explicit empty security tag
   - base.value?name=base&in=path
   - exponent.value?name=X-Ponent&in=header
   intSum:
