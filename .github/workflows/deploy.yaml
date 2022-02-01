@@ -11,22 +11,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fetch
-        uses: actions/download-artifact@v2
+        # Use official download-artifact action once fixed:
+        # https://github.com/actions/download-artifact/issues/3
+        uses: dawidd6/action-download-artifact@v2
         with:
+          workflow: cmake.yml
           name: zswag-py${{ matrix.python-version }}-${{ matrix.os }}
           path: dist/
-      - env:
+      - name: Upload
+        env:
           KE_PYPI_PW: ${{ secrets.KE_PYPI_PW }}
         run: |
           echo "Initial state:"
           echo "=============="
-          ls dist/
           cd dist/
-          for zip in *.zip; do
-            unzip -o "$zip";
-          done
-          echo "Unzipped:"
-          echo "========="
           ls .
           echo "Uploading..."
           echo "============"
