@@ -1,0 +1,43 @@
+name: Deploy
+
+on: [workflow_dispatch]
+
+jobs:
+  deploy:
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch
+        uses: actions/download-artifact@v2
+        with:
+          name: zswag-py${{ matrix.python-version }}-${{ matrix.os }}
+          path: dist/
+      - env:
+          KE_PYPI_PW: ${{ secrets.KE_PYPI_PW }}
+        run: |
+          echo "Initial state:"
+          echo "=============="
+          ls dist/
+          cd dist/
+          for zip in *.zip; do
+            unzip -o "$zip";
+          done
+          echo "Unzipped:"
+          echo "========="
+          ls .
+          echo "Uploading..."
+          echo "============"
+          python3 -m venv venv
+          . venv/bin/activate
+          pip install twine
+          twine upload \
+            --non-interactive \
+            --skip-existing \
+            --verbose \
+            --disable-progress-bar \
+            -u klebert-engineering \
+            -p "${KE_PYPI_PW}" \
+            *.whl
