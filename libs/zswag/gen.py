@@ -1,5 +1,6 @@
 import copy
 import os
+import random
 
 import openapi_spec_validator.exceptions
 import yaml
@@ -15,7 +16,7 @@ from copy import deepcopy
 from enum import Enum
 from zserio.typeinfo import MemberAttribute
 from openapi_spec_validator import validate_spec
-
+import uuid
 import zserio
 from pyzswagcl import \
     ZSERIO_OBJECT_CONTENT_TYPE, \
@@ -111,13 +112,14 @@ class OpenApiSchemaGenerator:
                  package: Optional[str] = None,
                  config: Optional[List[str]] = None,
                  output: IO,
-                 base_config: Optional[IO]):
+                 base_config: Optional[IO],
+                 zserio_src_root: Optional[str]):
 
         # Process service name and package path
         self.service_name = service
-        self.zs_pkg_path = None
+        self.zs_pkg_path = zserio_src_root
         service_name_parts = service.split(".") + ["Service"]
-        python_module = None
+
         if os.path.isdir(path):
             # Generate OpenAPI from existing Python code
             sys.path.append(path)
@@ -125,17 +127,25 @@ class OpenApiSchemaGenerator:
         elif os.path.isfile(path):
             # Generate OpenAPI from zserio code. Must generate
             # intermediate Python source to inspect service.
-            self.zs_pkg_path = os.path.abspath(os.path.dirname(path))
+            if self.zs_pkg_path is None:
+                self.zs_pkg_path = os.path.abspath(os.path.dirname(path))
+                path = os.path.basename(path)
+            if package is None:
+                package = f"zswag_gen_{uuid.uuid1().hex}"
+            if service_name_parts[0] != package:
+                service_name_parts = [package] + service_name_parts
             try:
                 gen_dir = tempfile.mkdtemp("zswag.gen")
                 python_module = zserio.generate(
                     zs_dir=self.zs_pkg_path,
-                    main_zs_file=os.path.basename(path),
+                    main_zs_file=path,
                     top_level_package=package,
                     gen_dir=gen_dir,
                     extra_args=["-withTypeInfoCode"])
             except CalledProcessError as e:
                 raise OpenApiGenError(f"Failed to parse zserio sources:\n{e.stderr}")
+        else:
+            raise OpenApiGenError(f"The input argument is neither a python module directory nor a zserio file.")
         if not python_module:
             raise OpenApiGenError(f"Could not import {service_name_parts[0]}.api!")
         self.service_type = rgetattr(python_module, ".".join(service_name_parts[1:]))
@@ -447,17 +457,28 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", nargs=1, metavar="zserio-or-python-path",
                         required=True, help=argdoc("""
                         Can be either ...
-                        (A) Path to a zserio .zs file.
+                        (A) Path to a zserio .zs file. Must be either a top-
+                            level entrypoint (e.g. all.zs), or a subpackage
+                            (e.g. services/myservice.zs) in conjunction with
+                            a "--zserio-source-root|-r <dir>" argument.
                         (B) Path to parent dir of a zserio Python package.
                         
                         Examples:
                             -i path/to/schema/main.zs         (A)
                             -i path/to/python/package/parent  (B) 
                         """))
+    parser.add_argument("-r", "--zserio-source-root", nargs=1, metavar="zserio-src-root-dir",
+                        required=False, help=argdoc("""
+                        When -i specifies a zs file (Option A), indicate the
+                        directory for the zserio -src directory argument. If
+                        not specified, the parent directory of the zs file
+                        will be used.
+                        """))
     parser.add_argument("-p", "--package", nargs=1, metavar="top-level-package",
                         required=False, help=argdoc("""
                         When -i specifies a zs file (Option A), indicate
-                        that a top-level zserio package name should be used.
+                        that a specific top-level zserio package name
+                        should be used.
                         
                         Examples:
                             -p zserio_pkg_name
@@ -560,7 +581,8 @@ if __name__ == "__main__":
             package=args.package[0] if args.package else None,
             config=[arg for args in args.config for arg in args] if args.config else [],
             output=args.output[0],
-            base_config=args.base_config_yaml[0] if args.base_config_yaml else None).generate()
+            base_config=args.base_config_yaml[0] if args.base_config_yaml else None,
+            zserio_src_root=args.zserio_source_root[0] if args.zserio_source_root else None).generate()
     except OpenApiGenError as e:
         print(f"[ERROR] {e}")
         exit(1)

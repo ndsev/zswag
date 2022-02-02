@@ -7,7 +7,7 @@ info:
     Check out these sweet docs.'
   license:
     name: TODO
-  title: Calculator
+  title: calculator.Calculator
   version: TODO
 openapi: 3.0.0
 paths:
