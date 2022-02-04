@@ -121,7 +121,7 @@ class OAServer(connexion.App):
                                 __import__(self.service_type.__module__.split('.')[0]).__file__
                             ))))
                         }" \\
-                        --config get,query,flat \\
+                        --config post,body \\
                         --output "{to_slashes(yaml_path)}"
                         
                     The --config argument is a comma-separated list of tags

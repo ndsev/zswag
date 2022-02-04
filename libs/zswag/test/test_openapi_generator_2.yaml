@@ -1,7 +1,7 @@
 info:
   contact:
     email: TODO@TODO.TODO
-  description: REST API for calculator.Calculator
+  description: REST API for Calculator service.
   license:
     name: TODO
   title: Calculator
@@ -9,15 +9,19 @@ info:
 openapi: 3.0.0
 paths:
   /bitMul:
-    post:
+    put:
       description: ''
       operationId: bitMul
-      requestBody:
-        content:
-          application/x-zserio-object:
-            schema:
-              type: string
-        description: ''
+      parameters:
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
+          required: true
+          schema:
+            format: base64
+            type: string
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -27,21 +31,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /byteSum/{values}:
-    get:
+  /byteSum:
+    put:
       description: ''
       operationId: byteSum
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: values
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
-            items:
-              type: string
-            type: array
-          x-zserio-request-part: values
+            format: base64
+            type: string
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -51,21 +54,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /concat/{values}:
-    get:
+  /concat:
+    put:
       description: ''
       operationId: concat
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: values
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
-            items:
-              type: string
-            type: array
-          x-zserio-request-part: values
+            format: base64
+            type: string
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -75,21 +77,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /floatMul/{values}:
-    get:
+  /floatMul:
+    put:
       description: ''
       operationId: floatMul
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: values
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
-            items:
-              type: string
-            type: array
-          x-zserio-request-part: values
+            format: base64
+            type: string
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -99,19 +100,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /identity/{value}:
+  /identity:
     put:
       description: ''
       operationId: identity
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: value
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
+            format: base64
             type: string
-          x-zserio-request-part: value
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -121,21 +123,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /intMul/{values}:
-    get:
+  /intMul:
+    put:
       description: ''
       operationId: intMul
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: values
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
-            items:
-              type: string
-            type: array
-          x-zserio-request-part: values
+            format: base64
+            type: string
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -145,21 +146,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /intSum/{values}:
-    get:
+  /intSum:
+    put:
       description: ''
       operationId: intSum
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: values
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
-            items:
-              type: string
-            type: array
-          x-zserio-request-part: values
+            format: base64
+            type: string
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -169,19 +169,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /name/{value}:
-    get:
+  /name:
+    put:
       description: ''
       operationId: name
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: value
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
+            format: base64
             type: string
-          x-zserio-request-part: value
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:
@@ -191,61 +192,20 @@ paths:
                 type: string
           description: ''
       summary: ''
-  /power/{base__value}/{exponent__value}/{unused1}/{unused2}/{unused3}/{unused5}:
-    get:
+  /power:
+    put:
       description: ''
       operationId: power
       parameters:
-        - description: Member of Unknown.
-          in: path
-          name: base__value
+        - allowEmptyValue: true
+          description: ''
+          in: query
+          name: data
           required: true
           schema:
-            format: string
+            format: base64
             type: string
-          x-zserio-request-part: base.value
-        - description: Member of Unknown.
-          in: path
-          name: exponent__value
-          required: true
-          schema:
-            format: string
-            type: string
-          x-zserio-request-part: exponent.value
-        - description: Member of Unknown.
-          in: path
-          name: unused1
-          required: true
-          schema:
-            format: string
-            type: string
-          x-zserio-request-part: unused1
-        - description: Member of Unknown.
-          in: path
-          name: unused2
-          required: true
-          schema:
-            format: string
-            type: string
-          x-zserio-request-part: unused2
-        - description: Member of Unknown.
-          in: path
-          name: unused3
-          required: true
-          schema:
-            format: string
-            type: string
-          x-zserio-request-part: unused3
-        - description: Member of Unknown.
-          in: path
-          name: unused5
-          required: true
-          schema:
-            format: string
-            items:
-              type: string
-            type: array
-          x-zserio-request-part: unused5
+          x-zserio-request-part: '*'
       responses:
         '200':
           content:

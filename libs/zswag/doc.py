@@ -54,7 +54,6 @@ def get_amalgamated_zs(pkg_path):
     if pkg_path in zs_pkg_cache:
         return zs_pkg_cache[pkg_path]
     zs_files = glob.glob(os.path.join(pkg_path, "**/*.zs"), recursive="True")
-    print(f"[INFO] Found {len(zs_files)} zserio files under {pkg_path}")
     result = ""
     for zs_file_path in zs_files:
         with open(zs_file_path) as zs_file:
@@ -90,7 +89,6 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
     zs_src = get_amalgamated_zs(pkg_path)
     ident_parts = ident.split(".")
     pattern_format_replacements = {}
-    pattern = ""
     if ident_type == IdentType.STRUCT:
         if not ident_parts:
             print("[ERROR] Need at least one identifier part to find struct docs.")
@@ -118,7 +116,6 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
     if match:
         return list(match.groups())
     else:
-        print(f"[WARNING] Could not find doc-string for `{ident}`!")
         return fallback
 
 

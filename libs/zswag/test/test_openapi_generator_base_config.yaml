@@ -1,0 +1,80 @@
+info:
+  contact:
+    email: support@nds-association.org
+  description: REST API for calculator.Calculator
+  license:
+    name: My-Fancy-License
+  title: Calculator
+  version: 1.0.0
+methods:
+  power:
+  - get
+  - path=/power/{base}
+  - security=  # explicit empty security tag
+  - base.value?name=base&in=path
+  - exponent.value?name=X-Ponent&in=header
+  intSum:
+  - get
+  - path=/isum
+  - security=BearerAuth
+  - values?name=values&in=query&explode=true&format=hex
+  byteSum:
+  - get
+  - path=/bsum/{values}
+  - security=BasicAuth
+  - values?name=values&in=path&format=base64url
+  intMul:
+  - get
+  - path=/imul/{values}
+  - security=QueryAuth
+  - values?name=values&in=path&style=simple&format=base64
+  floatMul:
+  - get
+  - path=/fmul
+  - security=CookieAuth
+  - values?name=values&in=query&explode=false
+  bitMul:
+  - get
+  - path=/bmul
+  - security=HeaderAuth
+  - values?name=values&in=query
+  identity:
+  - post
+  - path=/identity
+  - security=CookieAuth
+  - \*?in=body
+  concat:
+  - get
+  - path=/concat
+  - security=BearerAuth
+  - values?name=values&in=query&format=base64
+  name:
+  - get
+  - path=/name/{enum_value}
+  - value?name=enum_value&in=path
+servers: []
+securitySchemes:
+  BasicAuth:
+    type: http
+    scheme: basic
+    x-basicInfoFunc: zswag.test.calc.server.validate_basic_auth
+  BearerAuth:
+    type: http
+    scheme: bearer
+    x-bearerInfoFunc: zswag.test.calc.server.validate_bearer
+  CookieAuth:
+    type: apiKey
+    in: cookie
+    name: api-cookie
+    x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+  HeaderAuth:
+    type: apiKey
+    in: header
+    name: X-Generic-Token
+    x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+  QueryAuth:
+    type: apiKey
+    in: query
+    name: api-key
+    x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+security: [{HeaderAuth: []}]

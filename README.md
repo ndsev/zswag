@@ -18,6 +18,7 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Server Component (Python)](#server-component)
   * [Using the Python Client](#using-the-python-client)
   * [C++ Client](#c-client)
+  * [Client Environment Settings](#client-environment-settings)
   * [HTTP Proxies and Authentication](#persistent-http-headers-proxy-cookie-and-authentication)
   * [Swagger User Interface](#swagger-user-interface)
   * [OpenAPI Options Interoperability](#openapi-options-interoperability)
@@ -98,17 +99,15 @@ you can run `python -m zswag.gen`, a CLI to generate OpenAPI YAML files.
 The CLI offers the following options
 
 ```
-Usage: Zserio OpenApi YAML Generator
-  -s service-identifier -i zserio-or-python-path
-  [-p top-level-package]
-  [-c tags [tags ...]]
-  [-o output]
+usage: Zserio OpenApi YAML Generator [-h] -s service-identifier -i
+                                     zserio-or-python-path
+                                     [-r zserio-src-root-dir]
+                                     [-p top-level-package] [-c tags [tags ...]]
+                                     [-o output] [-b BASE_CONFIG_YAML]
 
 optional arguments:
   -h, --help
-  
-        Show this help message and exit.
-        
+        show this help message and exit
   -s service-identifier, --service service-identifier
 
         Fully qualified zserio service identifier.
@@ -119,17 +118,28 @@ optional arguments:
   -i zserio-or-python-path, --input zserio-or-python-path
 
         Can be either ...
-        (A) Path to a zserio .zs file.
+        (A) Path to a zserio .zs file. Must be either a top-
+            level entrypoint (e.g. all.zs), or a subpackage
+            (e.g. services/myservice.zs) in conjunction with
+            a "--zserio-source-root|-r <dir>" argument.
         (B) Path to parent dir of a zserio Python package.
 
         Examples:
             -i path/to/schema/main.zs         (A)
             -i path/to/python/package/parent  (B)
 
+  -r zserio-src-root-dir, --zserio-source-root zserio-src-root-dir
+
+        When -i specifies a zs file (Option A), indicate the
+        directory for the zserio -src directory argument. If
+        not specified, the parent directory of the zs file
+        will be used.
+
   -p top-level-package, --package top-level-package
 
         When -i specifies a zs file (Option A), indicate
-        that a top-level zserio package name should be used.
+        that a specific top-level zserio package name
+        should be used.
 
         Examples:
             -p zserio_pkg_name
@@ -139,34 +149,89 @@ optional arguments:
         Configuration tags for a specific or all methods.
         The argument syntax follows this pattern:
 
-            [(service-method-name):](comma-separated-tags)
+           [(service-method-name):](comma-separated-tags)
 
         Note: The -c argument may be applied multiple times.
         The `comma-separated-tags` must be a list of tags
-        which indicate OpenApi method generator preferences:
+        which indicate OpenApi method generator preferences.
+        The following tags are supported:
 
         get|put|post|delete : HTTP method tags
-            query|path|body : Parameter location tags
+                query|path| : Parameter location tags
+                header|body
                   flat|blob : Flatten request object,
                               or pass it as whole blob.
+          (param-specifier) : Specify parameter name, format
+                              and location for a specific
+                              request-part. See below.
+            security=(name) : Set a particular security
+                              scheme to be used. The scheme
+                              details must be provided through
+                              the --base-config-yaml.
+         path=(method-path) : Set a particular method path.
+                              May contain placeholders for
+                              path params.
+
+        A (param-specifier) tag has the following schema:
+
+            (field?name=...
+                  &in=[path|body|query|header]
+                  &format=[binary|base64|hex]
+                  [&style=...]
+                  [&explode=...])
+
+        Examples:
+
+          Expose all methods as POST, but `getLayerByTileId`
+          as GET with flat path-parameters:
+
+            `-c post getLayerByTileId:get,flat,path`
+
+          For myMethod, put the whole request blob into the a
+          query "data" parameter as base64:
+
+            `-c myMethod:*?name=data&in=query&format=base64`
+
+          For myMethod, set the "AwesomeAuth" auth scheme:
+
+            `-c myMethod:security=AwesomeAuth`
+
+          For myMethod, provide the path and place myField
+          explicitely in a path placeholder:
+
+            `-c 'myMethod:path=/my-method/{param},...
+                 myField?name=param&in=path&format=string'`
 
         Note:
-            * The http method defaults to `post`.
-            * The parameter location defaults to `query` for
+            * The HTTP-method defaults to `post`.
+            * The parameter 'in' defaults to `query` for
               `get`, `body` otherwise.
+            * If a method uses a parameter specifier, the
+              `flat`, `body`, `query`, `path`, `header` and
+              `body`-tags are ignored.
             * The `flat` tag is only meaningful in conjunction
               with `query` or `path`.
             * An unspecific tag list (no service-method-name)
               affects the defaults only for following, not
               preceding specialized tag assignments.
 
-        Example:
-            -c post getLayerByTileId:get,flat,path
-
   -o output, --output output
 
         Output file path. If not specified, the output will be
         written to stdout.
+
+  -b BASE_CONFIG_YAML, --base-config-yaml BASE_CONFIG_YAML
+
+        Base configuration file. Can be used to fully or partially
+        substitute --config arguments, and to provide additional
+        OpenAPI information. The YAML file must look like this:
+
+          method: # Optional method tags dictionary
+            <method-name|*>: <list of config tags>
+          securitySchemes: ... # Optional OpenAPI securitySchemes
+          info: ...            # Optional OpenAPI info section
+          servers: ...         # Optional OpenAPI servers section
+          security: ...        # Optional OpenAPI global security
 ```
 
 ### Generator Usage example
@@ -614,8 +679,8 @@ but also for arrays (see below).
 | ------------------ | ---------- | ------------- | -------- | --------- |
 | `x-zserio-request-part: *` | ✔️ | ✔️ | ✔️ | ✔️ |
 | `format: string` | ✔️ | ✔️ | ✔️ | ✔️ |
-| `format: byte` | ✔️ | ✔️ | ✔️ | ❌ |
-| `format: hex` | ✔️ | ✔️ | ✔️ | ❌ |
+| `format: byte` | ✔️ | ✔️ | ✔️ | ✔️ |
+| `format: hex` | ✔️ | ✔️ | ✔️ | ✔️ |
 
 ### URL Scalar Parameter
 
@@ -674,9 +739,9 @@ specifiers.
 | `x-zserio-request-part: <[parent.]*array_member>`  | ✔️ | ✔️ | ✔️ | ✔️ |
 | `style: simple` | ✔️ | ✔️ | ✔️ | ✔️ |
 | `style: form` | ✔️ | ✔️ | ✔️ | ✔️ |
-| `style: label` | ✔️ | ✔️ | ❌ | ❌ |
-| `style: matrix` | ✔️ | ✔️ | ❌ | ❌ |
-| `explode: true` | ✔️ | ✔️ | ✔️ | ❌ |
+| `style: label` | ✔️ | ✔️ | ❌ | ✔️ |
+| `style: matrix` | ✔️ | ✔️ | ❌ | ✔️ |
+| `explode: true` | ✔️ | ✔️ | ✔️ | ✔️ |
 | `explode: false` | ✔️ | ✔️ | ✔️ | ✔️ |
 
 ### URL Compound Parameter
@@ -709,7 +774,7 @@ and port, but prefix the `/path/to/my/api` string.
 
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
-| `servers`  | ✔️ | ✔️ | ✔️ | ❌️ |
+| `servers`  | ✔️ | ✔️ | ✔️ | ✔️ |
 
 ### Authentication Schemes
 
@@ -745,7 +810,7 @@ constructor in C++/Python with the relevant detail.
 
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
-| `HTTP Basic-Auth` `HTTP Bearer-Auth` `Cookie API-Key` `Header API-Key` `Query API-Key`  | ✔️ | ✔️ | ✔️(**) | ❌️ |
+| `HTTP Basic-Auth` `HTTP Bearer-Auth` `Cookie API-Key` `Header API-Key` `Query API-Key`  | ✔️ | ✔️ | ✔️(**) | ✔️ |
 | `OpenID Connect` `OAuth2`  | ❌️ | ❌️ | ✔️(**) | ❌️ |
 
 **(\*\*)**: The server support for all authentication schemes depends on your
