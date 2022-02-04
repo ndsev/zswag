@@ -1,7 +1,7 @@
 info:
   contact:
     email: TODO@TODO.TODO
-  description: REST API for calculator.Calculator
+  description: REST API for Calculator service.
   license:
     name: TODO
   title: Calculator

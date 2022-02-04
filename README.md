@@ -101,6 +101,7 @@ The CLI offers the following options
 ```
 usage: Zserio OpenApi YAML Generator [-h] -s service-identifier -i
                                      zserio-or-python-path
+                                     [-r zserio-src-root-dir]
                                      [-p top-level-package] [-c tags [tags ...]]
                                      [-o output] [-b BASE_CONFIG_YAML]
 
@@ -117,17 +118,28 @@ optional arguments:
   -i zserio-or-python-path, --input zserio-or-python-path
 
         Can be either ...
-        (A) Path to a zserio .zs file.
+        (A) Path to a zserio .zs file. Must be either a top-
+            level entrypoint (e.g. all.zs), or a subpackage
+            (e.g. services/myservice.zs) in conjunction with
+            a "--zserio-source-root|-r <dir>" argument.
         (B) Path to parent dir of a zserio Python package.
 
         Examples:
             -i path/to/schema/main.zs         (A)
             -i path/to/python/package/parent  (B)
 
+  -r zserio-src-root-dir, --zserio-source-root zserio-src-root-dir
+
+        When -i specifies a zs file (Option A), indicate the
+        directory for the zserio -src directory argument. If
+        not specified, the parent directory of the zs file
+        will be used.
+
   -p top-level-package, --package top-level-package
 
         When -i specifies a zs file (Option A), indicate
-        that a top-level zserio package name should be used.
+        that a specific top-level zserio package name
+        should be used.
 
         Examples:
             -p zserio_pkg_name

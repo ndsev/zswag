@@ -1,0 +1,31 @@
+info:
+  contact:
+    email: TODO@TODO.TODO
+  description: REST API for test_nested_service.services.MyService service.
+  license:
+    name: TODO
+  title: test_nested_service.services.MyService
+  version: TODO
+openapi: 3.0.0
+paths:
+  /myMethod:
+    post:
+      description: ''
+      operationId: myMethod
+      parameters: []
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+        description: ''
+      responses:
+        '200':
+          content:
+            application/x-zserio-object:
+              schema:
+                format: binary
+                type: string
+          description: ''
+      summary: ''
+servers: []

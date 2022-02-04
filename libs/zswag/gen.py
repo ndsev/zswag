@@ -124,12 +124,16 @@ class OpenApiSchemaGenerator:
             # Generate OpenAPI from existing Python code
             sys.path.append(path)
             python_module = importlib.import_module(f"{service_name_parts[0]}.api")
-        elif os.path.isfile(path):
-            # Generate OpenAPI from zserio code. Must generate
-            # intermediate Python source to inspect service.
+            self.zs_pkg_path = None
+        else:
             if self.zs_pkg_path is None:
                 self.zs_pkg_path = os.path.abspath(os.path.dirname(path))
                 path = os.path.basename(path)
+            full_path = os.path.join(self.zs_pkg_path, path)
+            if not os.path.isfile(full_path):
+                raise OpenApiGenError(f"The path '{full_path}' is neither a zserio file nor a pythonpath.")
+            # Generate OpenAPI from zserio code. Must generate
+            # intermediate Python source to inspect service.
             if package is None:
                 package = f"zswag_gen_{uuid.uuid1().hex}"
             if service_name_parts[0] != package:
@@ -144,8 +148,6 @@ class OpenApiSchemaGenerator:
                     extra_args=["-withTypeInfoCode"])
             except CalledProcessError as e:
                 raise OpenApiGenError(f"Failed to parse zserio sources:\n{e.stderr}")
-        else:
-            raise OpenApiGenError(f"The input argument is neither a python module directory nor a zserio file.")
         if not python_module:
             raise OpenApiGenError(f"Could not import {service_name_parts[0]}.api!")
         self.service_type = rgetattr(python_module, ".".join(service_name_parts[1:]))
@@ -254,7 +256,7 @@ class OpenApiSchemaGenerator:
                     ident_type=IdentType.SERVICE,
                     pkg_path=self.zs_pkg_path,
                     ident=self.service_instance.service_full_name,
-                    fallback=[f"REST API for {self.service_instance.service_full_name}"]
+                    fallback=[f"REST API for {'.'.join(service_name_parts[1:])} service."]
                 )[0]),
                 "contact": {
                     "email": "TODO@TODO.TODO"
