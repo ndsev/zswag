@@ -216,6 +216,11 @@ void Settings::load()
         return;
     }
 
+    if (!httplib::detail::is_file(cookieJar)) {
+        log().debug("The HTTP_SETTINGS_FILE path '{}' is not a file.", cookieJar);
+        return;
+    }
+
     try {
         log().debug("Loading HTTP settings from '{}'...", cookieJar);
         auto node = YAML::LoadFile(cookieJar);
