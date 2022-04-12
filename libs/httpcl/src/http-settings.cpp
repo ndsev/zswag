@@ -1,7 +1,9 @@
 #include "http-settings.hpp"
 #include "log.hpp"
 
+#ifdef ZSWAG_KEYCHAIN_SUPPORT
 #include <keychain/keychain.h>
+#endif
 #include <yaml-cpp/yaml.h>
 
 #include <cstdlib>
@@ -113,6 +115,7 @@ std::string secret::load(
         const std::string &service,
         const std::string &user)
 {
+#ifdef ZSWAG_KEYCHAIN_SUPPORT
     log().debug("Loading secret (service={}, user={}) ...", service, user);
     auto result = std::async(std::launch::async, [=]() {
         keychain::Error error;
@@ -134,6 +137,10 @@ std::string secret::load(
 
     log().debug("  ...OK.");
     return result.get();
+#else
+    throw std::runtime_error("zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
+    return {};
+#endif
 }
 
 std::string secret::store(
@@ -141,6 +148,7 @@ std::string secret::store(
         const std::string &user,
         const std::string &password)
 {
+#ifdef ZSWAG_KEYCHAIN_SUPPORT
     auto randServiceId = []() {
         std::string id(12, '.');
         std::generate(id.begin(), id.end(), []() {
@@ -174,12 +182,17 @@ std::string secret::store(
 
     log().debug("  ...OK.");
     return newService;
+#else
+    throw std::runtime_error("zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
+    return {};
+#endif
 }
 
 bool secret::remove(
         const std::string &service,
         const std::string &user)
 {
+#ifdef ZSWAG_KEYCHAIN_SUPPORT
     log().debug("Deleting secret (service={}, user={}) ...", service, user);
 
     auto result = std::async(std::launch::async, [=]() {
@@ -199,6 +212,10 @@ bool secret::remove(
 
     log().debug("  ...OK.");
     return result.get();
+#else
+    throw std::runtime_error("zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
+    return false;
+#endif
 }
 
 Settings::Settings()
