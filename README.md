@@ -451,6 +451,14 @@ Next to `myapp/services.zs`, we place a `myapp/CMakeLists.txt` which describes o
 ```cmake
 project(myapp)
 
+# If you are not interested in building zswag Python
+# wheels, you can set the following option:
+# set(ZSWAG_BUILD_WHEELS OFF)
+
+# If your compilation environment does not provide
+# libsecret, the following switch will disable keychain integration:
+# set(ZSWAG_KEYCHAIN_SUPPORT OFF)
+
 # This is how C++ will know about the zswag lib
 # and its dependencies, such as zserio.
 add_subdirectory(zswag)
@@ -467,6 +475,8 @@ add_zserio_library(${PROJECT_NAME}-zserio-cpp
 # the generated zserio C++ library and the zswag client
 # library.
 add_executable(${PROJECT_NAME} client.cpp)
+
+# Make sure to link to the `zswagcl` target
 target_link_libraries(${PROJECT_NAME}
     ${PROJECT_NAME}-zserio-cpp zswagcl)
 ```

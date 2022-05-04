@@ -138,8 +138,7 @@ std::string secret::load(
     log().debug("  ...OK.");
     return result.get();
 #else
-    throw std::runtime_error("zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
-    return {};
+    throw std::runtime_error("[secret::load] zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
 #endif
 }
 
@@ -183,8 +182,7 @@ std::string secret::store(
     log().debug("  ...OK.");
     return newService;
 #else
-    throw std::runtime_error("zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
-    return {};
+    throw std::runtime_error("[secret::store] zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
 #endif
 }
 
@@ -213,8 +211,7 @@ bool secret::remove(
     log().debug("  ...OK.");
     return result.get();
 #else
-    throw std::runtime_error("zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
-    return false;
+    throw std::runtime_error("[secret::remove] zswag was compiled with ZSWAG_KEYCHAIN_SUPPORT OFF.");
 #endif
 }
 
