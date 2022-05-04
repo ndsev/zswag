@@ -12,6 +12,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(ZSWAG_VERSION 1.2.1)
 
+option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
+option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
+
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   set(CMAKE_CXX_FLAGS -fPIC)
@@ -28,11 +31,13 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 
 find_package(OpenSSL REQUIRED)
 
-if (NOT TARGET wheel)
-  set(Python3_FIND_STRATEGY LOCATION)
-  set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
-  include(python-wheel)
-  set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
+if (ZSWAG_BUILD_WHEELS)
+  if (NOT TARGET wheel)
+    set(Python3_FIND_STRATEGY LOCATION)
+    set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
+    include(python-wheel)
+    set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
+  endif()
 endif()
 
 if (NOT TARGET yaml-cpp)
@@ -75,8 +80,10 @@ if (NOT TARGET httplib)
   target_link_libraries(httplib INTERFACE OpenSSL::SSL)
 endif()
 
-if (NOT TARGET keychain)
-  add_subdirectory(deps/keychain)
+if (ZSWAG_KEYCHAIN_SUPPORT)
+  if (NOT TARGET keychain)
+    add_subdirectory(deps/keychain)
+  endif()
 endif()
 
 if (NOT TARGET pybind11)
@@ -100,8 +107,6 @@ add_subdirectory(libs/zswagcl)
 
 ##############
 # wheels
-
-option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 
 if (ZSWAG_BUILD_WHEELS)
   add_subdirectory(libs/pyzswagcl)
