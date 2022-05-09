@@ -86,7 +86,7 @@ if (ZSWAG_KEYCHAIN_SUPPORT)
   endif()
 endif()
 
-if (NOT TARGET pybind11)
+if (ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
   add_subdirectory(deps/pybind11)
 endif()
 
