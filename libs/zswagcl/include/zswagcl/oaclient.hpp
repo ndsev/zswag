@@ -18,7 +18,7 @@ public:
 
     std::vector<uint8_t> callMethod(
         zserio::StringView methodName,
-        zserio::RequestData const& requestData,
+        zserio::IServiceData const& requestData,
         void* context) override;
 
 private:
