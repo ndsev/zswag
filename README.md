@@ -491,7 +491,7 @@ which contains the code to actually use the zswag C++ client.
 
 using namespace zswagcl;
 using namespace httpcl;
-using MyService = myapp_services::services::MyService;
+namespace MyService = myapp_services::services::MyService;
 
 int main (int argc, char* argv[])
 {
@@ -502,7 +502,7 @@ int main (int argc, char* argv[])
     auto httpClient = std::make_unique<HttpLibHttpClient>();
     
     // Fetch the OpenAPI configuration using the HTTP client
-    auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
+    auto openApiConfig = fetchOpenAPIConfig(openApiUrl, *httpClient);
     
     // Create a Zserio reflection-based OpenAPI client that
     // uses the OpenAPI configuration we just retrieved.
