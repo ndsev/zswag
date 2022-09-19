@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include "stx/format.h"
+#include "zserio/ITypeInfo.h"
 
 namespace zswagcl
 {
@@ -111,7 +112,7 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
 
 std::vector<uint8_t> OAClient::callMethod(
     zserio::StringView methodName,
-    zserio::RequestData const& requestData,
+    zserio::IServiceData const& requestData,
     void* context)
 {
     if (!requestData.getReflectable()) {

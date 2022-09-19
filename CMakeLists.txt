@@ -10,7 +10,7 @@ include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.2.1)
+set(ZSWAG_VERSION 1.3.0)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
@@ -90,13 +90,12 @@ if (ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
   add_subdirectory(deps/pybind11)
 endif()
 
-if (NOT TARGET ZserioCppRuntime)
-  add_subdirectory(deps/zserio/compiler/extensions/cpp/runtime/src)
-  set(ZSERIO_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/deps/zserio")
-endif()
-
 if (NOT TARGET zserio-cmake-helper)
+  set(ZSERIO_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/deps/zserio")
   add_subdirectory(deps/zserio-cmake-helper)
+  if (NOT TARGET ZserioCppRuntime)
+    add_zserio_cpp_runtime()
+  endif()
 endif()
 
 ##############
