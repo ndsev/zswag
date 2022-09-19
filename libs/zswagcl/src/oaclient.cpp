@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include "stx/format.h"
+#include "zserio/ITypeInfo.h"
 
 namespace zswagcl
 {
