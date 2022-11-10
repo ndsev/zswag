@@ -15,7 +15,7 @@ target_link_libraries(zswagcl-test
   PUBLIC
     zswagcl-test-zs
     zswagcl
-    Catch2::Catch2)
+    Catch2::Catch2WithMain)
 
 target_compile_definitions(zswagcl-test
   PRIVATE
