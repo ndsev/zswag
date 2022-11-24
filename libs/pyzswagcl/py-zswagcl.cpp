@@ -102,24 +102,25 @@ PYBIND11_MODULE(pyzswagcl, m)
                 host, port, user, pw, ""
             };
             return &self;
-        }, "host"_a, "port"_a, "user"_a, "pw"_a);
+        }, "host"_a, "port"_a, "user"_a, "pw"_a)
+        ;
 
     ///////////////////////////////////////////////////////////////////////////
     // OpenAPIConfig
     py::class_<OpenAPIConfig>(m, "OAConfig")
-            .def("__contains__", [](const OpenAPIConfig& self, std::string const& methodName) {
-                return self.methodPath.find(methodName) != self.methodPath.end();
-            }, py::is_operator(), "method_name"_a)
-
-            .def("__getitem__", [](const OpenAPIConfig& self, std::string const& methodName) {
-                auto it = self.methodPath.find(methodName);
-                if (it != self.methodPath.end())
-                    return it->second;
-                else
-                    throw std::runtime_error(
-                        "Could not find OpenAPI config for method name "s+methodName);
-            }, py::is_operator(), py::return_value_policy::reference_internal, "method_name"_a)
-            ;
+        .def("__contains__", [](const OpenAPIConfig& self, std::string const& methodName) {
+            return self.methodPath.find(methodName) != self.methodPath.end();
+        }, py::is_operator(), "method_name"_a)
+        .def("__getitem__", [](const OpenAPIConfig& self, std::string const& methodName) {
+            auto it = self.methodPath.find(methodName);
+            if (it != self.methodPath.end())
+                return it->second;
+            else
+                throw std::runtime_error(
+                    "Could not find OpenAPI config for method name "s+methodName);
+        }, py::is_operator(), py::return_value_policy::reference_internal, "method_name"_a)
+        .def_readonly("content", &OpenAPIConfig::content)
+        ;
 
     m.def("parse_openapi_config", [](std::string const& path){
         std::ifstream ifs;

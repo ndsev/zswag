@@ -2,7 +2,6 @@ from enum import Enum
 import calculator.api as api
 from zswag import OAClient, HTTPConfig
 
-
 def run(host, port):
 
     server_url = f"http://{host}:{port}/openapi.json"
@@ -16,7 +15,8 @@ def run(host, port):
         try:
             print(f"[py-test-client] Test#{counter}: {aspect}", flush=True)
             print(f"[py-test-client]   -> Instantiating client.", flush=True)
-            client = api.Calculator.Client(OAClient(f"http://{host}:{port}/openapi.json", **auth_args))
+            oa_client = OAClient(f"http://{host}:{port}/openapi.json", **auth_args)
+            client = api.Calculator.Client(oa_client)
             print(f"[py-test-client]   -> Running request.", flush=True)
             resp = fn(client, request)
             if resp.value == expect:

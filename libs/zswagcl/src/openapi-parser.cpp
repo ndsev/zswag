@@ -391,11 +391,12 @@ static void parseServer(const YAMLScope& serverNode,
     }
 }
 
-OpenAPIConfig parseOpenAPIConfig(std::istream& s)
+OpenAPIConfig parseOpenAPIConfig(std::istream& ss)
 {
     OpenAPIConfig config;
+    config.content = std::string(std::istreambuf_iterator<char>(ss), {});
 
-    auto doc = YAML::Load(s);
+    auto doc = YAML::Load(config.content);
     YAMLScope docScope{"", doc};
     docScope["servers"].forEach([&](auto const& serverNode){
         try { parseServer(serverNode, config); }
