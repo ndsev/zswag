@@ -15,8 +15,8 @@ bool OpenAPIConfig::BasicAuth::checkOrApply(httpcl::Config& config, std::string&
         return true;
 
     std::regex basicAuthValueRe{
-            "^Basic .+$",
-            std::regex_constants::ECMAScript|std::regex_constants::icase
+        "^Basic .+$",
+        std::regex_constants::ECMAScript|std::regex_constants::icase
     };
 
     auto found = std::any_of(config.headers.begin(), config.headers.end(), [&](auto const& headerNameAndValue){

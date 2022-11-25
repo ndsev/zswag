@@ -146,8 +146,13 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     std::string debugContext = stx::format("[{} {}]", method.httpMethod, uri.buildPath());
     httpcl::log().debug("{} Calling endpoint {} ...", debugContext, builtUri);
 
+    // Initialize HTTP config from persistent and ad-hoc values
     auto httpConfig = settings_[builtUri];
     httpConfig |= httpConfig_;
+
+    // Make sure that the server responds with correct content type
+    httpConfig.headers.insert({"Accept", ZSERIO_OBJECT_CONTENT_TYPE});
+
     httpcl::log().debug("{} Resolving query/path parameters ...", debugContext);
     resolveHeaderAndQueryParameters(httpConfig, method, paramCb);
 
@@ -163,7 +168,8 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     }
 
     const auto& httpMethod = method.httpMethod;
-    std::future<httpcl::IHttpClient::Result> resultFuture = ([&]() {
+    std::future<httpcl::IHttpClient::Result> resultFuture = ([&]()
+    {
         if (httpMethod == "GET") {
             httpcl::log().debug("{} Executing request ...", debugContext);
             return std::async(std::launch::async, [builtUri, httpConfig, this]{

@@ -50,7 +50,7 @@ BreakBeforeTernaryOperators: false
 IndentAccessModifiers: false
 AccessModifierOffset: -4
 
-PenaltyIndentedWhitespace: 10
+PenaltyIndentedWhitespace: 100
 PenaltyBreakAssignment: 100
 PenaltyReturnTypeOnItsOwnLine: 100
 PenaltyBreakBeforeFirstCallParameter: 0

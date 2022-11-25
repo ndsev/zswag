@@ -259,9 +259,10 @@ static void parseMethodBody(YAMLScope const& methodNode,
         if (auto contentNode = bodyNode["content"]) {
             for (auto contentTypeNode : contentNode.node_) {
                 auto contentType = contentTypeNode.first.as<std::string>();
-                if (contentType != ZSERIO_OBJECT_CONTENT_TYPE)
-                    throw contentNode.valueError(contentType, {ZSERIO_OBJECT_CONTENT_TYPE});
-                path.bodyRequestObject = true;
+                if (contentType == ZSERIO_OBJECT_CONTENT_TYPE)
+                    path.bodyRequestObject = true;
+                else
+                    httpcl::log().debug("Ignoring request body MIME type '{}'.", contentType);
             }
         }
     }
