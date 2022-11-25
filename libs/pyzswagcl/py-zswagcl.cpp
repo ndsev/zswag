@@ -103,7 +103,14 @@ PYBIND11_MODULE(pyzswagcl, m)
             };
             return &self;
         }, "host"_a, "port"_a, "user"_a, "pw"_a)
-        ;
+        .def(py::pickle(
+            [](httpcl::Config const& self) {
+                return py::make_tuple(self.toYaml());
+            },
+            [](py::tuple const& t)
+            {
+                return Config(t[0].cast<std::string>());
+            }));
 
     ///////////////////////////////////////////////////////////////////////////
     // OpenAPIConfig

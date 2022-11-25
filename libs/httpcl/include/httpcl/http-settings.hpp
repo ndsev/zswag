@@ -24,6 +24,9 @@ using Query = std::multimap<std::string, std::string>;
  */
 struct Config
 {
+    Config() = default;
+    Config(std::string const& yamlConf);
+
     struct BasicAuthentication {
         std::string user;
         std::string password;
@@ -55,6 +58,12 @@ struct Config
      * May read keychain passwords which can block and require user interaction.
      */
     void apply(httplib::Client& cl) const;
+
+    /**
+     * Convert this configuration to a YAML string, which may
+     * be passed to the respective `Config(yamlConf)` constructor.
+     */
+    std::string toYaml() const;
 };
 
 /**
