@@ -31,6 +31,9 @@ auto makeClientAndApplyQuery(
     config.apply(*client);
 
     applyQuery(uri, config);
+    if (httpcl::log().should_log(spdlog::level::debug)) {
+        httpcl::log().debug("  ... full URI: {}", uri.build());
+    }
     return client;
 }
 
@@ -58,8 +61,9 @@ Result HttpLibHttpClient::get(const std::string& uriStr,
                               const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
-    return makeResult(makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)->Get(
-        uri.buildPath().c_str()));
+    return makeResult(
+        makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)
+            ->Get(uri.buildPath().c_str()));
 }
 
 Result HttpLibHttpClient::post(const std::string& uriStr,
@@ -67,10 +71,12 @@ Result HttpLibHttpClient::post(const std::string& uriStr,
                                const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
-    return makeResult(makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)->Post(
-        uri.buildPath().c_str(),
-        body ? body->body : std::string(),
-        body ? body->contentType.c_str() : nullptr));
+    return makeResult(
+        makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)
+            ->Post(
+                uri.buildPath().c_str(),
+                body ? body->body : std::string(),
+                body ? body->contentType.c_str() : nullptr));
 }
 
 Result HttpLibHttpClient::put(const std::string& uriStr,
@@ -78,10 +84,12 @@ Result HttpLibHttpClient::put(const std::string& uriStr,
                               const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
-    return makeResult(makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)->Put(
-        uri.buildPath().c_str(),
-        body ? body->body : std::string(),
-        body ? body->contentType.c_str() : nullptr));
+    return makeResult(
+        makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)
+            ->Put(
+                uri.buildPath().c_str(),
+                body ? body->body : std::string(),
+                body ? body->contentType.c_str() : nullptr));
 }
 
 Result HttpLibHttpClient::del(const std::string& uriStr,
@@ -89,10 +97,12 @@ Result HttpLibHttpClient::del(const std::string& uriStr,
                               const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
-    return makeResult(makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)->Delete(
-        uri.buildPath().c_str(),
-        body ? body->body : std::string(),
-        body ? body->contentType.c_str() : nullptr));
+    return makeResult(
+        makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)
+            ->Delete(
+                uri.buildPath().c_str(),
+                body ? body->body : std::string(),
+                body ? body->contentType.c_str() : nullptr));
 }
 
 Result HttpLibHttpClient::patch(const std::string& uriStr,
@@ -100,10 +110,12 @@ Result HttpLibHttpClient::patch(const std::string& uriStr,
                                 const Config& config)
 {
     auto uri = URIComponents::fromStrRfc3986(uriStr);
-    return makeResult(makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)->Patch(
-        uri.buildPath().c_str(),
-        body ? body->body : std::string(),
-        body ? body->contentType.c_str() : nullptr));
+    return makeResult(
+        makeClientAndApplyQuery(uri, config, timeoutSecs_, sslCertStrict_)
+            ->Patch(
+                uri.buildPath().c_str(),
+                body ? body->body : std::string(),
+                body ? body->contentType.c_str() : nullptr));
 }
 
 Result MockHttpClient::get(const std::string& uri,

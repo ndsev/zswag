@@ -111,6 +111,71 @@ struct convert<Config::Proxy>
 };
 }
 
+namespace {
+YAML::Node configToNode(Config const& config, std::string const& url=".*") {
+    YAML::Node result;
+    result["url"] = url;
+
+    if (!config.cookies.empty())
+        result["cookies"] = config.cookies;
+
+    if (!config.headers.empty())
+        result["headers"] =
+            std::map<std::string, std::string>{config.headers.begin(), config.headers.end()};
+
+    if (!config.query.empty())
+        result["query"] =
+            std::map<std::string, std::string>{config.query.begin(), config.query.end()};
+
+    if (config.auth)
+        result["basic-auth"] = *config.auth;
+
+    if (config.proxy)
+        result["proxy"] = *config.proxy;
+
+    if (config.apiKey)
+        result["api-key"] = *config.apiKey;
+
+    return result;
+}
+
+std::pair<Config, std::string> configFromNode(YAML::Node const& node)
+{
+    std::string urlPattern;
+    Config conf;
+
+    if (auto entryParam = node["url"])
+        urlPattern = entryParam.as<std::string>();
+    else
+        throw std::runtime_error(
+            "HTTP Settings: Missing 'url' field in: " + YAML::Dump(node));
+
+    if (auto cookies = node["cookies"])
+        conf.cookies = cookies.as<std::map<std::string, std::string>>();
+
+    if (auto headers = node["headers"]) {
+        auto headersMap = headers.as<std::map<std::string, std::string>>();
+        conf.headers.insert(headersMap.begin(), headersMap.end());
+    }
+
+    if (auto query = node["query"]) {
+        auto queryMap = query.as<std::map<std::string, std::string>>();
+        conf.query.insert(queryMap.begin(), queryMap.end());
+    }
+
+    if (auto basicAuth = node["basic-auth"])
+        conf.auth = basicAuth.as<Config::BasicAuthentication>();
+
+    if (auto proxy = node["proxy"])
+        conf.proxy = proxy.as<Config::Proxy>();
+
+    if (auto apiKey = node["api-key"])
+        conf.apiKey = apiKey.as<std::string>();
+
+    return {std::move(conf), std::move(urlPattern)};
+}
+}
+
 std::string secret::load(
         const std::string &service,
         const std::string &user)
@@ -241,38 +306,7 @@ void Settings::load()
         uint32_t idx = 0;
 
         for (auto const& entry : node.as<std::vector<YAML::Node>>()) {
-            Config conf;
-            std::string urlPattern;
-
-            if (auto entryParam = entry["url"])
-                urlPattern = entryParam.as<std::string>();
-            else
-                throw std::runtime_error(
-                    "Settings: Failed to read 'url' of entry #"s + std::to_string(idx) +
-                    " in " + cookieJar);
-
-            if (auto cookies = entry["cookies"])
-                conf.cookies = cookies.as<std::map<std::string, std::string>>();
-
-            if (auto headers = entry["headers"]) {
-                auto headersMap = headers.as<std::map<std::string, std::string>>();
-                conf.headers.insert(headersMap.begin(), headersMap.end());
-            }
-
-            if (auto query = entry["query"]) {
-                auto queryMap = query.as<std::map<std::string, std::string>>();
-                conf.query.insert(queryMap.begin(), queryMap.end());
-            }
-
-            if (auto basicAuth = entry["basic-auth"])
-                conf.auth = basicAuth.as<Config::BasicAuthentication>();
-
-            if (auto proxy = entry["proxy"])
-                conf.proxy = proxy.as<Config::Proxy>();
-
-            if (auto apiKey = entry["api-key"])
-                conf.apiKey = apiKey.as<std::string>();
-
+            auto [conf, urlPattern] = configFromNode(entry);
             settings[urlPattern] = std::move(conf);
             ++idx;
         }
@@ -296,34 +330,8 @@ void Settings::store()
     try {
         auto node = YAML::Node();
 
-        for (const auto& pair : settings) {
-            auto settingsNode = YAML::Node();
-
-            settingsNode["url"] = pair.first;
-            const auto& entry = pair.second;
-
-            if (!entry.cookies.empty())
-                settingsNode["cookies"] = entry.cookies;
-
-            if (!entry.headers.empty())
-                settingsNode["headers"] = std::map<std::string, std::string>{
-                    entry.headers.begin(), entry.headers.end()};
-
-            if (!entry.query.empty())
-                settingsNode["query"] = std::map<std::string, std::string>{
-                    entry.query.begin(), entry.query.end()};
-
-            if (entry.auth)
-                settingsNode["basic-auth"] = *entry.auth;
-
-            if (entry.proxy)
-                settingsNode["proxy"] = *entry.proxy;
-
-            if (entry.apiKey)
-                settingsNode["api-key"] = *entry.apiKey;
-
-            node.push_back(settingsNode);
-        }
+        for (const auto& [key, config] : settings)
+            node.push_back(configToNode(config));
 
         log().debug("Saving HTTP settings to '{}'...", cookieJar);
         std::ofstream os(cookieJar);
@@ -332,6 +340,12 @@ void Settings::store()
     } catch (const std::exception& e) {
         log().error("Failed to write http-settings to '{}': {}", cookieJar, e.what());
     }
+}
+
+Config::Config(const std::string& yamlConf)
+{
+    YAML::Node parsedYaml = YAML::Load(yamlConf);
+    *this = configFromNode(parsedYaml).first;
 }
 
 Config Settings::operator[] (const std::string &url) const
@@ -387,6 +401,10 @@ void Config::apply(httplib::Client &cl) const
     }
 
     cl.set_default_headers(httpLibHeaders);
+}
+
+std::string Config::toYaml() const {
+    return YAML::Dump(configToNode(*this));
 }
 
 Config& Config::operator |= (Config const& other) {

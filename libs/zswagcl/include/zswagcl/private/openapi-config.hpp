@@ -200,6 +200,11 @@ struct OpenAPIConfig
      * is an empty array of combinations, which means no auth required.
      */
     SecurityAlternatives defaultSecurityScheme;
+
+    /**
+     * Original OpenAPI YAML string from which this config was parsed.
+     */
+    std::string content;
 };
 
 ZSWAGCL_EXPORT extern const std::string ZSERIO_OBJECT_CONTENT_TYPE;

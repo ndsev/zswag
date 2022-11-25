@@ -1,7 +1,8 @@
 from enum import Enum
 import calculator.api as api
 from zswag import OAClient, HTTPConfig
-
+import json
+import pickle
 
 def run(host, port):
 
@@ -10,13 +11,20 @@ def run(host, port):
     failed = 0
     print(f"[py-test-client] Connecting to {server_url}", flush=True)
 
+    # Make sure that HTTP Config pickling works
+    config_pickled = pickle.dumps(HTTPConfig().header("x", "42"))
+    assert pickle.loads(config_pickled)
+
     def run_test(aspect, request, fn, expect, auth_args):
         nonlocal counter, failed
         counter += 1
         try:
             print(f"[py-test-client] Test#{counter}: {aspect}", flush=True)
             print(f"[py-test-client]   -> Instantiating client.", flush=True)
-            client = api.Calculator.Client(OAClient(f"http://{host}:{port}/openapi.json", **auth_args))
+            oa_client = OAClient(f"http://{host}:{port}/openapi.json", **auth_args)
+            # Just make sure that OpenAPI JSON content is parsable
+            assert oa_client.config().content and json.loads(oa_client.config().content)
+            client = api.Calculator.Client(oa_client)
             print(f"[py-test-client]   -> Running request.", flush=True)
             resp = fn(client, request)
             if resp.value == expect:

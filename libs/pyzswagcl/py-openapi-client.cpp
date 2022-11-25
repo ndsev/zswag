@@ -66,11 +66,14 @@ namespace
 void PyOpenApiClient::bind(py::module_& m) {
     auto serviceClient = py::class_<PyOpenApiClient>(m, "OAClient")
         .def(py::init<std::string, bool, httpcl::Config, std::optional<std::string>, std::optional<std::string>>(),
-             "url"_a, "is_local_file"_a = false, "config"_a = httpcl::Config(),
-             "api_key"_a = std::optional<std::string>(), "bearer"_a = std::optional<std::string>())
+            "url"_a, "is_local_file"_a = false, "config"_a = httpcl::Config(),
+            "api_key"_a = std::optional<std::string>(), "bearer"_a = std::optional<std::string>())
         // zserio >= 2.3.0
         .def("call_method", &PyOpenApiClient::callMethod,
-             "method_name"_a, "request"_a, "unused"_a);
+            "method_name"_a, "request"_a, "unused"_a)
+        .def("config", [](PyOpenApiClient const& self)->OpenAPIConfig const&{
+            return self.client_->config_;
+        }, py::return_value_policy::reference_internal);
 
     py::object serviceClientBase = py::module::import("zserio").attr("ServiceInterface");
     serviceClient.attr("__bases__") = py::make_tuple(serviceClientBase) + serviceClient.attr("__bases__");

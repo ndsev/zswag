@@ -105,7 +105,7 @@ static std::string decode(const std::string& alphabet,
                           bool (*is_base64_pred)(unsigned char),
                           std::string const& encoded_string)
 {
-    int in_len = encoded_string.size();
+    auto in_len = encoded_string.size();
     int i = 0;
     int j = 0;
     int in_ = 0;
