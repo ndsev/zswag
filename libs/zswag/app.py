@@ -17,6 +17,9 @@ from .reflect import request_object_blob, service_method_request_type, to_snake
 # to hold the service instance.
 CONTROLLER_SERVICE_INSTANCE = "_service"
 
+# Name of OpenApi extension field from which connexion
+# reads the target wsgi function.
+CONTROLLER_OPENAPI_FIELD = "x-openapi-router-controller"
 
 # Utility function for slash conversion in format strings
 def to_slashes(s: str):
@@ -69,7 +72,7 @@ class OAServer(connexion.App):
                 #  In swagger yaml, the path specs reference `my.app.controller._service.myApi`
                 _service = Service()
                 _service.myApi = lambda request: _service._myApiMethod(request)
-                _service._myApiImpl = my.app.controller.myApiImpl
+                _service._myApiImpl = my.app.controller.my_api
 
                 # Written by user
                 def my_api(request):
@@ -81,7 +84,7 @@ class OAServer(connexion.App):
              Zserio Server instance injected method (ns.service.service(base64): blob), which calls
              ns.service._serviceMethod(blob), which calls
              ns.service._serviceImpl(value) which is remapped to
-             Runtime-generated user function (ns.serviceImpl(value): value).
+             User function (ns.serviceImpl(value): value).
 
         """
         if not yaml_path:
@@ -173,9 +176,12 @@ class OAServer(connexion.App):
         print(f"Loading spec from {yaml_path} ...")
         with open(yaml_path, 'r') as swagger_file:
             openapi = yaml.load(swagger_file, Loader=yaml.FullLoader)
-        for _, path_spec in openapi["paths"].items():
-            for _, method_spec in path_spec.items():
-                method_spec["x-openapi-router-controller"] = self.service_instance_path
+        for path_name, path_spec in openapi["paths"].items():
+            for meth_name, method_spec in path_spec.items():
+                if CONTROLLER_OPENAPI_FIELD not in method_spec:
+                    method_spec[CONTROLLER_OPENAPI_FIELD] = self.service_instance_path
+                else:
+                    print(f"{meth_name} {path_name}: Using pre-set {CONTROLLER_OPENAPI_FIELD}.")
 
         # Initialise connexion app
         super(OAServer, self).__init__(
