@@ -23,7 +23,7 @@ ParameterValue reflectableArrayToParameterValue(std::function<void(std::vector<a
     return helper.array(values);
 }
 
-ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio::IReflectablePtr const& ref, zserio::ITypeInfo const& refType, ParameterValueHelper& helper)
+ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio::IReflectableConstPtr const& ref, zserio::ITypeInfo const& refType, ParameterValueHelper& helper)
 {
     switch (refType.getCppType())
     {
@@ -70,6 +70,16 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
             }
             return helper.value(ref->toString());
         case zserio::CppType::BIT_BUFFER: {
+            if (ref->isArray()) {
+                return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
+                    auto const& buffer = ref->at(i)->getBytes();
+                    arr.emplace_back(buffer.begin(), buffer.end());
+                }, ref->size(), helper);
+            }
+            auto const& buffer = ref->getBytes();
+            return helper.binary(std::vector<uint8_t>(buffer.begin(), buffer.end()));
+        }
+        case zserio::CppType::BYTES: {
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
                     auto const& buffer = ref->at(i)->getBitBuffer();
