@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.24)
+# Add conan 2.0 support
+set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conan-provider.cmake)
 
 if (NOT PROJECT_NAME)
   set (ZSWAG_ENABLE_TESTING ON)
@@ -7,12 +9,8 @@ endif()
 project(zswag)
 enable_testing()
 
-# Cmake includes
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(fetch_deps_with_conan)
 include(FetchContent)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,15 +31,26 @@ set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 
 ##############
-# deps
+# dependencies
 
-find_package(OpenSSL REQUIRED)
-find_package(keychain REQUIRED)
+find_package(OpenSSL CONFIG REQUIRED)
+find_package(keychain CONFIG REQUIRED)
 
 if (ZSWAG_BUILD_WHEELS)
+  FetchContent_Declare(python_cmake_wheel
+  GIT_REPOSITORY "https://github.com/Klebert-Engineering/python-cmake-wheel"
+  GIT_TAG        "main"
+  GIT_SHALLOW    ON)
+
+  FetchContent_GetProperties(python_cmake_wheel)
+
+  if(NOT python_cmake_wheel_POPULATED)
+    FetchContent_Populate(python_cmake_wheel)
+    set(CMAKE_MODULE_PATH "${python_cmake_wheel_SOURCE_DIR}" ${CMAKE_MODULE_PATH})
+  endif()
+
   if (NOT TARGET wheel)
     set(Python3_FIND_STRATEGY LOCATION)
-    set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
     include(python-wheel)
     set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
   endif()
@@ -71,14 +80,6 @@ if (NOT TARGET speedyj)
   FetchContent_MakeAvailable(speedyj)
 endif()
 
-if (NOT TARGET spdlog)
-  FetchContent_Declare(spdlog
-    GIT_REPOSITORY "https://github.com/gabime/spdlog.git"
-    GIT_TAG        "v1.x"
-    GIT_SHALLOW    ON)
-  FetchContent_MakeAvailable(spdlog)
-endif()
-
 if (NOT TARGET Catch2)
   FetchContent_Declare(Catch2
     GIT_REPOSITORY "https://github.com/catchorg/Catch2.git"
@@ -101,14 +102,14 @@ if (NOT TARGET httplib)
 endif()
 
 if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
-  add_subdirectory(deps/pybind11)
+  find_package(pybind11 REQUIRED)
 endif()
 
 if (NOT TARGET zserio-cmake-helper)
-  set(ZSERIO_VERSION "2.10.0")
+  set(ZSERIO_VERSION "2.11.0")
   FetchContent_Declare(zserio-cmake-helper
   GIT_REPOSITORY "https://github.com/Klebert-Engineering/zserio-cmake-helper.git"
-  GIT_TAG        "v1.0.0-rc1"
+  GIT_TAG        "main"
   GIT_SHALLOW    ON)
   FetchContent_MakeAvailable(zserio-cmake-helper)
   if (NOT TARGET ZserioCppRuntime)
