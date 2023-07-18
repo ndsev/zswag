@@ -1,6 +1,0 @@
-[submodule "deps/pybind11"]
-	path = deps/pybind11
-	url = https://github.com/pybind/pybind11.git
-[submodule "deps/python-cmake-wheel"]
-	path = deps/python-cmake-wheel
-	url = https://github.com/klebert-engineering/python-cmake-wheel.git
