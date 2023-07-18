@@ -27,8 +27,8 @@ if (MSVC)
 endif()
 
 add_wheel(pyzswagcl
-  AUTHOR "Klebert Engineering"
-  URL "https://github.com/klebert-engineering/zswag"
+  AUTHOR "Navigation Data Standard e.V."
+  URL "https://github.com/ndsev/zswag"
   VERSION "${ZSWAG_VERSION}"
   DESCRIPTION "Python bindings for the zswag client library."
   TARGET_DEPENDENCIES
