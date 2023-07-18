@@ -35,7 +35,7 @@ target_include_directories(httpcl
 
 if (ZSWAG_KEYCHAIN_SUPPORT)
   target_compile_definitions(httpcl PRIVATE ZSWAG_KEYCHAIN_SUPPORT)
-  target_link_libraries(httpcl PUBLIC keychain)
+  target_link_libraries(httpcl PUBLIC keychain::keychain)
 endif()
 
 add_subdirectory(test)
