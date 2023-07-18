@@ -46,6 +46,13 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
+    - name: Cache Conan packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.conan/data
+        key: ${{ runner.os }}-conan-${{ hashFiles('**/conanfile.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-conan-
     - uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
