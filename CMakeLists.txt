@@ -37,16 +37,16 @@ find_package(OpenSSL CONFIG REQUIRED)
 find_package(keychain CONFIG REQUIRED)
 
 if (ZSWAG_BUILD_WHEELS)
-  FetchContent_Declare(python_cmake_wheel
+  FetchContent_Declare(python-cmake-wheel
   GIT_REPOSITORY "https://github.com/Klebert-Engineering/python-cmake-wheel"
   GIT_TAG        "main"
   GIT_SHALLOW    ON)
 
-  FetchContent_GetProperties(python_cmake_wheel)
+  FetchContent_GetProperties(python-cmake-wheel)
 
-  if(NOT python_cmake_wheel_POPULATED)
-    FetchContent_Populate(python_cmake_wheel)
-    set(CMAKE_MODULE_PATH "${python_cmake_wheel_SOURCE_DIR}" ${CMAKE_MODULE_PATH})
+  if(NOT python-cmake-wheel_POPULATED)
+    FetchContent_Populate(python-cmake-wheel)
+    set(CMAKE_MODULE_PATH "${python-cmake-wheel_SOURCE_DIR}" ${CMAKE_MODULE_PATH})
   endif()
 
   if (NOT TARGET wheel)

@@ -70,7 +70,7 @@ jobs:
         cmake --build .
         mv bin/wheel bin/wheel-auditme  # Same as on Linux
         mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
-        deps_/python-cmake-wheel-src/repair-wheel-macos.bash \
+        _deps/python-cmake-wheel-src/repair-wheel-macos.bash \
               "$(pwd)"/bin/wheel-auditme/pyzswagcl*.whl \
               "$(pwd)"/bin/wheel pyzswagcl
     - name: Build (Windows)
