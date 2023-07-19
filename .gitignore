@@ -130,3 +130,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 dist/
+
+# VSCode stuff
+.vscode/
+
+# CodeChecker stuff
+.codechecker/
