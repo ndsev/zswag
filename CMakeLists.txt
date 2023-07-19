@@ -39,7 +39,7 @@ find_package(keychain CONFIG REQUIRED)
 if (ZSWAG_BUILD_WHEELS)
   FetchContent_Declare(python-cmake-wheel
   GIT_REPOSITORY "https://github.com/Klebert-Engineering/python-cmake-wheel"
-  GIT_TAG        "main"
+  GIT_TAG        "debug-macos-zswag-build"
   GIT_SHALLOW    ON)
 
   FetchContent_GetProperties(python-cmake-wheel)
