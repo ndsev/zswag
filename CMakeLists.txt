@@ -130,7 +130,7 @@ if (ZSWAG_BUILD_WHEELS)
 endif()
 
 ##############
-# deploy
+# deploy openssl libs
 
 message(STATUS "Deploying to ${ZSWAG_DEPLOY_DIR}")
 message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
@@ -154,6 +154,23 @@ elseif(UNIX AND NOT APPLE)
       "${OPENSSL_LIB_DIR}/libssl.so.1.1"
   )
 endif()
+
+foreach(file_i ${OPENSSL_LIBS})
+    add_custom_command(
+        OUTPUT "${ZSWAG_DEPLOY_DIR}/$(notdir ${file_i})"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${file_i}"
+            "${ZSWAG_DEPLOY_DIR}/$(notdir ${file_i})"
+        DEPENDS "${file_i}"
+        COMMENT "Copying ${file_i} to ${ZSWAG_DEPLOY_DIR}"
+    )
+    list(APPEND COPIED_OPENSSL_LIBS "${ZSWAG_DEPLOY_DIR}/$(notdir ${file_i})")
+endforeach(file_i)
+
+add_custom_target(copy_openssl_libs ALL DEPENDS ${COPIED_OPENSSL_LIBS})
+
+add_dependencies(zswagcl copy_openssl_libs)
+
 
 
 
