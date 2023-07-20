@@ -71,7 +71,7 @@ jobs:
       if: matrix.os == 'macos-13'
       working-directory: build
       run: |
-        export MACOSX_DEPLOYMENT_TARGET=13.0
+        export MACOSX_DEPLOYMENT_TARGET=10.15
         python -m pip install delocate
         cmake -DPython3_ROOT_DIR=$pythonLocation \
               -DPython3_FIND_FRAMEWORK=LAST \
