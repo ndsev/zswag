@@ -80,6 +80,14 @@ if (NOT TARGET speedyj)
   FetchContent_MakeAvailable(speedyj)
 endif()
 
+if (NOT TARGET Catch2)
+  FetchContent_Declare(Catch2
+    GIT_REPOSITORY "https://github.com/catchorg/Catch2.git"
+    GIT_TAG        "v3.1.0"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(Catch2)
+endif()
+
 if (NOT TARGET httplib)
   FetchContent_Declare(httplib
     GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"

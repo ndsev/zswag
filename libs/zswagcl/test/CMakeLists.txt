@@ -1,7 +1,5 @@
 project(zswagcl-test)
 
-find_package(Catch2 CONFIG REQUIRED)
-
 add_zserio_library(zswagcl-test-zs
   ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src"
   ENTRY "service_client_test.zs"
