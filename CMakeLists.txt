@@ -156,15 +156,16 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 foreach(file_i ${OPENSSL_LIBS})
+    get_filename_component(filename ${file_i} NAME)
     add_custom_command(
-        OUTPUT "${ZSWAG_DEPLOY_DIR}/$(notdir ${file_i})"
+        OUTPUT "${ZSWAG_DEPLOY_DIR}/${filename}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${file_i}"
-            "${ZSWAG_DEPLOY_DIR}/$(notdir ${file_i})"
+            "${ZSWAG_DEPLOY_DIR}/${filename}"
         DEPENDS "${file_i}"
         COMMENT "Copying ${file_i} to ${ZSWAG_DEPLOY_DIR}"
     )
-    list(APPEND COPIED_OPENSSL_LIBS "${ZSWAG_DEPLOY_DIR}/$(notdir ${file_i})")
+    list(APPEND COPIED_OPENSSL_LIBS "${ZSWAG_DEPLOY_DIR}/${filename}")
 endforeach(file_i)
 
 add_custom_target(copy_openssl_libs ALL DEPENDS ${COPIED_OPENSSL_LIBS})
