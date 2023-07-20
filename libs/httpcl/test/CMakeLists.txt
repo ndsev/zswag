@@ -1,5 +1,7 @@
 project(httpcl-test)
 
+find_package(Catch2 CONFIG REQUIRED)
+
 add_executable(httpcl-test
   src/main.cpp
   src/uri.cpp)

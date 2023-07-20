@@ -80,15 +80,6 @@ if (NOT TARGET speedyj)
   FetchContent_MakeAvailable(speedyj)
 endif()
 
-if (NOT TARGET Catch2)
-  FetchContent_Declare(Catch2
-    GIT_REPOSITORY "https://github.com/catchorg/Catch2.git"
-    GIT_TAG        "v3.1.0"
-    GIT_SHALLOW    ON)
-  FetchContent_MakeAvailable(Catch2)
-endif()
-
-
 if (NOT TARGET httplib)
   FetchContent_Declare(httplib
     GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"
@@ -137,3 +128,33 @@ if (ZSWAG_BUILD_WHEELS)
       ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
   add_dependencies(wheel zswag-server-wheel)
 endif()
+
+##############
+# deploy
+
+message(STATUS "Deploying to ${ZSWAG_DEPLOY_DIR}")
+message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
+
+if(APPLE)
+  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
+  set(OPENSSL_LIBS
+      "${OPENSSL_LIB_DIR}/libcrypto.1.1.dylib"
+      "${OPENSSL_LIB_DIR}/libssl.1.1.dylib"
+  )
+elseif(MSVC)
+  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../bin")
+  set(OPENSSL_LIBS
+      "${OPENSSL_LIB_DIR}/libcrypto-1_1-x64.dll"
+      "${OPENSSL_LIB_DIR}/libssl-1_1-x64.dll"
+  )
+elseif(UNIX AND NOT APPLE)
+  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
+  set(OPENSSL_LIBS
+      "${OPENSSL_LIB_DIR}/libcrypto.so.1.1"
+      "${OPENSSL_LIB_DIR}/libssl.so.1.1"
+  )
+endif()
+
+
+
+
