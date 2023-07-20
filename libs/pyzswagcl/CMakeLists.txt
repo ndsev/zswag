@@ -26,6 +26,13 @@ if (MSVC)
     "${OPENSSL_INCLUDE_DIR}/../bin/libssl-1_1-x64.dll")
 endif()
 
+if (APPLE)
+  # Required because cpp-httplib speaks https via OpenSSL
+  set (DEPLOY_FILES
+    "${OPENSSL_INCLUDE_DIR}/../lib/libcrypto.1.1.dylib"
+    "${OPENSSL_INCLUDE_DIR}/../lib/libssl.1.1.dylib")
+endif()
+
 add_wheel(pyzswagcl
   AUTHOR "Navigation Data Standard e.V."
   URL "https://github.com/ndsev/zswag"
