@@ -27,8 +27,3 @@ if (ZSWAG_ENABLE_TESTING)
   add_test(NAME zswagcl-test
     COMMAND "$<TARGET_FILE:zswagcl-test>")
 endif()
-
-if(APPLE)
-  add_custom_command(TARGET zswagcl-test POST_BUILD
-    COMMAND install_name_tool -add_rpath "${OPENSSL_INCLUDE_DIR}/../lib" "$<TARGET_FILE:zswagcl-test>")
-endif()
