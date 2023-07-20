@@ -28,6 +28,7 @@ jobs:
       - name: Build
         working-directory: build
         run: |
+          export LD_LIBRARY_PATH=$(pwd)/bin:${LD_LIBRARY_PATH}
           . ../venv/bin/activate
           cmake --build .
           mv bin/wheel bin/wheel-auditme
