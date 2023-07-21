@@ -34,7 +34,9 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 # dependencies
 
 find_package(OpenSSL CONFIG REQUIRED)
-find_package(keychain CONFIG REQUIRED)
+if(ZSWAG_KEYCHAIN_SUPPORT)
+  find_package(keychain CONFIG REQUIRED)
+endif()
 
 if (ZSWAG_BUILD_WHEELS)
   FetchContent_Declare(python-cmake-wheel
