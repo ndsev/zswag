@@ -142,7 +142,13 @@ endif()
 ##############
 # deploy openssl libs
 
-message(STATUS "Deploying to ${ZSWAG_DEPLOY_DIR}")
+if (WIN32)
+        set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}/${CMAKE_BUILD_TYPE}")
+    else()
+        set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}")
+    endif()
+
+message(STATUS "Deploying to ${OPENSSL_DEPLOY_DIR}")
 message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
 
 if(APPLE)
@@ -168,14 +174,14 @@ endif()
 foreach(file_i ${OPENSSL_LIBS})
     get_filename_component(filename ${file_i} NAME)
     add_custom_command(
-        OUTPUT "${ZSWAG_DEPLOY_DIR}/${filename}"
+        OUTPUT "${OPENSSL_DEPLOY_DIR}/${filename}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${file_i}"
-            "${ZSWAG_DEPLOY_DIR}/${filename}"
+            "${OPENSSL_DEPLOY_DIR}/${filename}"
         DEPENDS "${file_i}"
-        COMMENT "Copying ${file_i} to ${ZSWAG_DEPLOY_DIR}"
+        COMMENT "Copying ${file_i} to ${OPENSSL_DEPLOY_DIR}"
     )
-    list(APPEND COPIED_OPENSSL_LIBS "${ZSWAG_DEPLOY_DIR}/${filename}")
+    list(APPEND COPIED_OPENSSL_LIBS "${OPENSSL_DEPLOY_DIR}/${filename}")
 endforeach(file_i)
 
 add_custom_target(copy_openssl_libs ALL DEPENDS ${COPIED_OPENSSL_LIBS})
