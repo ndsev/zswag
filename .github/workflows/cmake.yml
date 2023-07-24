@@ -8,19 +8,27 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
     runs-on: ubuntu-latest
-    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}:2023.1
+    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}:2023.2
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
+      - name: Cache Conan packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.conan/data
+          key: ${{ runner.os }}-conan-${{ hashFiles('**/conanfile.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-conan-
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
-          pip install -U setuptools wheel pip
+          pip install -U setuptools wheel pip conan==2.0.8
           mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
       - name: Build
         working-directory: build
         run: |
+          export LD_LIBRARY_PATH=$(pwd)/bin:${LD_LIBRARY_PATH}
           . ../venv/bin/activate
           cmake --build .
           mv bin/wheel bin/wheel-auditme
@@ -40,25 +48,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-13, windows-latest]
         python-version: ["3.8", "3.9", "3.10", "3.11"]
     steps:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
+    - name: Cache Conan packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.conan/data
+        key: ${{ runner.os }}-conan-${{ hashFiles('**/conanfile.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-conan-
     - uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
-    - run: python -m pip install setuptools wheel
+    - run: python -m pip install setuptools wheel conan==2.0.8
     - run: mkdir build
     - name: Build (macOS)
-      if: matrix.os == 'macos-latest' || matrix.os == 'macos-10.15'
+      if: matrix.os == 'macos-13'
       working-directory: build
       run: |
+        export MACOSX_DEPLOYMENT_TARGET=10.15
         python -m pip install delocate
-        brew install openssl
-        export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
         cmake -DPython3_ROOT_DIR=$pythonLocation \
               -DPython3_FIND_FRAMEWORK=LAST \
               -DCMAKE_BUILD_TYPE=Release \
@@ -66,14 +80,13 @@ jobs:
         cmake --build .
         mv bin/wheel bin/wheel-auditme  # Same as on Linux
         mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
-        ../deps/python-cmake-wheel/repair-wheel-macos.bash \
+        _deps/python-cmake-wheel-src/repair-wheel-macos.bash \
               "$(pwd)"/bin/wheel-auditme/pyzswagcl*.whl \
               "$(pwd)"/bin/wheel pyzswagcl
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       working-directory: build
       run: |
-        choco install --no-progress -y openssl
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
         cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DHTTPLIB_USE_ZLIB_IF_AVAILABLE=OFF -DCMAKE_BUILD_TYPE=Release ..
         cmake --build . --config Release

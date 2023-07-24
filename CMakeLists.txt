@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.24)
+# Add conan 2.0 support
+set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conan-provider.cmake)
 
 if (NOT PROJECT_NAME)
   set (ZSWAG_ENABLE_TESTING ON)
@@ -6,7 +8,9 @@ endif()
 
 project(zswag)
 enable_testing()
+
 include(FetchContent)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,21 +31,39 @@ set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 
 ##############
-# deps
+# dependencies
 
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL CONFIG REQUIRED)
+if(ZSWAG_KEYCHAIN_SUPPORT)
+  find_package(keychain CONFIG REQUIRED)
+endif()
 
 if (ZSWAG_BUILD_WHEELS)
+  FetchContent_Declare(python-cmake-wheel
+  GIT_REPOSITORY "https://github.com/Klebert-Engineering/python-cmake-wheel"
+  GIT_TAG        "debug-macos-zswag-build"
+  GIT_SHALLOW    ON)
+
+  FetchContent_GetProperties(python-cmake-wheel)
+
+  if(NOT python-cmake-wheel_POPULATED)
+    FetchContent_Populate(python-cmake-wheel)
+    set(CMAKE_MODULE_PATH "${python-cmake-wheel_SOURCE_DIR}" ${CMAKE_MODULE_PATH})
+  endif()
+
   if (NOT TARGET wheel)
     set(Python3_FIND_STRATEGY LOCATION)
-    set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel")
     include(python-wheel)
     set(WHEEL_DEPLOY_DIRECTORY "${ZSWAG_DEPLOY_DIR}/wheel")
   endif()
 endif()
 
 if (NOT TARGET yaml-cpp)
-  add_subdirectory(deps/yaml-cpp)
+  FetchContent_Declare(yaml-cpp
+  GIT_REPOSITORY "https://github.com/jbeder/yaml-cpp.git"
+  GIT_TAG        "yaml-cpp-0.7.0"
+  GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(yaml-cpp)
 endif()
 
 if (NOT TARGET stx)
@@ -60,39 +82,37 @@ if (NOT TARGET speedyj)
   FetchContent_MakeAvailable(speedyj)
 endif()
 
-if (NOT TARGET spdlog)
-  FetchContent_Declare(spdlog
-    GIT_REPOSITORY "https://github.com/gabime/spdlog.git"
-    GIT_TAG        "v1.x"
-    GIT_SHALLOW    ON)
-  FetchContent_MakeAvailable(spdlog)
-endif()
-
 if (NOT TARGET Catch2)
-  add_subdirectory(deps/Catch2)
+  FetchContent_Declare(Catch2
+    GIT_REPOSITORY "https://github.com/catchorg/Catch2.git"
+    GIT_TAG        "v3.1.0"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(Catch2)
 endif()
 
 if (NOT TARGET httplib)
-  add_subdirectory(deps/cpp-httplib)
+  FetchContent_Declare(httplib
+    GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"
+    GIT_TAG        "v0.12.2"
+    GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(httplib)
   target_compile_definitions(httplib
     INTERFACE
     CPPHTTPLIB_OPENSSL_SUPPORT)
   target_link_libraries(httplib INTERFACE OpenSSL::SSL)
 endif()
 
-if (ZSWAG_KEYCHAIN_SUPPORT)
-  if (NOT TARGET keychain)
-    add_subdirectory(deps/keychain)
-  endif()
-endif()
-
-if (ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
-  add_subdirectory(deps/pybind11)
+if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
+  find_package(pybind11 REQUIRED)
 endif()
 
 if (NOT TARGET zserio-cmake-helper)
-  set(ZSERIO_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/deps/zserio")
-  add_subdirectory(deps/zserio-cmake-helper)
+  set(ZSERIO_VERSION "2.11.0")
+  FetchContent_Declare(zserio-cmake-helper
+  GIT_REPOSITORY "https://github.com/Klebert-Engineering/zserio-cmake-helper.git"
+  GIT_TAG        "main"
+  GIT_SHALLOW    ON)
+  FetchContent_MakeAvailable(zserio-cmake-helper)
   if (NOT TARGET ZserioCppRuntime)
     add_zserio_cpp_runtime()
   endif()
@@ -118,3 +138,57 @@ if (ZSWAG_BUILD_WHEELS)
       ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
   add_dependencies(wheel zswag-server-wheel)
 endif()
+
+##############
+# deploy openssl libs
+
+if (WIN32)
+        set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}/${CMAKE_BUILD_TYPE}")
+    else()
+        set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}")
+    endif()
+
+message(STATUS "Deploying to ${OPENSSL_DEPLOY_DIR}")
+message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
+
+if(APPLE)
+  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
+  set(OPENSSL_LIBS
+      "${OPENSSL_LIB_DIR}/libcrypto.1.1.dylib"
+      "${OPENSSL_LIB_DIR}/libssl.1.1.dylib"
+  )
+elseif(MSVC)
+  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../bin")
+  set(OPENSSL_LIBS
+      "${OPENSSL_LIB_DIR}/libcrypto-1_1-x64.dll"
+      "${OPENSSL_LIB_DIR}/libssl-1_1-x64.dll"
+  )
+elseif(UNIX AND NOT APPLE)
+  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
+  set(OPENSSL_LIBS
+      "${OPENSSL_LIB_DIR}/libcrypto.so.1.1"
+      "${OPENSSL_LIB_DIR}/libssl.so.1.1"
+  )
+endif()
+
+foreach(file_i ${OPENSSL_LIBS})
+    get_filename_component(filename ${file_i} NAME)
+    add_custom_command(
+        OUTPUT "${OPENSSL_DEPLOY_DIR}/${filename}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${file_i}"
+            "${OPENSSL_DEPLOY_DIR}/${filename}"
+        DEPENDS "${file_i}"
+        COMMENT "Copying ${file_i} to ${OPENSSL_DEPLOY_DIR}"
+    )
+    list(APPEND COPIED_OPENSSL_LIBS "${OPENSSL_DEPLOY_DIR}/${filename}")
+endforeach(file_i)
+
+add_custom_target(copy_openssl_libs ALL DEPENDS ${COPIED_OPENSSL_LIBS})
+
+add_dependencies(zswagcl copy_openssl_libs)
+
+
+
+
+

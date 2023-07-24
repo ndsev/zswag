@@ -6,10 +6,10 @@ using namespace zswagcl;
 
 using Parameter = OpenAPIConfig::Parameter;
 using Format = Parameter::Format;
-using Style = Parameter::Style;
+using PStyle = Parameter::Style;
 
 static auto makeParameter(std::string ident,
-                          Style style,
+                         PStyle style,
                           bool explode,
                           Format format = Format::String)
 {
@@ -46,7 +46,7 @@ const auto object = std::map<std::string, std::string>{
 
 TEST_CASE("openapi path parameters", "[zswagcl::open-api-format-helper]") {
     SECTION("Style Simple") {
-        auto style = Style::Simple;
+        auto style =PStyle::Simple;
 
         SECTION("Primitive Value") {
             auto explode = GENERATE(false, true);
@@ -89,7 +89,7 @@ TEST_CASE("openapi path parameters", "[zswagcl::open-api-format-helper]") {
     }
 
     SECTION("Style Label") {
-        auto style = Style::Label;
+        auto style =PStyle::Label;
 
         SECTION("Primitive Value") {
             auto explode = GENERATE(false, true);
@@ -135,7 +135,7 @@ TEST_CASE("openapi path parameters", "[zswagcl::open-api-format-helper]") {
     }
 
     SECTION("Style Matrix") {
-        auto style = Style::Matrix;
+        auto style =PStyle::Matrix;
 
         SECTION("Primitive Value") {
             auto explode = GENERATE(false, true);
@@ -186,7 +186,7 @@ TEST_CASE("openapi path parameters", "[zswagcl::open-api-format-helper]") {
 
 TEST_CASE("openapi path parameters - formats", "[zswagcl::open-api-format-helper]") {
     SECTION("Style Simple") {
-        auto style = Style::Simple;
+        auto style =PStyle::Simple;
 
         SECTION("Format Hex") {
             auto format = Format::Hex;
@@ -262,7 +262,7 @@ TEST_CASE("openapi path parameters - formats", "[zswagcl::open-api-format-helper
 
 TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
     SECTION("Style Form") {
-        auto style = Style::Form;
+        auto style =PStyle::Form;
 
         SECTION("Primitive Value") {
             auto explode = GENERATE(false, true);

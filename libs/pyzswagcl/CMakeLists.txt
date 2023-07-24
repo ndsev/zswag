@@ -22,13 +22,20 @@ target_compile_features(pyzswagcl
 if (MSVC)
   # Required because cpp-httplib speaks https via OpenSSL
   set (DEPLOY_FILES
-    "${OPENSSL_INCLUDE_DIR}/../libcrypto-1_1-x64.dll"
-    "${OPENSSL_INCLUDE_DIR}/../libssl-1_1-x64.dll")
+    "${OPENSSL_INCLUDE_DIR}/../bin/libcrypto-1_1-x64.dll"
+    "${OPENSSL_INCLUDE_DIR}/../bin/libssl-1_1-x64.dll")
+endif()
+
+if (APPLE)
+  # Required because cpp-httplib speaks https via OpenSSL
+  set (DEPLOY_FILES
+    "${OPENSSL_INCLUDE_DIR}/../lib/libcrypto.1.1.dylib"
+    "${OPENSSL_INCLUDE_DIR}/../lib/libssl.1.1.dylib")
 endif()
 
 add_wheel(pyzswagcl
-  AUTHOR "Klebert Engineering"
-  URL "https://github.com/klebert-engineering/zswag"
+  AUTHOR "Navigation Data Standard e.V."
+  URL "https://github.com/ndsev/zswag"
   VERSION "${ZSWAG_VERSION}"
   DESCRIPTION "Python bindings for the zswag client library."
   TARGET_DEPENDENCIES

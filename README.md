@@ -75,6 +75,9 @@ Using CMake, you can ...
 * 🌟build the zswag wheels for a custom Python version.
 * 🌟[integrate the C++ client into a C++ project.](#c-client)
 
+Dependencies are managed via CMake's `FetchContent` mechanism and Conan 2.0.
+Make sure you have a recent version of CMake (>= 3.24) and Conan (>= 2.0.5) installed.
+
 The basic setup follows the usual CMake configure/build steps:
 ```bash
 mkdir build && cd build
@@ -461,7 +464,16 @@ project(myapp)
 
 # This is how C++ will know about the zswag lib
 # and its dependencies, such as zserio.
-add_subdirectory(zswag)
+if (NOT TARGET zswag)
+        FetchContent_Declare(zswag
+                GIT_REPOSITORY "https://github.com/ndsev/zswag.git"
+                GIT_TAG        "v1.5.0"
+                GIT_SHALLOW    ON)
+        FetchContent_MakeAvailable(zswag)
+endif()
+
+find_package(OpenSSL CONFIG REQUIRED)
+target_link_libraries(httplib INTERFACE OpenSSL::SSL)
 
 # This command is provided by zswag to easily create
 # a CMake C++ reflection library from zserio code.

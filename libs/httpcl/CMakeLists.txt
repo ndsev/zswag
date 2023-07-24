@@ -3,6 +3,8 @@ project(httpcl)
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
+find_package(spdlog CONFIG REQUIRED)
+
 add_library(httpcl STATIC
   include/httpcl/http-client.hpp
   include/httpcl/http-settings.hpp
@@ -21,7 +23,7 @@ target_link_libraries(httpcl
   PRIVATE
     stx
   PUBLIC
-    spdlog
+    spdlog::spdlog
     httplib::httplib
     yaml-cpp
   )
@@ -35,7 +37,7 @@ target_include_directories(httpcl
 
 if (ZSWAG_KEYCHAIN_SUPPORT)
   target_compile_definitions(httpcl PRIVATE ZSWAG_KEYCHAIN_SUPPORT)
-  target_link_libraries(httpcl PUBLIC keychain)
+  target_link_libraries(httpcl PUBLIC keychain::keychain)
 endif()
 
 add_subdirectory(test)
