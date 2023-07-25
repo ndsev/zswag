@@ -14,7 +14,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.5.0)
+set(ZSWAG_VERSION 1.6.0)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
@@ -60,9 +60,9 @@ endif()
 
 if (NOT TARGET yaml-cpp)
   FetchContent_Declare(yaml-cpp
-  GIT_REPOSITORY "https://github.com/jbeder/yaml-cpp.git"
-  GIT_TAG        "yaml-cpp-0.7.0"
-  GIT_SHALLOW    ON)
+    GIT_REPOSITORY "https://github.com/jbeder/yaml-cpp.git"
+    GIT_TAG        "yaml-cpp-0.7.0"
+    GIT_SHALLOW    ON)
   FetchContent_MakeAvailable(yaml-cpp)
 endif()
 
@@ -109,9 +109,9 @@ endif()
 if (NOT TARGET zserio-cmake-helper)
   set(ZSERIO_VERSION "2.11.0")
   FetchContent_Declare(zserio-cmake-helper
-  GIT_REPOSITORY "https://github.com/Klebert-Engineering/zserio-cmake-helper.git"
-  GIT_TAG        "main"
-  GIT_SHALLOW    ON)
+    GIT_REPOSITORY "https://github.com/Klebert-Engineering/zserio-cmake-helper.git"
+    GIT_TAG        "main"
+    GIT_SHALLOW    ON)
   FetchContent_MakeAvailable(zserio-cmake-helper)
   if (NOT TARGET ZserioCppRuntime)
     add_zserio_cpp_runtime()
@@ -143,10 +143,10 @@ endif()
 # deploy openssl libs
 
 if (WIN32)
-        set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}/${CMAKE_BUILD_TYPE}")
-    else()
-        set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}")
-    endif()
+  set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}/${CMAKE_BUILD_TYPE}")
+else()
+  set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}")
+endif()
 
 message(STATUS "Deploying to ${OPENSSL_DEPLOY_DIR}")
 message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
@@ -154,8 +154,8 @@ message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
 if(APPLE)
   set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
   set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto.1.1.dylib"
-      "${OPENSSL_LIB_DIR}/libssl.1.1.dylib"
+    "${OPENSSL_LIB_DIR}/libcrypto.1.1.dylib"
+    "${OPENSSL_LIB_DIR}/libssl.1.1.dylib"
   )
 elseif(MSVC)
   set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../bin")
