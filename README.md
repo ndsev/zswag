@@ -439,7 +439,7 @@ for zserio to use as the service client's transport implementation.
 The generic C++ client talks to any zserio service that is running
 via HTTP/REST, and provides an OpenAPI specification of its interface.
 When using the C++ `OAClient` with your zserio schema, make sure
-that the flag `-withTypeInfoCode` is passed to the zserio C++ emitter.
+that the flags [`-withTypeInfoCode` and `-withReflectionCode`](http://zserio.org/doc/ZserioUserGuide.html#zserio-command-line-interface) are passed to the zserio C++ emitter.
 
 ### Integration Example
 
