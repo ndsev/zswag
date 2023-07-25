@@ -93,7 +93,7 @@ endif()
 if (NOT TARGET httplib)
   FetchContent_Declare(httplib
     GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"
-    GIT_TAG        "v0.12.2"
+    GIT_TAG        "v0.13.1"
     GIT_SHALLOW    ON)
   FetchContent_MakeAvailable(httplib)
   target_compile_definitions(httplib
