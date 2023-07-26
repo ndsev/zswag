@@ -10,10 +10,7 @@ add_executable(${PROJECT_NAME} client.cpp)
 target_link_libraries(${PROJECT_NAME}
   ${PROJECT_NAME}-zserio zswagcl stx)
 
-# The integration tests are flaky on macOS in Github CI,
-# and running them on macOS is not required. So we save
-# ourselves some build minutes and workflow headache.
-if (ZSWAG_ENABLE_TESTING AND NOT APPLE)
+if (ZSWAG_ENABLE_TESTING)
   add_wheel_test(zswag-server-integration
     WORKING_DIRECTORY
       "${CMAKE_CURRENT_SOURCE_DIR}"

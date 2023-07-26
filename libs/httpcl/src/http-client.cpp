@@ -28,6 +28,7 @@ auto makeClientAndApplyQuery(
     client->enable_server_certificate_verification(sslCertStrict);
     client->set_connection_timeout(timeoutSecs);
     client->set_read_timeout(timeoutSecs);
+    client->set_follow_location(true);
     config.apply(*client);
 
     applyQuery(uri, config);
