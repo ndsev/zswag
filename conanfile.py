@@ -12,13 +12,10 @@ class ZswagConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "ZSWAG_KEYCHAIN_SUPPORT": [True, False]}
     default_options = {"shared": True, "openssl*:shared": True, "ZSWAG_KEYCHAIN_SUPPORT": True}
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps"
     requires = "openssl/1.1.1t", "pybind11/2.10.4", "keychain/1.2.1", "spdlog/1.11.0"
     build_policy = "missing"
-    exports_sources = "CMakeLists.txt", "libs/*", "cmake/*", "*"  # Include all sources
-
-    #def layout(self):
-    #    cmake_layout(self)
+    exports_sources = "conanfile.py", "CMakeLists.txt", "libs/*", "cmake/*"  # Include all sources
 
     def build(self):
         cmake = CMake(self)
