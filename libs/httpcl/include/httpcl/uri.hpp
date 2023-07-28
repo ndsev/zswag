@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <stdexcept>
+#include <cstdint>
 
 namespace httpcl
 {
@@ -16,7 +17,7 @@ struct URIComponents
     std::string scheme;
     std::string host;
     std::string path;
-    uint16_t port = 0u;
+    std::uint16_t port = 0u;
     std::string query;
     std::multimap<std::string, std::string> queryVars;
 
