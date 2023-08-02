@@ -1,23 +1,34 @@
 cmake_minimum_required(VERSION 3.24)
-# Add conan 2.0 support
-set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conan-provider.cmake)
 
-if (NOT PROJECT_NAME)
-  set (ZSWAG_ENABLE_TESTING ON)
+include(FetchContent)
+
+if(NOT CONAN_PROVIDER_INCLUDED)
+  set(CONAN_PROVIDER_INCLUDED true)
+  FetchContent_Declare(
+    conan_provider
+    GIT_REPOSITORY https://github.com/Klebert-Engineering/cmake-conan
+    GIT_TAG zswag)
+  FetchContent_MakeAvailable(conan_provider)
+  set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES "${conan_provider_SOURCE_DIR}/conan_provider.cmake")
 endif()
 
 project(zswag)
-enable_testing()
-
-include(FetchContent)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.6.0)
+set(ZSWAG_VERSION 1.6.1)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
+option(ZSWAG_ENABLE_TESTING "Enable testing for the project" OFF)
+
+if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  set (ZSWAG_ENABLE_TESTING ON CACHE BOOL "By default, enable testing if this is the main project")
+endif()
+
+if (ZSWAG_ENABLE_TESTING)
+  enable_testing()
+endif()
 
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
