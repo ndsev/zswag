@@ -16,7 +16,7 @@ project(zswag)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.6.1)
+set(ZSWAG_VERSION 1.6.3)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
