@@ -309,6 +309,11 @@ server class with a user-written app controller and a fitting OpenAPI specificat
 It is based on [Flask](https://flask.palletsprojects.com/en/1.1.x/) and
 [Connexion](https://connexion.readthedocs.io/en/latest/).
 
+**Implementation choice regarding HTTP response codes:** The server as implemented
+here will return HTTP code `400` (Bad Request) when the user request could not
+be parsed, and `500` (Internal Server Error) when a different exception occurred while
+generating the response/running the user's controller implementation.
+
 ### Integration Example
 
 We consider the same `myapp` directory with a `services.zs` zserio file
