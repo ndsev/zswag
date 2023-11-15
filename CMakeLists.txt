@@ -118,7 +118,7 @@ if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
 endif()
 
 if (NOT TARGET zserio-cmake-helper)
-  set(ZSERIO_VERSION "2.11.0")
+  set(ZSERIO_VERSION "2.12.0")
   FetchContent_Declare(zserio-cmake-helper
     GIT_REPOSITORY "https://github.com/Klebert-Engineering/zserio-cmake-helper.git"
     GIT_TAG        "main"
