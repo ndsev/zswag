@@ -165,7 +165,13 @@ class OAServer(connexion.App):
                         spec=spec,
                         headers=flask_request.headers,
                         **kwargs)
-                return bytes(fun(request_blob, None).byte_array)
+                try:
+                    return bytes(fun(request_blob, None).byte_array)
+                except zserio.PythonRuntimeException as e:
+                    if str(e).startswith("BitStreamReader"):
+                        return "Error in BitStreamReader: Could not parse malformed request.", 400
+                    else:
+                        return f"Internal Server Error: {e}", 500
             setattr(self.service_instance, method_name, wsgi_method)
 
             def method_impl(request, ctx=None, fun=user_function):

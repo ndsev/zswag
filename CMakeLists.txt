@@ -16,7 +16,7 @@ project(zswag)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.6.1)
+set(ZSWAG_VERSION 1.6.3)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
@@ -118,7 +118,7 @@ if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
 endif()
 
 if (NOT TARGET zserio-cmake-helper)
-  set(ZSERIO_VERSION "2.11.0")
+  set(ZSERIO_VERSION "2.12.0")
   FetchContent_Declare(zserio-cmake-helper
     GIT_REPOSITORY "https://github.com/Klebert-Engineering/zserio-cmake-helper.git"
     GIT_TAG        "main"
