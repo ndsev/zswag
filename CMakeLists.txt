@@ -16,7 +16,7 @@ project(zswag)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.6.3)
+set(ZSWAG_VERSION 1.6.4)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
@@ -104,7 +104,7 @@ endif()
 if (NOT TARGET httplib)
   FetchContent_Declare(httplib
     GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"
-    GIT_TAG        "v0.13.1"
+    GIT_TAG        "v0.15.0"
     GIT_SHALLOW    ON)
   FetchContent_MakeAvailable(httplib)
   target_compile_definitions(httplib
@@ -165,20 +165,20 @@ message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
 if(APPLE)
   set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
   set(OPENSSL_LIBS
-    "${OPENSSL_LIB_DIR}/libcrypto.1.1.dylib"
-    "${OPENSSL_LIB_DIR}/libssl.1.1.dylib"
+      "${OPENSSL_LIB_DIR}/libcrypto.3.dylib"
+      "${OPENSSL_LIB_DIR}/libssl.3.dylib"
   )
 elseif(MSVC)
   set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../bin")
   set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto-1_1-x64.dll"
-      "${OPENSSL_LIB_DIR}/libssl-1_1-x64.dll"
+      "${OPENSSL_LIB_DIR}/libcrypto-3-x64.dll"
+      "${OPENSSL_LIB_DIR}/libssl-3-x64.dll"
   )
 elseif(UNIX AND NOT APPLE)
   set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
   set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto.so.1.1"
-      "${OPENSSL_LIB_DIR}/libssl.so.1.1"
+      "${OPENSSL_LIB_DIR}/libcrypto.so.3"
+      "${OPENSSL_LIB_DIR}/libssl.so.3"
   )
 endif()
 

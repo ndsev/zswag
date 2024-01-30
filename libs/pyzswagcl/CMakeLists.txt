@@ -22,15 +22,15 @@ target_compile_features(pyzswagcl
 if (MSVC)
   # Required because cpp-httplib speaks https via OpenSSL
   set (DEPLOY_FILES
-    "${OPENSSL_INCLUDE_DIR}/../bin/libcrypto-1_1-x64.dll"
-    "${OPENSSL_INCLUDE_DIR}/../bin/libssl-1_1-x64.dll")
+    "${OPENSSL_INCLUDE_DIR}/../bin/libcrypto-3-x64.dll"
+    "${OPENSSL_INCLUDE_DIR}/../bin/libssl-3-x64.dll")
 endif()
 
 if (APPLE)
   # Required because cpp-httplib speaks https via OpenSSL
   set (DEPLOY_FILES
-    "${OPENSSL_INCLUDE_DIR}/../lib/libcrypto.1.1.dylib"
-    "${OPENSSL_INCLUDE_DIR}/../lib/libssl.1.1.dylib")
+    "${OPENSSL_INCLUDE_DIR}/../lib/libcrypto.3.dylib"
+    "${OPENSSL_INCLUDE_DIR}/../lib/libssl.3.dylib")
 endif()
 
 add_wheel(pyzswagcl
