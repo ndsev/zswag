@@ -2,5 +2,5 @@ connexion~=2.14.2
 requests
 zserio<3.0.0
 pyyaml
-pyzswagcl==1.6.3
+pyzswagcl==1.6.4
 openapi-spec-validator
