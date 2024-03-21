@@ -41,5 +41,6 @@ target_include_directories(zswagcl
     include/zswagcl
   PUBLIC
     include)
-
-add_subdirectory(test)
+if(ZSWAG_ENABLE_TESTING)
+  add_subdirectory(test)
+endif()

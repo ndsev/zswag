@@ -40,4 +40,6 @@ if (ZSWAG_KEYCHAIN_SUPPORT)
   target_link_libraries(httpcl PUBLIC keychain::keychain)
 endif()
 
-add_subdirectory(test)
+if(ZSWAG_ENABLE_TESTING)
+  add_subdirectory(test)
+endif()
