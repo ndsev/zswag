@@ -23,7 +23,7 @@ jobs:
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
-          pip install -U setuptools wheel pip conan==2.0.8
+          pip install -U setuptools wheel pip conan==2.2.1
           mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
       - name: Build
         working-directory: build
@@ -65,7 +65,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
-    - run: python -m pip install setuptools wheel conan==2.0.8
+    - run: python -m pip install setuptools wheel conan==2.2.1
     - run: mkdir build
     - name: Build (macOS)
       if: matrix.os == 'macos-13'
