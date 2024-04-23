@@ -3,7 +3,9 @@ project(httpcl)
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-find_package(spdlog CONFIG REQUIRED)
+if(NOT TARGET spdlog)
+  find_package(spdlog CONFIG REQUIRED)
+endif()
 
 add_library(httpcl STATIC
   include/httpcl/http-client.hpp
