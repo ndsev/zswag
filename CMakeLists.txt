@@ -44,7 +44,10 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 ##############
 # dependencies
 
-find_package(OpenSSL CONFIG REQUIRED)
+if(NOT TARGET OpenSSL)
+  find_package(OpenSSL CONFIG REQUIRED)
+endif()
+
 if(ZSWAG_KEYCHAIN_SUPPORT)
   find_package(keychain CONFIG REQUIRED)
 endif()
