@@ -611,6 +611,12 @@ on each platform:
 * [macOS `add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html)
 * [Windows `cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/)
 
+## Client Result Code Handling
+
+Both clients (Python and C++) will treat any HTTP response code other than `200` as an error since zserio services are expected to return a parsable response object. The client will throw an exception with a descriptive message if the response code is not `200`.
+
+In case applications want to utilize for example the `204 (No Content)` response code, they have to catch the exception and handle it accordingly.
+
 ## Swagger User Interface 
 
 If you have installed `pip install "connexion[swagger-ui]"`, you can view
