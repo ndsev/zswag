@@ -472,7 +472,7 @@ project(myapp)
 if (NOT TARGET zswag)
         FetchContent_Declare(zswag
                 GIT_REPOSITORY "https://github.com/ndsev/zswag.git"
-                GIT_TAG        "v1.5.0"
+                GIT_TAG        "v1.6.6"
                 GIT_SHALLOW    ON)
         FetchContent_MakeAvailable(zswag)
 endif()
@@ -497,6 +497,8 @@ add_executable(${PROJECT_NAME} client.cpp)
 target_link_libraries(${PROJECT_NAME}
     ${PROJECT_NAME}-zserio-cpp zswagcl)
 ```
+
+**Note:** OpenSSL is assumed to be installed or built using the `lib` not the `lib64` directory name.
 
 The `add_executable` command above references the file `myapp/client.cpp`,
 which contains the code to actually use the zswag C++ client.
