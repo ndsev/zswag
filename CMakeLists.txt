@@ -1,22 +1,29 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.22.3) # to build without conan
 
 include(FetchContent)
 
-if(NOT CONAN_PROVIDER_INCLUDED)
-  set(CONAN_PROVIDER_INCLUDED true)
-  FetchContent_Declare(
-    conan_provider
-    GIT_REPOSITORY https://github.com/Klebert-Engineering/cmake-conan
-    GIT_TAG zswag)
-  FetchContent_MakeAvailable(conan_provider)
-  set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES "${conan_provider_SOURCE_DIR}/conan_provider.cmake")
+# Provide an option to disable Conan, defaulting to using Conan
+option(WITH_CONAN "Build with Conan dependency management" ON)
+
+if(WITH_CONAN)
+  # Upgrade the required CMake version for Conan
+  cmake_minimum_required(VERSION 3.24)
+  if(NOT CONAN_PROVIDER_INCLUDED)
+    set(CONAN_PROVIDER_INCLUDED true)
+    FetchContent_Declare(
+      conan_provider
+      GIT_REPOSITORY https://github.com/Klebert-Engineering/cmake-conan
+      GIT_TAG zswag)
+    FetchContent_MakeAvailable(conan_provider)
+    set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES "${conan_provider_SOURCE_DIR}/conan_provider.cmake")
+  endif()
 endif()
 
 project(zswag)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.6.4)
+set(ZSWAG_VERSION 1.6.7)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
