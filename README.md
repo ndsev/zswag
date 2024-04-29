@@ -21,6 +21,7 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Client Environment Settings](#client-environment-settings)
   * [HTTP Proxies and Authentication](#persistent-http-headers-proxy-cookie-and-authentication)
   * [Swagger User Interface](#swagger-user-interface)
+  * [Client Result Code Handling](#client-result-code-handling)
   * [OpenAPI Options Interoperability](#openapi-options-interoperability)
     + [HTTP method](#http-method)
     + [Request Body](#request-body)
@@ -503,7 +504,7 @@ target_link_libraries(${PROJECT_NAME}
     ${PROJECT_NAME}-zserio-cpp zswagcl)
 ```
 
-**Note:** OpenSSL is assumed to be installed or built using the `lib` not the `lib64` directory name.
+**Note:** OpenSSL is assumed to be installed or built using the `lib` (not `lib64`) directory name.
 
 The `add_executable` command above references the file `myapp/client.cpp`,
 which contains the code to actually use the zswag C++ client.
