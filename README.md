@@ -467,12 +467,17 @@ project(myapp)
 # libsecret, the following switch will disable keychain integration:
 # set(ZSWAG_KEYCHAIN_SUPPORT OFF)
 
+# In case you want to build zswag without using conan
+# make sure to provide targets for OpenSSL and spdlog
+# and set the following switch to OFF:
+# set(ZSWAG_WITH_CONAN OFF)
+
 # This is how C++ will know about the zswag lib
 # and its dependencies, such as zserio.
 if (NOT TARGET zswag)
         FetchContent_Declare(zswag
                 GIT_REPOSITORY "https://github.com/ndsev/zswag.git"
-                GIT_TAG        "v1.6.6"
+                GIT_TAG        "v1.6.7"
                 GIT_SHALLOW    ON)
         FetchContent_MakeAvailable(zswag)
 endif()

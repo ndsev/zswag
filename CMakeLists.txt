@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.22.3) # to build without conan
 include(FetchContent)
 
 # Provide an option to disable Conan, defaulting to using Conan
-option(WITH_CONAN "Build with Conan dependency management" ON)
+option(ZSWAG_WITH_CONAN "Build with Conan dependency management" ON)
 
-if(WITH_CONAN)
+if(ZSWAG_WITH_CONAN)
   # Upgrade the required CMake version for Conan
   cmake_minimum_required(VERSION 3.24)
   if(NOT CONAN_PROVIDER_INCLUDED)
