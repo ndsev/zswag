@@ -21,6 +21,7 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Client Environment Settings](#client-environment-settings)
   * [HTTP Proxies and Authentication](#persistent-http-headers-proxy-cookie-and-authentication)
   * [Swagger User Interface](#swagger-user-interface)
+  * [Client Result Code Handling](#client-result-code-handling)
   * [OpenAPI Options Interoperability](#openapi-options-interoperability)
     + [HTTP method](#http-method)
     + [Request Body](#request-body)
@@ -467,12 +468,17 @@ project(myapp)
 # libsecret, the following switch will disable keychain integration:
 # set(ZSWAG_KEYCHAIN_SUPPORT OFF)
 
+# In case you want to build zswag without using conan
+# make sure to provide targets for OpenSSL and spdlog
+# and set the following switch to OFF:
+# set(ZSWAG_WITH_CONAN OFF)
+
 # This is how C++ will know about the zswag lib
 # and its dependencies, such as zserio.
 if (NOT TARGET zswag)
         FetchContent_Declare(zswag
                 GIT_REPOSITORY "https://github.com/ndsev/zswag.git"
-                GIT_TAG        "v1.5.0"
+                GIT_TAG        "v1.6.7"
                 GIT_SHALLOW    ON)
         FetchContent_MakeAvailable(zswag)
 endif()
@@ -497,6 +503,8 @@ add_executable(${PROJECT_NAME} client.cpp)
 target_link_libraries(${PROJECT_NAME}
     ${PROJECT_NAME}-zserio-cpp zswagcl)
 ```
+
+**Note:** OpenSSL is assumed to be installed or built using the `lib` (not `lib64`) directory name.
 
 The `add_executable` command above references the file `myapp/client.cpp`,
 which contains the code to actually use the zswag C++ client.
@@ -608,6 +616,12 @@ on each platform:
 * [Linux `secret-tool`](https://www.marian-dan.ro/blog/storing-secrets-using-secret-tool) 
 * [macOS `add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html)
 * [Windows `cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/)
+
+## Client Result Code Handling
+
+Both clients (Python and C++) will treat any HTTP response code other than `200` as an error since zserio services are expected to return a parsable response object. The client will throw an exception with a descriptive message if the response code is not `200`.
+
+In case applications want to utilize for example the `204 (No Content)` response code, they have to catch the exception and handle it accordingly.
 
 ## Swagger User Interface 
 

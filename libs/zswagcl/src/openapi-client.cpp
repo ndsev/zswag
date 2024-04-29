@@ -220,7 +220,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     auto result = resultFuture.get();
     httpcl::log().debug("{} Response received (code {}, content length {} bytes).", debugContext, result.status, result.content.size());
 
-    if (result.status >= 200 && result.status < 300) {
+    if (result.status == 200) {
         return std::move(result.content);
     }
 
