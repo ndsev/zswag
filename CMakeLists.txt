@@ -163,55 +163,6 @@ if (ZSWAG_BUILD_WHEELS)
   add_dependencies(wheel zswag-server-wheel)
 endif()
 
-##############
-# deploy openssl libs
-
-if (WIN32)
-  set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}/${CMAKE_BUILD_TYPE}")
-else()
-  set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}")
-endif()
-
-message(STATUS "Deploying to ${OPENSSL_DEPLOY_DIR}")
-message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
-
-if(APPLE)
-  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
-  set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto.3.dylib"
-      "${OPENSSL_LIB_DIR}/libssl.3.dylib"
-  )
-elseif(MSVC)
-  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../bin")
-  set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto-3-x64.dll"
-      "${OPENSSL_LIB_DIR}/libssl-3-x64.dll"
-  )
-elseif(UNIX AND NOT APPLE)
-  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
-  set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto.so.3"
-      "${OPENSSL_LIB_DIR}/libssl.so.3"
-  )
-endif()
-
-foreach(file_i ${OPENSSL_LIBS})
-    get_filename_component(filename ${file_i} NAME)
-    add_custom_command(
-        OUTPUT "${OPENSSL_DEPLOY_DIR}/${filename}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${file_i}"
-            "${OPENSSL_DEPLOY_DIR}/${filename}"
-        DEPENDS "${file_i}"
-        COMMENT "Copying ${file_i} to ${OPENSSL_DEPLOY_DIR}"
-    )
-    list(APPEND COPIED_OPENSSL_LIBS "${OPENSSL_DEPLOY_DIR}/${filename}")
-endforeach(file_i)
-
-add_custom_target(copy_openssl_libs ALL DEPENDS ${COPIED_OPENSSL_LIBS})
-
-add_dependencies(zswagcl copy_openssl_libs)
-
 
 
 
