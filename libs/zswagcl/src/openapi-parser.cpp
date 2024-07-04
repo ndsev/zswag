@@ -235,6 +235,22 @@ static void parseMethodParameter(YAMLScope const& parameterNode,
                                  OpenAPIConfig::Path& path)
 {
     auto nameNode = parameterNode.mandatoryChild("name");
+
+    if (!parameterNode[ZSERIO_REQUEST_PART]) {
+        // Ignore parameters which do not have x-zserio-request-part, but
+        // output a warning for such parameters if they are not optional.
+        // By default, OpenAPI treats all request parameters as optional.
+        // You can add required: true to mark a parameter as required.
+        if (auto requiredNode = parameterNode["required"]) {
+            if (requiredNode.as<bool>())
+                httpcl::log().warn(
+                    "The parameter {} does not have x-zserio-request-part and is not optional."
+                    "Ensure that it is filled by passing additional HTTP settings.",
+                    parameterNode.str());
+        }
+        return;
+    }
+
     auto& parameter = path.parameters[nameNode.as<std::string>()];
     parameter.ident = nameNode.as<std::string>();
 
