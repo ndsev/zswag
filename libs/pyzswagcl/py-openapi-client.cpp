@@ -65,9 +65,9 @@ namespace
 
 void PyOpenApiClient::bind(py::module_& m) {
     auto serviceClient = py::class_<PyOpenApiClient>(m, "OAClient")
-        .def(py::init<std::string, bool, httpcl::Config, std::optional<std::string>, std::optional<std::string>>(),
+        .def(py::init<std::string, bool, httpcl::Config, std::optional<std::string>, std::optional<std::string>, std::optional<uint32_t>>(),
             "url"_a, "is_local_file"_a = false, "config"_a = httpcl::Config(),
-            "api_key"_a = std::optional<std::string>(), "bearer"_a = std::optional<std::string>())
+            "api_key"_a = std::optional<std::string>(), "bearer"_a = std::optional<std::string>(), "server_index"_a = std::optional<uint32_t>())
         // zserio >= 2.3.0
         .def("call_method", &PyOpenApiClient::callMethod,
             "method_name"_a, "request"_a, "unused"_a)
@@ -83,7 +83,8 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
                                  bool isLocalFile,
                                  httpcl::Config const& config,
                                  std::optional<std::string> apiKey,
-                                 std::optional<std::string> bearer)
+                                 std::optional<std::string> bearer,
+                                 std::optional<uint32_t> serverIndex)
 {
     auto httpConfig = config; // writable copy
     if (apiKey)
@@ -100,7 +101,7 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
             return fetchOpenAPIConfig(openApiUrl, *httpClient, httpConfig);
     }();
 
-    client_ = std::make_unique<OpenAPIClient>(openApiConfig, httpConfig, std::move(httpClient));
+    client_ = std::make_unique<OpenAPIClient>(openApiConfig, httpConfig, std::move(httpClient), *serverIndex);
 }
 
 std::vector<uint8_t> PyOpenApiClient::callMethod(

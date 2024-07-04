@@ -385,9 +385,9 @@ static void parseServer(const YAMLScope& serverNode,
         if (urlStr.empty()) {
             // Ignore empty URLs.
         } else if (urlStr.front() == '/') {
-            config.uri = httpcl::URIComponents::fromStrPath(urlStr);
+            config.servers.emplace_back(httpcl::URIComponents::fromStrPath(urlStr));
         } else {
-            config.uri = httpcl::URIComponents::fromStrRfc3986(urlStr);
+            config.servers.emplace_back(httpcl::URIComponents::fromStrRfc3986(urlStr));
         }
     }
 }
@@ -452,11 +452,16 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
 
         httpcl::log().debug("{} Parsing OpenAPI spec", debugContext);
         auto config = parseOpenAPIConfig(ss);
-        if (config.uri.scheme.empty())
-            config.uri.scheme = uriParts.scheme;
-        if (config.uri.host.empty()) {
-            config.uri.host = uriParts.host;
-            config.uri.port = uriParts.port;
+        // Add a default server and add missing server uri parts.
+        if (config.servers.empty())
+            config.servers.emplace_back();
+        for (auto& server : config.servers) {
+            if (server.scheme.empty())
+                server.scheme = uriParts.scheme;
+            if (server.host.empty()) {
+                server.host = uriParts.host;
+                server.port = uriParts.port;
+            }
         }
         httpcl::log().debug("{} Parsed spec has {} methods.", debugContext, config.methodPath.size());
 

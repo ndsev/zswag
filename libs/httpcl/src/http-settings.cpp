@@ -389,7 +389,7 @@ void Config::apply(httplib::Client &cl) const
 
     // Proxy Settings
     if (proxy) {
-        cl.set_proxy(proxy->host.c_str(), proxy->port);
+        cl.set_proxy(proxy->host, proxy->port);
 
         auto password = proxy->password;
         if (!proxy->keychain.empty())
@@ -397,7 +397,7 @@ void Config::apply(httplib::Client &cl) const
 
         if (!proxy->user.empty())
             cl.set_proxy_basic_auth(
-                proxy->user.c_str(), password.c_str());
+                proxy->user, password);
     }
 
     cl.set_default_headers(httpLibHeaders);
