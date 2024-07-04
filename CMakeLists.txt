@@ -112,6 +112,8 @@ if (NOT TARGET Catch2)
 endif()
 
 if (NOT TARGET httplib)
+  find_package(ZLIB CONFIG REQUIRED)
+  set(HTTPLIB_REQUIRE_ZLIB ON CACHE BOOL "Do not use zlib when compiling httplib." FORCE)
   FetchContent_Declare(httplib
     GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"
     GIT_TAG        "v0.15.3"
@@ -120,7 +122,8 @@ if (NOT TARGET httplib)
   target_compile_definitions(httplib
     INTERFACE
     CPPHTTPLIB_OPENSSL_SUPPORT)
-  target_link_libraries(httplib INTERFACE OpenSSL::SSL)
+  target_link_libraries(
+    httplib INTERFACE OpenSSL::SSL ZLIB::ZLIB)
 endif()
 
 if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
