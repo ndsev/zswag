@@ -129,7 +129,7 @@ OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
                 "The server {} index is out of bounds - there are only {}.",
                 serverIndex,
                 config_.servers.size()));
-    server_ = config.servers[serverIndex];
+    server_ = config_.servers[serverIndex];
     httpcl::log().debug("Instantiating OpenApiClient for node at '{}'", server_.build());
     assert(client_);
 }
