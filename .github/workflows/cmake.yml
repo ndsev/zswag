@@ -8,18 +8,19 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
     runs-on: ubuntu-latest
-    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}:2023.2
+    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-x86_64:2024.1
     steps:
-      # Use taiki-e/checkout-action, because the GH checkout actions require
-      # node20 which can't run on manylinux2014.
-      - uses: taiki-e/checkout-action@v1
-      - name: Cache Conan packages
-        uses: actions/cache@v2
-        with:
-          path: ~/.conan/data
-          key: ${{ runner.os }}-conan-${{ hashFiles('**/conanfile.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-conan-
+      - name: Symlink Node.js
+        run: |
+          # Find the Node.js installation
+          NODE_DIR=$(dirname $(which node))
+          # Create the symlink
+          mkdir -p /__e && ln -s ${NODE_DIR} /__e/node20
+          # Verify the symlink
+          ls -l /__e
+          node -v && npm -v
+      - name: Checkout code
+        uses: actions/checkout@v2
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
