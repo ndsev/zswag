@@ -9,17 +9,12 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     runs-on: ubuntu-latest
     container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-x86_64:2024.1
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
-      - name: Symlink Node.js
+      - name: Which Node.js?
         run: |
-          # Find the Node.js installation
-          NODE_DIR=$(dirname $(which node))
-          # Create the symlink
-          mv -f /__e/node20 /__e/node20.bak
-          ln -sf "${NODE_DIR}" /__e/node20
-          # Verify the symlink
-          ls -l /__e
-          node -v && npm -v
+          echo "Node at $(which node): $(node -v); npm: $(npm -v)"
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Configure
