@@ -15,7 +15,8 @@ jobs:
           # Find the Node.js installation
           NODE_DIR=$(dirname $(which node))
           # Create the symlink
-          mkdir -p /__e && ln -s ${NODE_DIR} /__e/node20
+          mv -f /__e/node20 /__e/node20.bak
+          ln -sf "${NODE_DIR}" /__e/node20
           # Verify the symlink
           ls -l /__e
           node -v && npm -v
