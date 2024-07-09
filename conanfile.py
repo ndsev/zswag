@@ -3,8 +3,7 @@ from conan.tools.cmake import CMakeDeps
 
 class ZswagRecipe(ConanFile):
     name = "zswag"
-    
-    # Specify the generators
+    settings = "os", "arch", "compiler", "build_type"
     generators = "CMakeDeps"
 
     # Specify options
