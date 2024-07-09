@@ -101,7 +101,11 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
             return fetchOpenAPIConfig(openApiUrl, *httpClient, httpConfig);
     }();
 
-    client_ = std::make_unique<OpenAPIClient>(openApiConfig, httpConfig, std::move(httpClient), *serverIndex);
+    client_ = std::make_unique<OpenAPIClient>(
+        openApiConfig,
+        httpConfig,
+        std::move(httpClient),
+        serverIndex ? *serverIndex : 0);
 }
 
 std::vector<uint8_t> PyOpenApiClient::callMethod(

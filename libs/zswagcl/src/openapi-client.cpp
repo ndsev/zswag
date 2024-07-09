@@ -126,7 +126,7 @@ OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
     if (serverIndex >= config_.servers.size())
         throw httpcl::logRuntimeError(
             fmt::format(
-                "The server {} index is out of bounds - there are only {}.",
+                "The server index {} is out of bounds (servers.size()={}).",
                 serverIndex,
                 config_.servers.size()));
     server_ = config_.servers[serverIndex];
