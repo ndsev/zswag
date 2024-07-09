@@ -35,7 +35,7 @@ jobs:
         working-directory: build
         run: |
           . ../venv/bin/activate
-          ctest -C Release --verbose --no-test=fail
+          ctest -C Release --verbose --no-tests=error
       - name: Deploy
         uses: actions/upload-artifact@v2
         with:
@@ -95,4 +95,4 @@ jobs:
     - name: Test
       working-directory: build
       run: |
-        ctest -C Release --verbose --no-test=fail
+        ctest -C Release --verbose --no-tests=error
