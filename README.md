@@ -581,26 +581,28 @@ variable. The YAML file contains a list of HTTP-related configs that are
 applied to HTTP requests based on a regular expression which is matched
 against the requested URL.
 
-For example, the following entry would match all requests due to the `.*`
-url-match-pattern:
+For example, the following entry would match all requests due to the `*`
+url-match-pattern for the `scope` field:
 
 ```yaml
-- url: .*
-  basic-auth:
-    user: johndoe
-    keychain: keychain-service-string
-  proxy:
-    host: localhost
-    port: 8888
-    user: test
-    keychain: ...
-  cookies:
-    key: value
-  headers:
-    key: value
-  query:
-    key: value
-  api-key: value
+http-settings:
+  # Under http-settings, a list of settings is defined for specific URL scopes.
+  - scope: *     # URL scope - e.g. https://*.nds.live/* or *.google.com.
+    basic-auth:  # Basic auth credentials for matching requests.
+      user: johndoe
+      keychain: keychain-service-string
+    proxy:      # Proxy settings for matching requests.
+      host: localhost
+      port: 8888
+      user: test
+      keychain: ...
+    cookies:    # Additional Cookies for matching requests.
+      key: value
+    headers:    # Additional Headers for matching requests.
+      key: value
+    query:      # Additional Query parameters for matching requests.
+      key: value
+    api-key: value  # API Key as required by OpenAPI config - see description below.
 ```
 
 **Note:** For `proxy` configs, the credentials are optional.
