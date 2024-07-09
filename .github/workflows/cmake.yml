@@ -21,7 +21,7 @@ jobs:
         run: |
           python3 -m venv venv && . ./venv/bin/activate
           pip install -U setuptools wheel pip conan==2.5.0
-          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
+          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON ..
       - name: Build
         working-directory: build
         run: |
@@ -73,7 +73,8 @@ jobs:
         cmake -DPython3_ROOT_DIR=$pythonLocation \
               -DPython3_FIND_FRAMEWORK=LAST \
               -DCMAKE_BUILD_TYPE=Release \
-              -DHTTPLIB_USE_BROTLI_IF_AVAILABLE=OFF ..
+              -DHTTPLIB_USE_BROTLI_IF_AVAILABLE=OFF \
+              -DZSWAG_ENABLE_TESTING=ON ..
         cmake --build .
         mv bin/wheel bin/wheel-auditme  # Same as on Linux
         mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
@@ -85,7 +86,7 @@ jobs:
       working-directory: build
       run: |
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
-        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DHTTPLIB_USE_ZLIB_IF_AVAILABLE=OFF -DCMAKE_BUILD_TYPE=Release ..
+        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON ..
         cmake --build . --config Release
     - name: Deploy
       uses: actions/upload-artifact@v2

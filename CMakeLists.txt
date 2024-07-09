@@ -30,6 +30,7 @@ option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
 option(ZSWAG_ENABLE_TESTING "Enable testing for the project" OFF)
 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  message (STATUS "Testing will be enabled as zswag is the top-level project.")
   set (ZSWAG_ENABLE_TESTING ON CACHE BOOL "By default, enable testing if this is the main project")
 endif()
 
