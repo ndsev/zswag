@@ -5,6 +5,8 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <shared_mutex>
+#include <atomic>
 #include "yaml-cpp/yaml.h"
 
 

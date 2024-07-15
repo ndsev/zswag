@@ -113,8 +113,10 @@ if (NOT TARGET Catch2)
 endif()
 
 if (NOT TARGET httplib)
-  find_package(ZLIB CONFIG REQUIRED)
-  set(HTTPLIB_REQUIRE_ZLIB ON CACHE BOOL "Do not use zlib when compiling httplib." FORCE)
+  if (NOT TARGET ZLIB::ZLIB)
+    find_package(ZLIB CONFIG REQUIRED)
+  endif ()
+  set (HTTPLIB_IS_USING_ZLIB TRUE)
   FetchContent_Declare(httplib
     GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"
     GIT_TAG        "v0.15.3"
@@ -122,7 +124,7 @@ if (NOT TARGET httplib)
   FetchContent_MakeAvailable(httplib)
   target_compile_definitions(httplib
     INTERFACE
-    CPPHTTPLIB_OPENSSL_SUPPORT)
+      CPPHTTPLIB_OPENSSL_SUPPORT)
   target_link_libraries(
     httplib INTERFACE OpenSSL::SSL ZLIB::ZLIB)
 endif()
