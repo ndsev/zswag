@@ -97,8 +97,7 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
             std::ifstream fs(openApiUrl);
             return parseOpenAPIConfig(fs);
         }
-        else
-            return fetchOpenAPIConfig(openApiUrl, *httpClient, httpConfig);
+        return fetchOpenAPIConfig(openApiUrl, *httpClient, httpConfig);
     }();
 
     client_ = std::make_unique<OpenAPIClient>(

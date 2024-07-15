@@ -9,8 +9,9 @@ namespace zswagcl
 
 OAClient::OAClient(zswagcl::OpenAPIConfig config,
                    std::unique_ptr<httpcl::IHttpClient> client,
-                   httpcl::Config httpConfig)
-    : client_(std::move(config), std::move(httpConfig), std::move(client))
+                   httpcl::Config httpConfig,
+                   uint32_t serverIndex)
+    : client_(std::move(config), std::move(httpConfig), std::move(client), serverIndex)
 {}
 
 template<typename arr_elem_t>
