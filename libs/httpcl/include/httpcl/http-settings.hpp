@@ -94,6 +94,15 @@ struct Settings
      */
     std::vector<Config> settings;
     YAML::Node document;
+    mutable std::shared_mutex mutex;
+    std::chrono::steady_clock::time_point lastRead;
+
+    /**
+     * Prompt settings instance to re-parse the HTTP settings file,
+     * by calling updateTimestamp with std::chrono::steady_clock::now().
+     */
+    static void updateTimestamp(std::chrono::steady_clock::time_point time);
+    static std::atomic<std::chrono::steady_clock::time_point> lastUpdated;
 };
 
 struct secret

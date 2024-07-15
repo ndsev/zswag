@@ -332,8 +332,16 @@ Settings::Settings()
     load();
 }
 
+std::atomic<std::chrono::steady_clock::time_point> Settings::lastUpdated{std::chrono::steady_clock::now()};
+
+void Settings::updateTimestamp(std::chrono::steady_clock::time_point time) {
+    lastUpdated.store(time, std::memory_order_relaxed);
+}
+
 void Settings::load()
 {
+    std::unique_lock lock(mutex);
+    lastRead = std::chrono::steady_clock::now();
     settings.clear();
 
     auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
@@ -412,15 +420,20 @@ Config::Config(const std::string& yamlConf)
 
 Config Settings::operator[] (const std::string &url) const
 {
-    Config result;
+    std::shared_lock lock(mutex);
+    if (lastRead < lastUpdated.load(std::memory_order_relaxed)) {
+        lock.unlock();
+        const_cast<Settings*>(this)->load();
+        lock.lock();
+    }
 
+    Config result;
     for (auto const& config : settings)
     {
         if (!std::regex_match(url, config.urlPattern))
             continue;
         result |= config;
     }
-
     return result;
 }
 
