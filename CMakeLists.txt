@@ -80,7 +80,7 @@ if (ZSWAG_BUILD_WHEELS)
   endif()
 endif()
 
-if (NOT TARGET yaml-cpp)
+if (NOT TARGET yaml-cpp::yaml-cpp)
   FetchContent_Declare(yaml-cpp
     GIT_REPOSITORY "https://github.com/jbeder/yaml-cpp.git"
     GIT_TAG        "yaml-cpp-0.7.0"
@@ -104,7 +104,7 @@ if (NOT TARGET speedyj)
   FetchContent_MakeAvailable(speedyj)
 endif()
 
-if (NOT TARGET Catch2)
+if (NOT TARGET Catch2::Catch2)
   FetchContent_Declare(Catch2
     GIT_REPOSITORY "https://github.com/catchorg/Catch2.git"
     GIT_TAG        "v3.4.0"
@@ -112,7 +112,7 @@ if (NOT TARGET Catch2)
   FetchContent_MakeAvailable(Catch2)
 endif()
 
-if (NOT TARGET httplib)
+if (NOT TARGET httplib::httplib)
   if (NOT TARGET ZLIB::ZLIB)
     find_package(ZLIB CONFIG REQUIRED)
   endif ()
