@@ -23,13 +23,14 @@ project(zswag)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.6.7post1)
+set(ZSWAG_VERSION 1.7.0)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
 option(ZSWAG_ENABLE_TESTING "Enable testing for the project" OFF)
 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  message (STATUS "Testing will be enabled as zswag is the top-level project.")
   set (ZSWAG_ENABLE_TESTING ON CACHE BOOL "By default, enable testing if this is the main project")
 endif()
 
@@ -79,7 +80,7 @@ if (ZSWAG_BUILD_WHEELS)
   endif()
 endif()
 
-if (NOT TARGET yaml-cpp)
+if (NOT TARGET yaml-cpp::yaml-cpp)
   FetchContent_Declare(yaml-cpp
     GIT_REPOSITORY "https://github.com/jbeder/yaml-cpp.git"
     GIT_TAG        "yaml-cpp-0.7.0"
@@ -103,7 +104,7 @@ if (NOT TARGET speedyj)
   FetchContent_MakeAvailable(speedyj)
 endif()
 
-if (NOT TARGET Catch2)
+if (NOT TARGET Catch2::Catch2)
   FetchContent_Declare(Catch2
     GIT_REPOSITORY "https://github.com/catchorg/Catch2.git"
     GIT_TAG        "v3.4.0"
@@ -111,7 +112,11 @@ if (NOT TARGET Catch2)
   FetchContent_MakeAvailable(Catch2)
 endif()
 
-if (NOT TARGET httplib)
+if (NOT TARGET httplib::httplib)
+  if (NOT TARGET ZLIB::ZLIB)
+    find_package(ZLIB CONFIG REQUIRED)
+  endif ()
+  set (HTTPLIB_IS_USING_ZLIB TRUE)
   FetchContent_Declare(httplib
     GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git"
     GIT_TAG        "v0.15.3"
@@ -119,8 +124,9 @@ if (NOT TARGET httplib)
   FetchContent_MakeAvailable(httplib)
   target_compile_definitions(httplib
     INTERFACE
-    CPPHTTPLIB_OPENSSL_SUPPORT)
-  target_link_libraries(httplib INTERFACE OpenSSL::SSL)
+      CPPHTTPLIB_OPENSSL_SUPPORT)
+  target_link_libraries(
+    httplib INTERFACE OpenSSL::SSL ZLIB::ZLIB)
 endif()
 
 if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
@@ -159,55 +165,6 @@ if (ZSWAG_BUILD_WHEELS)
       ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
   add_dependencies(wheel zswag-server-wheel)
 endif()
-
-##############
-# deploy openssl libs
-
-if (WIN32)
-  set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}/${CMAKE_BUILD_TYPE}")
-else()
-  set(OPENSSL_DEPLOY_DIR "${ZSWAG_DEPLOY_DIR}")
-endif()
-
-message(STATUS "Deploying to ${OPENSSL_DEPLOY_DIR}")
-message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
-
-if(APPLE)
-  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
-  set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto.3.dylib"
-      "${OPENSSL_LIB_DIR}/libssl.3.dylib"
-  )
-elseif(MSVC)
-  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../bin")
-  set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto-3-x64.dll"
-      "${OPENSSL_LIB_DIR}/libssl-3-x64.dll"
-  )
-elseif(UNIX AND NOT APPLE)
-  set(OPENSSL_LIB_DIR "${OPENSSL_INCLUDE_DIR}/../lib")
-  set(OPENSSL_LIBS
-      "${OPENSSL_LIB_DIR}/libcrypto.so.3"
-      "${OPENSSL_LIB_DIR}/libssl.so.3"
-  )
-endif()
-
-foreach(file_i ${OPENSSL_LIBS})
-    get_filename_component(filename ${file_i} NAME)
-    add_custom_command(
-        OUTPUT "${OPENSSL_DEPLOY_DIR}/${filename}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${file_i}"
-            "${OPENSSL_DEPLOY_DIR}/${filename}"
-        DEPENDS "${file_i}"
-        COMMENT "Copying ${file_i} to ${OPENSSL_DEPLOY_DIR}"
-    )
-    list(APPEND COPIED_OPENSSL_LIBS "${OPENSSL_DEPLOY_DIR}/${filename}")
-endforeach(file_i)
-
-add_custom_target(copy_openssl_libs ALL DEPENDS ${COPIED_OPENSSL_LIBS})
-
-add_dependencies(zswagcl copy_openssl_libs)
 
 
 

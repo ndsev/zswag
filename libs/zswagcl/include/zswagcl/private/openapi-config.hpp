@@ -183,7 +183,7 @@ struct OpenAPIConfig
     /**
      * URI parts.
      */
-    httpcl::URIComponents uri;
+    std::vector<httpcl::URIComponents> servers;
 
     /**
      * Map from service method name to path configuration.

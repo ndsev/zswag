@@ -176,7 +176,7 @@ def str_to_bytes(s: str, fmt: OAParamFormat) -> bytes:
 
 # Convert a single passed parameter value to it's correct type
 def parse_param_value(param: OAParam, target_type: Type, value: str) -> Any:
-    # Check if its an enum ...
+    # Check if it's an enum ...
     if issubclass(target_type, Enum):
         return target_type(parse_param_value(param, int, value))
     # Check if the parameter format is native string conversion

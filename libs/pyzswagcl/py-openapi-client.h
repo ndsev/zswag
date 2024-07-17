@@ -18,7 +18,8 @@ public:
                     bool isLocalFile,
                     httpcl::Config const& config,
                     std::optional<std::string> apiKey,
-                    std::optional<std::string> bearer);
+                    std::optional<std::string> bearer,
+                    std::optional<uint32_t> serverIndex);
 
     std::vector<uint8_t> callMethod(
         const std::string& methodName,

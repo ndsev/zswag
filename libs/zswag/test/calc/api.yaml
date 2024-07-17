@@ -273,4 +273,5 @@ paths:
       summary: ''
 security:
   - HeaderAuth: []
-servers: []
+servers:
+  - url: /

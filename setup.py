@@ -10,7 +10,7 @@ with codecs.open("README.md", "r", "utf-8") as fh:
     long_description = fh.read()
 
 required_url = []
-required = []
+required = [f"pyzswagcl=={VERSION}"]
 with open("requirements.txt", "r") as freq:
     for line in freq.read().split():
         if "://" in line:

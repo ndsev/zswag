@@ -12,9 +12,10 @@ class OAClient : public ::zserio::IServiceClient
 {
 public:
     OAClient(
-        zswagcl::OpenAPIConfig config,
+        OpenAPIConfig config,
         std::unique_ptr<httpcl::IHttpClient> client,
-        httpcl::Config httpConfig = {});
+        httpcl::Config httpConfig = {},
+        uint32_t serverIndex = 0);
 
     std::vector<uint8_t> callMethod(
         zserio::StringView methodName,

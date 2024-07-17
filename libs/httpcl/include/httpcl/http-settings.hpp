@@ -5,6 +5,9 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <shared_mutex>
+#include <atomic>
+#include "yaml-cpp/yaml.h"
 
 
 namespace httpcl
@@ -41,6 +44,10 @@ struct Config
         std::string keychain;
     };
 
+    std::optional<std::string> scope;
+    std::regex urlPattern;
+    std::string urlPatternString;
+
     std::map<std::string, std::string> cookies;
     std::optional<BasicAuthentication> auth;
     std::optional<Proxy> proxy;
@@ -67,7 +74,7 @@ struct Config
 };
 
 /**
- * Loads settings from HTTP_SETTINGS_FILE.
+ * Loads/stores settings from/to HTTP_SETTINGS_FILE.
  * Allows returning config for a specific URL.
  */
 struct Settings
@@ -85,7 +92,17 @@ struct Settings
     /**
      * Map from URL pattern to some config values.
      */
-    std::map<std::string, Config> settings;
+    std::vector<Config> settings;
+    YAML::Node document;
+    mutable std::shared_mutex mutex;
+    std::chrono::steady_clock::time_point lastRead;
+
+    /**
+     * Prompt settings instance to re-parse the HTTP settings file,
+     * by calling updateTimestamp with std::chrono::steady_clock::now().
+     */
+    static void updateTimestamp(std::chrono::steady_clock::time_point time);
+    static std::atomic<std::chrono::steady_clock::time_point> lastUpdated;
 };
 
 struct secret

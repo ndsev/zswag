@@ -112,9 +112,51 @@ struct convert<Config::Proxy>
 }
 
 namespace {
-YAML::Node configToNode(Config const& config, std::string const& url=".*") {
+
+std::string convertToRegex(const std::string& scope) {
+    std::string regexPattern = "^";
+    for (char c : scope) {
+        switch (c) {
+        case '*':
+            regexPattern += ".*";
+            break;
+        case '.':
+            regexPattern += "\\.";
+            break;
+        case '\\':
+            regexPattern += "\\\\";
+            break;
+        case '^':
+        case '$':
+        case '|':
+        case '(':
+        case ')':
+        case '[':
+        case ']':
+        case '{':
+        case '}':
+        case '?':
+        case '+':
+        case '-':
+        case '!':
+            regexPattern += '\\';
+            regexPattern += c;
+            break;
+        default:
+            regexPattern += c;
+            break;
+        }
+    }
+    regexPattern += ".*$";
+    return regexPattern;
+}
+
+YAML::Node configToNode(Config const& config) {
     YAML::Node result;
-    result["url"] = url;
+    if (config.scope)
+        result["scope"] = *config.scope;
+    else
+        result["url"] = config.urlPatternString;
 
     if (!config.cookies.empty())
         result["cookies"] = config.cookies;
@@ -139,16 +181,21 @@ YAML::Node configToNode(Config const& config, std::string const& url=".*") {
     return result;
 }
 
-std::pair<Config, std::string> configFromNode(YAML::Node const& node)
+Config configFromNode(YAML::Node const& node)
 {
-    std::string urlPattern;
     Config conf;
 
-    if (auto entryParam = node["url"])
-        urlPattern = entryParam.as<std::string>();
-    else
-        throw std::runtime_error(
-            "HTTP Settings: Missing 'url' field in: " + YAML::Dump(node));
+    if (auto entryParam = node["url"]) {
+        conf.urlPattern = conf.urlPatternString = entryParam.as<std::string>();
+    }
+    else {
+        if (auto entryParamScope = node["scope"])
+            conf.scope = entryParamScope.as<std::string>();
+        else
+            conf.scope = "*";
+        conf.urlPatternString = convertToRegex(*conf.scope);
+        conf.urlPattern = conf.urlPatternString;
+    }
 
     if (auto cookies = node["cookies"])
         conf.cookies = cookies.as<std::map<std::string, std::string>>();
@@ -172,7 +219,7 @@ std::pair<Config, std::string> configFromNode(YAML::Node const& node)
     if (auto apiKey = node["api-key"])
         conf.apiKey = apiKey.as<std::string>();
 
-    return {std::move(conf), std::move(urlPattern)};
+    return conf;
 }
 }
 
@@ -285,8 +332,16 @@ Settings::Settings()
     load();
 }
 
+std::atomic<std::chrono::steady_clock::time_point> Settings::lastUpdated{std::chrono::steady_clock::now()};
+
+void Settings::updateTimestamp(std::chrono::steady_clock::time_point time) {
+    lastUpdated.store(time, std::memory_order_relaxed);
+}
+
 void Settings::load()
 {
+    std::unique_lock lock(mutex);
+    lastRead = std::chrono::steady_clock::now();
     settings.clear();
 
     auto cookieJar = std::getenv("HTTP_SETTINGS_FILE");
@@ -302,12 +357,20 @@ void Settings::load()
 
     try {
         log().debug("Loading HTTP settings from '{}'...", cookieJar);
-        auto node = YAML::LoadFile(cookieJar);
+        document = YAML::LoadFile(cookieJar);
+        YAML::Node httpSettingsNode;
         uint32_t idx = 0;
 
-        for (auto const& entry : node.as<std::vector<YAML::Node>>()) {
-            auto [conf, urlPattern] = configFromNode(entry);
-            settings[urlPattern] = std::move(conf);
+        if (document.IsMap()) {
+            httpSettingsNode = document["http-settings"];
+        }
+        else {
+            // Keep supporting the old format, where the root structure is a settings array.
+            httpSettingsNode = document;
+        }
+
+        for (auto const& entry : httpSettingsNode.as<std::vector<YAML::Node>>()) {
+            settings.emplace_back(configFromNode(entry));
             ++idx;
         }
 
@@ -330,8 +393,15 @@ void Settings::store()
     try {
         auto node = YAML::Node();
 
-        for (const auto& [key, config] : settings)
+        for (const auto& config : settings)
             node.push_back(configToNode(config));
+
+        if (document && document.IsMap()) {
+            document["http-settings"] = node;
+        }
+        else {
+            document = node;
+        }
 
         log().debug("Saving HTTP settings to '{}'...", cookieJar);
         std::ofstream os(cookieJar);
@@ -345,20 +415,31 @@ void Settings::store()
 Config::Config(const std::string& yamlConf)
 {
     YAML::Node parsedYaml = YAML::Load(yamlConf);
-    *this = configFromNode(parsedYaml).first;
+    *this = configFromNode(parsedYaml);
 }
 
 Config Settings::operator[] (const std::string &url) const
 {
-    Config result;
+    std::shared_lock lock(mutex);
+    if (lastRead < lastUpdated.load(std::memory_order_relaxed)) {
+        lock.unlock();
+        try {
+            const_cast<Settings*>(this)->load();
+        }
+        catch (...) {
+            // If an exception occurred during load(), it was already
+            // logged in all likelihood.
+        }
+        lock.lock();
+    }
 
-    for (auto const& [pattern, config] : settings)
+    Config result;
+    for (auto const& config : settings)
     {
-        if (!std::regex_match(url, std::regex(pattern)))
+        if (!std::regex_match(url, config.urlPattern))
             continue;
         result |= config;
     }
-
     return result;
 }
 
@@ -389,7 +470,7 @@ void Config::apply(httplib::Client &cl) const
 
     // Proxy Settings
     if (proxy) {
-        cl.set_proxy(proxy->host.c_str(), proxy->port);
+        cl.set_proxy(proxy->host, proxy->port);
 
         auto password = proxy->password;
         if (!proxy->keychain.empty())
@@ -397,7 +478,7 @@ void Config::apply(httplib::Client &cl) const
 
         if (!proxy->user.empty())
             cl.set_proxy_basic_auth(
-                proxy->user.c_str(), password.c_str());
+                proxy->user, password);
     }
 
     cl.set_default_headers(httpLibHeaders);

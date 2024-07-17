@@ -19,7 +19,7 @@ int main (int argc, char* argv[]) {
 
     spdlog::info("[cpp-test-client] Starting integration tests with {}", specUrl);
 
-    auto runTest = [&] (auto const& fn, auto expect, std::string const& aspect, std::function<void(httpcl::Config&)> const& authFun)
+    auto runTest = [&] (auto const& fn, auto expect, std::string const& aspect, std::function<void(Config&)> const& authFun)
     {
         ++testCounter;
         spdlog::info("[cpp-test-client] Executing test #{}: {} ...", testCounter, aspect);
@@ -28,9 +28,11 @@ int main (int argc, char* argv[]) {
             spdlog::info("[cpp-test-client]   => Instantiating client.");
             auto httpClient = std::make_unique<HttpLibHttpClient>();
             auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
-            httpcl::Config authHttpConf;
+            // See https://github.com/spec-first/connexion/issues/1139
+            openApiConfig.servers.insert(openApiConfig.servers.begin(), URIComponents::fromStrPath("/bad/path/we/dont/access"));
+            Config authHttpConf;
             authFun(authHttpConf);
-            auto oaClient = OAClient(openApiConfig, std::move(httpClient), authHttpConf);
+            auto oaClient = OAClient(openApiConfig, std::move(httpClient), authHttpConf, 1);
             spdlog::info("[cpp-test-client]   => Running request.");
             calculator::Calculator::Client calcClient(oaClient);
             auto response = fn(calcClient);
@@ -49,13 +51,13 @@ int main (int argc, char* argv[]) {
         calculator::BaseAndExponent req(calculator::I32(2), calculator::I32(3), 0, "", .0, std::vector<bool>{});
         return calcClient.powerMethod(req);
     }, 8., "Pass fields in path and header",
-    [](httpcl::Config& conf){});
+    [](Config& conf){});
 
     runTest([](calculator::Calculator::Client& calcClient){
         calculator::Integers req(std::vector<int32_t>{100, -200, 400});
         return calcClient.intSumMethod(req);
     }, 300., "Pass hex-encoded array in query",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.headers.insert({"Authorization", "Bearer 123"});
     });
 
@@ -63,8 +65,8 @@ int main (int argc, char* argv[]) {
         calculator::Bytes req(std::vector<uint8_t>{8, 16, 32, 64});
         return calcClient.byteSumMethod(req);
     }, 120., "Pass base64url-encoded byte array in path",
-    [](httpcl::Config& conf){
-        conf.auth = httpcl::Config::BasicAuthentication{
+    [](Config& conf){
+        conf.auth = Config::BasicAuthentication{
             "u", "pw", ""
         };
     });
@@ -73,7 +75,7 @@ int main (int argc, char* argv[]) {
         calculator::Integers req(std::vector<int32_t>{1, 2, 3, 4});
         return calcClient.intMulMethod(req);
     }, 24., "Pass base64-encoded long array in path",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.query.insert({"api-key", "42"});
     });
 
@@ -81,7 +83,7 @@ int main (int argc, char* argv[]) {
         calculator::Doubles req(std::vector<double>{34.5, 2.});
         return calcClient.floatMulMethod(req);
     }, 69., "Pass float array in query.",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.cookies.insert({"api-cookie", "42"});
     });
 
@@ -89,7 +91,7 @@ int main (int argc, char* argv[]) {
         calculator::Bools req(std::vector<bool>{true, false});
         return calcClient.bitMulMethod(req);
     }, false, "Pass bool array in query (expect false).",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.apiKey = "42";
     });
 
@@ -97,7 +99,7 @@ int main (int argc, char* argv[]) {
         calculator::Bools req(std::vector<bool>{true, true});
         return calcClient.bitMulMethod(req);
     }, true, "Pass bool array in query (expect true).",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.headers.insert({"X-Generic-Token", "42"});
     });
 
@@ -105,7 +107,7 @@ int main (int argc, char* argv[]) {
         calculator::Double req(1.);
         return calcClient.identityMethod(req);
     }, 1., "Pass request as blob in body",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.cookies.insert({"api-cookie", "42"});
     });
 
@@ -113,7 +115,7 @@ int main (int argc, char* argv[]) {
         calculator::Strings req(std::vector<std::string>{"foo", "bar"});
         return calcClient.concatMethod(req);
     }, std::string("foobar"), "Pass base64-encoded strings.",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.headers.insert({"Authorization", "Bearer 123"});
     });
 
@@ -121,7 +123,7 @@ int main (int argc, char* argv[]) {
         calculator::EnumWrapper req(calculator::Enum::TEST_ENUM_0);
         return calcClient.nameMethod(req);
     }, std::string("TEST_ENUM_0"), "Pass enum.",
-    [](httpcl::Config& conf){
+    [](Config& conf){
         conf.apiKey = "42";
     });
 

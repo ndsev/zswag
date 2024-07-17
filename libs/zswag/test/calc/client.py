@@ -21,7 +21,7 @@ def run(host, port):
         try:
             print(f"[py-test-client] Test#{counter}: {aspect}", flush=True)
             print(f"[py-test-client]   -> Instantiating client.", flush=True)
-            oa_client = OAClient(f"http://{host}:{port}/openapi.json", **auth_args)
+            oa_client = OAClient(f"http://{host}:{port}/openapi.json", **auth_args, server_index=0)
             # Just make sure that OpenAPI JSON content is parsable
             assert oa_client.config().content and json.loads(oa_client.config().content)
             client = api.Calculator.Client(oa_client)

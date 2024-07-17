@@ -235,6 +235,22 @@ static void parseMethodParameter(YAMLScope const& parameterNode,
                                  OpenAPIConfig::Path& path)
 {
     auto nameNode = parameterNode.mandatoryChild("name");
+
+    if (!parameterNode[ZSERIO_REQUEST_PART]) {
+        // Ignore parameters which do not have x-zserio-request-part, but
+        // output a warning for such parameters if they are not optional.
+        // By default, OpenAPI treats all request parameters as optional.
+        // You can add required: true to mark a parameter as required.
+        if (auto requiredNode = parameterNode["required"]) {
+            if (requiredNode.as<bool>())
+                httpcl::log().warn(
+                    "The parameter {} does not have x-zserio-request-part and is not optional."
+                    "Ensure that it is filled by passing additional HTTP settings.",
+                    parameterNode.str());
+        }
+        return;
+    }
+
     auto& parameter = path.parameters[nameNode.as<std::string>()];
     parameter.ident = nameNode.as<std::string>();
 
@@ -385,9 +401,9 @@ static void parseServer(const YAMLScope& serverNode,
         if (urlStr.empty()) {
             // Ignore empty URLs.
         } else if (urlStr.front() == '/') {
-            config.uri = httpcl::URIComponents::fromStrPath(urlStr);
+            config.servers.emplace_back(httpcl::URIComponents::fromStrPath(urlStr));
         } else {
-            config.uri = httpcl::URIComponents::fromStrRfc3986(urlStr);
+            config.servers.emplace_back(httpcl::URIComponents::fromStrRfc3986(urlStr));
         }
     }
 }
@@ -452,11 +468,16 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
 
         httpcl::log().debug("{} Parsing OpenAPI spec", debugContext);
         auto config = parseOpenAPIConfig(ss);
-        if (config.uri.scheme.empty())
-            config.uri.scheme = uriParts.scheme;
-        if (config.uri.host.empty()) {
-            config.uri.host = uriParts.host;
-            config.uri.port = uriParts.port;
+        // Add a default server and add missing server uri parts.
+        if (config.servers.empty())
+            config.servers.emplace_back();
+        for (auto& server : config.servers) {
+            if (server.scheme.empty())
+                server.scheme = uriParts.scheme;
+            if (server.host.empty()) {
+                server.host = uriParts.host;
+                server.port = uriParts.port;
+            }
         }
         httpcl::log().debug("{} Parsed spec has {} methods.", debugContext, config.methodPath.size());
 

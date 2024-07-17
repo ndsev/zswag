@@ -20,7 +20,8 @@ public:
 
     OpenAPIClient(OpenAPIConfig config,
                   httpcl::Config httpConfig,
-                  std::unique_ptr<httpcl::IHttpClient> client);
+                  std::unique_ptr<httpcl::IHttpClient> client,
+                  uint32_t serverIndex = 0);
     ~OpenAPIClient();
 
     /**
@@ -41,6 +42,7 @@ public:
 private:
     std::unique_ptr<httpcl::IHttpClient> client_;
     httpcl::Settings settings_;
+    httpcl::URIComponents server_;
 };
 
 }

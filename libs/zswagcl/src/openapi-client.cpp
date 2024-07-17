@@ -117,17 +117,24 @@ void checkSecurityAlternativesAndApplyApiKey(OpenAPIConfig::SecurityAlternatives
 
 OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
                              httpcl::Config httpConfig,
-                             std::unique_ptr<httpcl::IHttpClient> client)
+                             std::unique_ptr<httpcl::IHttpClient> client,
+                             uint32_t serverIndex)
     : config_(std::move(config))
+    , httpConfig_(std::move(httpConfig))
     , client_(std::move(client))
-    , httpConfig_(httpConfig)
 {
-    httpcl::log().debug("Instantiating OpenApiClient for node at '{}'", config_.uri.build());
+    if (serverIndex >= config_.servers.size())
+        throw httpcl::logRuntimeError(
+            fmt::format(
+                "The server index {} is out of bounds (servers.size()={}).",
+                serverIndex,
+                config_.servers.size()));
+    server_ = config_.servers[serverIndex];
+    httpcl::log().debug("Instantiating OpenApiClient for node at '{}'", server_.build());
     assert(client_);
 }
 
-OpenAPIClient::~OpenAPIClient()
-{}
+OpenAPIClient::~OpenAPIClient() = default;
 
 std::string OpenAPIClient::call(const std::string& methodIdent,
                                 const std::function<ParameterValue(const std::string&, /* parameter ident */
@@ -140,7 +147,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
 
     const auto& method = methodIter->second;
 
-    httpcl::URIComponents uri(config_.uri);
+    auto uri = server_;
     uri.appendPath(resolvePath(method, paramCb));
     std::string builtUri = uri.build();
     std::string debugContext = stx::format("[{} {}]", method.httpMethod, uri.buildPath());

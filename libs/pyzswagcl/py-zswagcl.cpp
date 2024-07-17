@@ -122,11 +122,17 @@ PYBIND11_MODULE(pyzswagcl, m)
             auto it = self.methodPath.find(methodName);
             if (it != self.methodPath.end())
                 return it->second;
-            else
-                throw std::runtime_error(
-                    "Could not find OpenAPI config for method name "s+methodName);
+            throw std::runtime_error(
+                "Could not find OpenAPI config for method name "s+methodName);
         }, py::is_operator(), py::return_value_policy::reference_internal, "method_name"_a)
         .def_readonly("content", &OpenAPIConfig::content)
+        .def_property_readonly("servers", [](const OpenAPIConfig& self) -> std::vector<std::string>
+        {
+            std::vector<std::string> result;
+            for (auto const& uri : self.servers)
+                result.emplace_back(uri.build());
+            return result;
+        }, py::return_value_policy::automatic)
         ;
 
     m.def("parse_openapi_config", [](std::string const& path){
