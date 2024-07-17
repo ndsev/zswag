@@ -423,7 +423,13 @@ Config Settings::operator[] (const std::string &url) const
     std::shared_lock lock(mutex);
     if (lastRead < lastUpdated.load(std::memory_order_relaxed)) {
         lock.unlock();
-        const_cast<Settings*>(this)->load();
+        try {
+            const_cast<Settings*>(this)->load();
+        }
+        catch (...) {
+            // If an exception occurred during load(), it was already
+            // logged in all likelihood.
+        }
         lock.lock();
     }
 
