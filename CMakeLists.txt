@@ -129,7 +129,7 @@ if (NOT TARGET httplib::httplib)
     httplib INTERFACE OpenSSL::SSL ZLIB::ZLIB)
 endif()
 
-if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
+if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11::pybind11)
   find_package(pybind11 REQUIRED)
 endif()
 
