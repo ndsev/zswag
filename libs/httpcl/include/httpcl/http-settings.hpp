@@ -90,6 +90,11 @@ struct Settings
     Config operator[](const std::string& url) const;
 
     /**
+     * Get or create a Config entry by a target scope.
+     */
+    Config& getOrCreateConfigScope(std::string_view const& scope);
+
+    /**
      * Map from URL pattern to some config values.
      */
     std::vector<Config> settings;

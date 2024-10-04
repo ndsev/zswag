@@ -443,6 +443,22 @@ Config Settings::operator[] (const std::string &url) const
     return result;
 }
 
+Config& Settings::getOrCreateConfigScope(std::string_view const& scope)
+{
+    Config* config = nullptr;
+    for (auto& configCandidate : settings) {
+        if (configCandidate.scope.has_value() && *configCandidate.scope == scope) {
+            config = &configCandidate;
+            break;
+        }
+    }
+    if (!config) {
+        config = &settings.emplace_back(
+            fmt::format("scope: {}", scope));
+    }
+    return *config;
+}
+
 void Config::apply(httplib::Client &cl) const
 {
     // Headers
