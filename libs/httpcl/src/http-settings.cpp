@@ -453,8 +453,8 @@ Config& Settings::getOrCreateConfigScope(std::string_view const& scope)
         }
     }
     if (!config) {
-        config = &settings.emplace_back(
-            fmt::format("scope: {}", scope));
+        std::string formatted_scope = fmt::format("scope: '{}'", scope);
+        config = &settings.emplace_back(formatted_scope);
     }
     return *config;
 }

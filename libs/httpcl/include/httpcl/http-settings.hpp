@@ -7,6 +7,8 @@
 #include <string>
 #include <shared_mutex>
 #include <atomic>
+#include <deque>
+
 #include "yaml-cpp/yaml.h"
 
 
@@ -97,7 +99,7 @@ struct Settings
     /**
      * Map from URL pattern to some config values.
      */
-    std::vector<Config> settings;
+    std::deque<Config> settings;
     YAML::Node document;
     mutable std::shared_mutex mutex;
     std::chrono::steady_clock::time_point lastRead;
