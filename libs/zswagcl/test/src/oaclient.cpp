@@ -1,4 +1,6 @@
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_predicate.hpp>
+#include "zswag/test_common.hpp"
 
 #include <fstream>
 
@@ -6,8 +8,10 @@
 #include "zserio/SerializeUtil.h"
 #include "service_client_test/Flat.h"
 #include "service_client_test/Request.h"
+#include "zswag/compat.hpp"
 
 using namespace zswagcl;
+using string_view = zswag::compat::string_view;
 
 /**
  * Load config template file and replace pathes with input string.
@@ -33,8 +37,8 @@ static auto makeConfig(std::string pathsReplacement, std::string source = TESTDA
 TEST_CASE("HTTP-Service", "[oaclient]") {
     SECTION("Fetch Server Config") {
         httpcl::MockHttpClient configClient;
-        configClient.getFun = [&](std::string_view uri) {
-            REQUIRE(uri == "https://dummy");
+        configClient.getFun = [&](const string_view& uri) {
+            REQUIRE(std::string(uri) == "https://dummy");
 
             std::ifstream file(TESTDATA "/dummy.json");
             return httpcl::IHttpClient::Result{200, std::string(std::istreambuf_iterator<char>(file),
@@ -53,7 +57,7 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
         auto client = std::make_unique<httpcl::MockHttpClient>();
 
         /* Define mock behavior */
-        client->getFun = [&](std::string_view uri) {
+        client->getFun = [&](string_view uri) {
             getCalled = true;
 
             REQUIRE(uri == "https://my.server.com/api/multi"
@@ -125,7 +129,7 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
         auto client = std::make_unique<httpcl::MockHttpClient>();
 
         /* Define mock behavior */
-        client->getFun = [&](std::string_view uri) {
+        client->getFun = [&](string_view uri) {
             getCalled = true;
 
             REQUIRE(uri == "https://my.server.com/api/q?"
@@ -189,7 +193,7 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
 
         /* Setup mock client */
         auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](std::string_view uri,
+        client->postFun = [&](string_view uri,
                               httpcl::OptionalBodyAndContentType const& body,
                               httpcl::Config const& conf)
         {

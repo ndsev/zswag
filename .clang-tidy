@@ -1,0 +1,22 @@
+---
+Checks: >
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
+  -modernize-concat-nested-namespaces,
+  readability-*,
+  -readability-qualified-auto,
+  -readability-convert-member-functions-to-static
+
+CheckOptions:
+  - key: modernize-use-auto.MinTypeNameLength
+    value: '5'
+
+FormatStyle: 'file'
+
+# Specifically look for C++17 features
+Checks: >
+  modernize-use-structured-bindings,
+  modernize-use-nodiscard,
+  modernize-use-transparent-functors,
+  modernize-use-uncaught-exceptions 

@@ -25,15 +25,18 @@ target_link_libraries(zswagcl
     speedyj
     httplib::httplib
     yaml-cpp
-    ZserioCppRuntime)
+    ZserioCppRuntime
+    zswag-common)
 
 target_compile_definitions(zswagcl
   PRIVATE
     -DZSWAG_BUILD=1)
 
-target_compile_features(zswagcl
-  PUBLIC
-    cxx_std_17)
+if(ZSWAG_USE_CPP14)
+  target_compile_features(zswagcl PUBLIC cxx_std_14)
+else()
+  target_compile_features(zswagcl PUBLIC cxx_std_17)
+endif()
 
 target_include_directories(zswagcl
   PRIVATE
@@ -41,6 +44,7 @@ target_include_directories(zswagcl
     include/zswagcl
   PUBLIC
     include)
+
 if(ZSWAG_ENABLE_TESTING)
   add_subdirectory(test)
 endif()

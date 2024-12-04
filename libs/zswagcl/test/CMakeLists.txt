@@ -12,16 +12,27 @@ add_executable(zswagcl-test
   src/base64.cpp)
 
 target_link_libraries(zswagcl-test
-  PUBLIC
-    zswagcl-test-zs
+  PRIVATE
     zswagcl
+    zswag-common
+    zswagcl-test-zs
     Catch2::Catch2WithMain)
+
+target_include_directories(zswagcl-test
+  PRIVATE
+    src)
 
 target_compile_definitions(zswagcl-test
   PRIVATE
     -DTESTDATA="${CMAKE_CURRENT_LIST_DIR}/testdata/")
 
-if (ZSWAG_ENABLE_TESTING)
+if(ZSWAG_USE_CPP14)
+  target_compile_features(zswagcl-test PUBLIC cxx_std_14)
+else()
+  target_compile_features(zswagcl-test PUBLIC cxx_std_17)
+endif()
+
+if(ZSWAG_ENABLE_TESTING)
   add_test(NAME zswagcl-test
     COMMAND "$<TARGET_FILE:zswagcl-test>")
 endif()

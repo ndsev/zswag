@@ -1,7 +1,7 @@
 #include "private/openapi-client.hpp"
+#include "zswag/compat.hpp"
 
 #include <cassert>
-#include <variant>
 #include <future>
 
 #include "stx/format.h"
@@ -28,7 +28,7 @@ std::string replaceTemplate(std::string str,
             break;
 
         auto len = end - begin;
-        auto replacement = paramCb(std::string_view(str).substr(begin + 1, len - 1));
+        auto replacement = paramCb(zswag::compat::string_view(str).substr(begin + 1, len - 1));
 
         pos = begin + replacement.size();
         str.replace(begin, len + 1, std::move(replacement));
@@ -41,7 +41,7 @@ template <class _Fun>
 std::string resolvePath(const OpenAPIConfig::Path& path,
                         const _Fun paramCb)
 {
-    return replaceTemplate(path.path, [&](std::string_view ident) -> std::string {
+    return replaceTemplate(path.path, [&](zswag::compat::string_view ident) -> std::string {
         auto parameterIter = path.parameters.find(std::string(ident));
         if (parameterIter == path.parameters.end())
             throw std::runtime_error(stx::format("Could not find path parameter for name '{}' (path: '{}')", ident, path.path));
@@ -60,7 +60,9 @@ void resolveHeaderAndQueryParameters(httpcl::Config& result,
                                      const OpenAPIConfig::Path& path,
                                      const _Fun paramCb)
 {
-    for (const auto& [key, parameter] : path.parameters) {
+    for (const auto& param_pair : path.parameters) {
+        const auto& key = param_pair.first;
+        const auto& parameter = param_pair.second;
         switch (parameter.location) {
         case OpenAPIConfig::ParameterLocation::Query:
         case OpenAPIConfig::ParameterLocation::Header:

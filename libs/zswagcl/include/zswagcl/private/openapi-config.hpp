@@ -3,12 +3,11 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <variant>
-#include <optional>
 
 #include "zswagcl/export.hpp"
 #include "httpcl/uri.hpp"
 #include "httpcl/http-settings.hpp"
+#include "zswag/compat.hpp"
 
 namespace zswagcl
 {
@@ -177,7 +176,7 @@ struct OpenAPIConfig
         /**
          * Optional security schemes override for the global default.
          */
-        std::optional<SecurityAlternatives> security;
+        zswag::compat::optional<SecurityAlternatives> security;
     };
 
     /**

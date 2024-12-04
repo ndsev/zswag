@@ -21,9 +21,30 @@ endif()
 
 project(zswag)
 
-set(CMAKE_CXX_STANDARD 17)
+option(ZSWAG_USE_CPP14 "Use C++14 instead of C++17" OFF)
+
+# Set the C++ standard before any dependencies are included
+if(ZSWAG_USE_CPP14)
+    message(STATUS "Using C++14")
+    set(CMAKE_CXX_STANDARD 14)
+    # Add warnings for C++17 features when in C++14 mode
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_compile_options(-Wc++1z-compat)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(-Wc++17-compat -Wc++17-extensions)
+    elseif(MSVC)
+        add_compile_options(/w14348) # warning for non-standard extensions
+    endif()
+else()
+    set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(ZSWAG_VERSION 1.7.0)
+
+# Add common library first as it contains compatibility layer
+add_subdirectory(libs/common)
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)

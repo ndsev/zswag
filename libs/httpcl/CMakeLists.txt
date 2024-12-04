@@ -17,25 +17,28 @@ add_library(httpcl STATIC
   src/uri.cpp
   src/log.cpp)
 
-target_compile_features(httpcl
-  INTERFACE
-    cxx_std_17)
+target_include_directories(httpcl
+  PRIVATE
+    src
+    include/httpcl
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(httpcl
   PRIVATE
     stx
   PUBLIC
+    zswag-common
     spdlog::spdlog
     httplib::httplib
-    yaml-cpp
-  )
+    yaml-cpp)
 
-target_include_directories(httpcl
-  PRIVATE
-    src
-  include/httpcl
-  PUBLIC
-    include)
+if(ZSWAG_USE_CPP14)
+  target_compile_features(httpcl PUBLIC cxx_std_14)
+else()
+  target_compile_features(httpcl PUBLIC cxx_std_17)
+endif()
 
 if (ZSWAG_KEYCHAIN_SUPPORT)
   target_compile_definitions(httpcl PRIVATE ZSWAG_KEYCHAIN_SUPPORT)

@@ -1,16 +1,15 @@
 #pragma once
 
 #include <string>
-#include <string_view>
 #include <memory>
 #include <functional>
 #include <map>
-#include <optional>
 #include <stdexcept>
 
 #include "http-settings.hpp"
 #include "uri.hpp"
 #include "log.hpp"
+#include "compat.hpp"
 
 namespace httpcl
 {
@@ -20,7 +19,7 @@ struct BodyAndContentType {
     std::string contentType;
 };
 
-using OptionalBodyAndContentType = std::optional<BodyAndContentType>;
+using OptionalBodyAndContentType = compat::optional<BodyAndContentType>;
 
 class IHttpClient
 {
@@ -86,11 +85,11 @@ class MockHttpClient : public IHttpClient
 {
 public:
     std::function<
-        IHttpClient::Result(std::string_view /* uri */)
+        IHttpClient::Result(zswag::compat::string_view /* uri */)
     > getFun;
     std::function<
         IHttpClient::Result(
-            std::string_view /* uri */,
+            zswag::compat::string_view /* uri */,
             OptionalBodyAndContentType const& /* body */,
             Config const& config /* config */
     )> postFun;

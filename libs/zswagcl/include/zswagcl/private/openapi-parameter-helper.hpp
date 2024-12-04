@@ -5,12 +5,12 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <variant>
 #include <sstream>
 #include <array>
 
 #include "stx/string.h"
 #include "zserio/Span.h"
+#include "zswag/compat.hpp"
 
 namespace zswagcl
 {
@@ -18,7 +18,7 @@ namespace zswagcl
 /**
  * Any value type container
  */
-using Any = std::variant<std::int64_t, std::uint64_t, double, std::string>;
+using Any = zswag::compat::variant<std::int64_t, std::uint64_t, double, std::string>;
 
 namespace impl
 {
@@ -137,7 +137,7 @@ struct FormatHelper<Any>
 
 struct ParameterValue
 {
-    using ValueHolder = std::variant<std::string,
+    using ValueHolder = zswag::compat::variant<std::string,
                                      std::vector<std::string>,
                                      std::map<std::string, std::string>>;
 
@@ -145,6 +145,14 @@ struct ParameterValue
 
     ParameterValue(ValueHolder&& value)
         : value(std::move(value))
+    {}
+
+    ParameterValue(std::string value)
+        : value(std::move(value))
+    {}
+
+    ParameterValue(const char* value)
+        : value(std::string(value))
     {}
 
     /**
