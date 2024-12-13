@@ -8,7 +8,7 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
     runs-on: ubuntu-latest
-    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-x86_64:2024.1
+    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-x86_64:2024.2
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
@@ -16,7 +16,7 @@ jobs:
         run: |
           echo "Node at $(which node): $(node -v); npm: $(npm -v)"
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
@@ -37,7 +37,7 @@ jobs:
           . ../venv/bin/activate
           ctest -C Release --verbose --no-tests=error
       - name: Deploy
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: zswag-py${{ matrix.python-version }}-ubuntu-latest
           path: build/bin/wheel/*.whl
@@ -48,7 +48,7 @@ jobs:
         os: [macos-13, windows-latest]
         python-version: ["3.8", "3.9", "3.10", "3.11"]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Cache Conan packages
@@ -89,7 +89,7 @@ jobs:
         cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON ..
         cmake --build . --config Release
     - name: Deploy
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: zswag-py${{ matrix.python-version }}-${{ matrix.os }}
         path: build/bin/wheel/*.whl
