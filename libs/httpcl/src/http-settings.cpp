@@ -362,9 +362,13 @@ void Settings::load()
         uint32_t idx = 0;
 
         if (document.IsMap()) {
-            httpSettingsNode = document["http-settings"];
-        }
-        else {
+            auto settingsNode = document["http-settings"];
+            if (!settingsNode.IsDefined()) {
+                log().debug("No 'http-settings' section found in the YAML file.");
+                return;
+            }
+            httpSettingsNode = settingsNode;
+        } else {
             // Keep supporting the old format, where the root structure is a settings array.
             httpSettingsNode = document;
         }
