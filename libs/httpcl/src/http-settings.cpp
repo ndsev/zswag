@@ -364,7 +364,7 @@ void Settings::load()
         if (document.IsMap()) {
             auto settingsNode = document["http-settings"];
             if (!settingsNode.IsDefined()) {
-                log().debug("No 'http-settings' section found in the YAML file.");
+                log().debug("No 'http-settings' section found in the YAML file '{}'.", cookieJar);
                 return;
             }
             httpSettingsNode = settingsNode;
