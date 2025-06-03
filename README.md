@@ -1,6 +1,6 @@
 # Zswag
 
-[![CI](https://github.com/Klebert-Engineering/zswag/actions/workflows/cmake.yml/badge.svg)](https://github.com/Klebert-Engineering/zswag/actions/workflows/cmake.yml)
+[![CI](https://github.com/Klebert-Engineering/zswag/actions/workflows/build-deploy.yml/badge.svg)](https://github.com/Klebert-Engineering/zswag/actions/workflows/build-deploy.yml)
 [![Release](https://img.shields.io/github/release/Klebert-Engineering/zswag)](https://GitHub.com/Klebert-Engineering/zswag/releases/)
 [![License](https://img.shields.io/github/license/klebert-engineering/zswag)](https://github.com/Klebert-Engineering/zswag/blob/master/LICENSE)
 
@@ -12,6 +12,11 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Setup](#setup)
     + [For Python Users](#for-python-users)
     + [For C++ Users](#for-c-users)
+  * [CI/CD and Release Process](#cicd-and-release-process)
+    + [Continuous Integration](#continuous-integration)
+    + [Release Process](#release-process)
+    + [Development Snapshots](#development-snapshots)
+    + [Version Validation](#version-validation)
   * [OpenAPI Generator CLI](#openapi-generator-cli)
     + [Generator Usage Example](#generator-usage-example)
     + [Documentation extraction](#documentation-extraction)
@@ -63,8 +68,8 @@ Here are some brief descriptions of the main components:
 
 Simply run `pip install zswag`. **Note: This only works with ...**
 
-* 64-bit Python 3.8.x, `pip --version` >= 19.3
-* 64-bit Python 3.9.x, `pip --version` >= 19.3
+* 64-bit Python 3.10-3.13, `pip --version` >= 19.3
+* Supported platforms: Linux (x86_64), macOS (x86_64 and arm64), Windows (x64)
 
 **Note:** On Windows, make sure that you have the *Microsoft Visual C++ Redistributable Binaries* installed. You can find the x64 installer here: https://aka.ms/vs/16/release/vc_redist.x64.exe
  
@@ -95,6 +100,39 @@ wheels under `build/bin/wheel`.
 cd build && ctest --verbose
 ```
 
+## CI/CD and Release Process
+
+### Continuous Integration
+
+The project uses GitHub Actions for automated building and deployment:
+
+- **Platforms**: Linux (x86_64), macOS (Intel x86_64 and Apple Silicon arm64), Windows (x64)
+- **Python versions**: 3.10, 3.11, 3.12, 3.13
+- **Triggers**: Pull requests, pushes to main branch, and version tags
+
+### Release Process
+
+Releases are automated through the CI/CD pipeline:
+
+1. **Update version**: Modify `ZSWAG_VERSION` in `CMakeLists.txt`
+2. **Create release tag**: Tag the commit with `v{version}` (e.g., `v1.7.2`)
+3. **Automatic deployment**: The CI pipeline will:
+   - Validate that the tag version matches the CMake version
+   - Build wheels for all supported platforms
+   - Deploy to PyPI automatically
+
+### Development Snapshots
+
+Pushes to the main branch automatically create development releases:
+- Version format: `{base_version}.dev{commit_count}` (e.g., `1.7.2.dev3`)
+- Automatically deployed to PyPI for testing
+
+### Version Validation
+
+The build process ensures version consistency:
+- Git tags must match the version in `CMakeLists.txt`
+- Mismatched versions will cause the build to fail
+- This prevents accidental deployment of incorrect versions
 
 ## OpenAPI Generator CLI
 
