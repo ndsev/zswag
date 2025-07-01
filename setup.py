@@ -23,7 +23,7 @@ setuptools.setup(
     version=VERSION,
     url="https://github.com/klebert-engineering/zswag",
     author="Klebert Engineering",
-    author_email="j.birkner@klebert-engineering.de",
+    author_email="team@klebert-engineering.de",
 
     description="OpenAPI service transport layer for zserio.",
     long_description=long_description,
@@ -41,7 +41,7 @@ setuptools.setup(
 
     install_requires=required,
     dependency_links=required_url,
-    python_requires='>=3.8',
+    python_requires='>=3.10',
 
     license="BSD-3 Clause",
     classifiers=[
