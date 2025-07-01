@@ -12,7 +12,7 @@ The script compares:
 If the base versions don't match, the build fails to prevent deploying
 mismatched versions. This ensures that:
 - Release tags (v1.7.2) match the CMake version (1.7.2)
-- Dev builds from main branch use the correct base version
+- Dev builds from master branch use the correct base version
 """
 import re
 import sys
