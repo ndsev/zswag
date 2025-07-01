@@ -71,8 +71,11 @@ Simply run `pip install zswag`. **Note: This only works with ...**
 * 64-bit Python 3.10-3.13, `pip --version` >= 19.3
 * Supported platforms: Linux (x86_64), macOS (x86_64 and arm64), Windows (x64)
 
-**Note:** On Windows, make sure that you have the *Microsoft Visual C++ Redistributable Binaries* installed. You can find the x64 installer here: https://aka.ms/vs/16/release/vc_redist.x64.exe
- 
+**Notes:**
+* On Windows, make sure that you have the *Microsoft Visual C++ Redistributable Binaries* installed. You can find the x64 installer here: https://aka.ms/vs/16/release/vc_redist.x64.exe
+* zswag for Python 3.10 is not supported on Apple Silicon (arm64) because no compatible GitHub Actions runner is available.
+  However, this is typically not an issue, as macOS includes more recent Python versions by default.
+
 ### For C++ Users
 
 Using CMake, you can ...
