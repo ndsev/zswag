@@ -31,3 +31,6 @@
 [submodule "third_party/python-cmake-wheel"]
 	path = third_party/python-cmake-wheel
 	url = https://github.com/Klebert-Engineering/python-cmake-wheel.git
+[submodule "third_party/openssl"]
+	path = third_party/openssl
+	url = https://github.com/openssl/openssl.git
