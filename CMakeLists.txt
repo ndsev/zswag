@@ -46,9 +46,9 @@ include(ExternalProject)
 # Determine platform-specific OpenSSL configuration
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure VC-WIN64A)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure VC-WIN64A)
     else()
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure VC-WIN32)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure VC-WIN32)
     endif()
     set(OPENSSL_BUILD_COMMAND nmake)
     set(OPENSSL_INSTALL_COMMAND nmake install)
@@ -56,9 +56,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(OPENSSL_LIB_SUFFIX ".lib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure darwin64-arm64-cc)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure darwin64-arm64-cc)
     else()
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure darwin64-x86_64-cc)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure darwin64-x86_64-cc)
     endif()
     set(OPENSSL_BUILD_COMMAND make)
     set(OPENSSL_INSTALL_COMMAND make install_sw)
@@ -66,9 +66,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(OPENSSL_LIB_SUFFIX ".a")
 else() # Linux and other Unix-like systems
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure linux-x86_64)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure linux-x86_64)
     else()
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure linux-x86)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure linux-x86)
     endif()
     set(OPENSSL_BUILD_COMMAND make)
     set(OPENSSL_INSTALL_COMMAND make install_sw)
@@ -77,11 +77,11 @@ else() # Linux and other Unix-like systems
 endif()
 
 # Set OpenSSL install directory
-set(OPENSSL_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/openssl-install)
+set(OPENSSL_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/openssl-install)
 
 # Build OpenSSL using ExternalProject
 ExternalProject_Add(openssl_build
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl
     CONFIGURE_COMMAND ${OPENSSL_CONFIGURE_COMMAND}
                       --prefix=${OPENSSL_INSTALL_DIR}
                       --openssldir=${OPENSSL_INSTALL_DIR}/ssl
@@ -131,51 +131,48 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # zlib
-add_subdirectory(third_party/zlib EXCLUDE_FROM_ALL)
+add_subdirectory(deps/zlib EXCLUDE_FROM_ALL)
 
 # spdlog
-add_subdirectory(third_party/spdlog EXCLUDE_FROM_ALL)
+add_subdirectory(deps/spdlog EXCLUDE_FROM_ALL)
 
 # yaml-cpp
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
-add_subdirectory(third_party/yaml-cpp EXCLUDE_FROM_ALL)
+add_subdirectory(deps/yaml-cpp EXCLUDE_FROM_ALL)
 
 # stx
-add_subdirectory(third_party/stx EXCLUDE_FROM_ALL)
+add_subdirectory(deps/stx EXCLUDE_FROM_ALL)
 
 # speedyj
-add_subdirectory(third_party/speedyj EXCLUDE_FROM_ALL)
+add_subdirectory(deps/speedyj EXCLUDE_FROM_ALL)
 
 # Catch2 (for testing)
 if(ZSWAG_ENABLE_TESTING)
   set(CATCH_INSTALL_DOCS OFF CACHE BOOL "" FORCE)
-  set(CATCH_INSTALL_HELPERS OFF CACHE BOOL "" FORCE)
-  add_subdirectory(third_party/catch2 EXCLUDE_FROM_ALL)
+  set(CATCH_INSTALL_EXTRAS OFF CACHE BOOL "" FORCE)
+  add_subdirectory(deps/catch2 EXCLUDE_FROM_ALL)
 endif()
 
 # httplib
 set(HTTPLIB_USE_CERTS_FROM_MACOSX_KEYCHAIN OFF CACHE BOOL "" FORCE)
-add_subdirectory(third_party/httplib EXCLUDE_FROM_ALL)
+add_subdirectory(deps/httplib EXCLUDE_FROM_ALL)
 # Configure httplib with OpenSSL and zlib support
 target_compile_definitions(httplib INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
 target_link_libraries(httplib INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
 
-# keychain (if enabled)
-if(ZSWAG_KEYCHAIN_SUPPORT)
-  add_subdirectory(third_party/keychain EXCLUDE_FROM_ALL)
+# keychain
+if (ZSWAG_KEYCHAIN_SUPPORT)
+  add_subdirectory(deps/keychain EXCLUDE_FROM_ALL)
 endif()
 
-# pybind11 (if building wheels)
-if(ZSWAG_BUILD_WHEELS)
-  set(PYBIND11_TEST OFF CACHE BOOL "" FORCE)
-  add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-endif()
+# pybind11
+add_subdirectory(deps/pybind11 EXCLUDE_FROM_ALL)
 
 # python-cmake-wheel
 if (ZSWAG_BUILD_WHEELS)
-  set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/python-cmake-wheel" ${CMAKE_MODULE_PATH})
+  set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/python-cmake-wheel" ${CMAKE_MODULE_PATH})
   
   if (NOT TARGET wheel)
     set(Python3_FIND_STRATEGY LOCATION)
@@ -186,7 +183,7 @@ endif()
 
 # zserio-cmake-helper
 set(ZSERIO_VERSION "2.13.0")
-add_subdirectory(third_party/zserio-cmake-helper EXCLUDE_FROM_ALL)
+add_subdirectory(deps/zserio-cmake-helper EXCLUDE_FROM_ALL)
 if (NOT TARGET ZserioCppRuntime)
   add_zserio_cpp_runtime()
 endif()
