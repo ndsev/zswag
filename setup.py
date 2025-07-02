@@ -1,17 +1,23 @@
 import setuptools
 import sys
 import codecs
+import os
 
 # Read first argument as version, pass rest on to setuptools
 VERSION = sys.argv[1]
 del sys.argv[1]
 
-with codecs.open("README.md", "r", "utf-8") as fh:
+# Determine the directory containing this setup.py file
+setup_dir = os.path.dirname(os.path.abspath(__file__))
+readme_path = os.path.join(setup_dir, "README.md")
+
+with codecs.open(readme_path, "r", "utf-8") as fh:
     long_description = fh.read()
 
 required_url = []
 required = [f"pyzswagcl=={VERSION}"]
-with open("requirements.txt", "r") as freq:
+requirements_path = os.path.join(setup_dir, "requirements.txt")
+with open(requirements_path, "r") as freq:
     for line in freq.read().split():
         if "://" in line:
             required_url.append(line)
