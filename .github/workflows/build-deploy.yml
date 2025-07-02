@@ -7,7 +7,33 @@ on:
   pull_request:
 
 jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install setuptools_scm
+        run: pip install setuptools_scm
+      
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(python -c "import setuptools_scm; print(setuptools_scm.get_version(local_scheme='no-local-version'))")
+          echo "Version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
   build-manylinux:
+    needs: [determine-version]
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
@@ -25,7 +51,7 @@ jobs:
         run: |
           python3 -m venv venv && . ./venv/bin/activate
           pip install -U setuptools wheel pip conan==2.5.0
-          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON ..
+          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
       - name: Build
         working-directory: build
         run: |
@@ -47,6 +73,7 @@ jobs:
           path: build/bin/wheel/*.whl
   
   build:
+    needs: [determine-version]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -91,7 +118,8 @@ jobs:
               -DPython3_FIND_FRAMEWORK=LAST \
               -DCMAKE_BUILD_TYPE=Release \
               -DHTTPLIB_USE_BROTLI_IF_AVAILABLE=OFF \
-              -DZSWAG_ENABLE_TESTING=ON ..
+              -DZSWAG_ENABLE_TESTING=ON \
+              -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
         cmake --build .
         mv bin/wheel bin/wheel-auditme  # Same as on Linux
         mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
@@ -103,7 +131,7 @@ jobs:
       working-directory: build
       run: |
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
-        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON ..
+        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
         cmake --build . --config Release
     - name: Deploy
       uses: actions/upload-artifact@v4
@@ -116,7 +144,7 @@ jobs:
         ctest -C Release --verbose --no-tests=error
 
   deploy:
-    needs: [build-manylinux, build]
+    needs: [determine-version, build-manylinux, build]
     if: |
       success() && 
       github.event_name == 'push' && 
@@ -135,10 +163,9 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install setuptools_scm twine
+          pip install setuptools wheel setuptools_scm twine
       
-      - name: Validate and get version
-        id: version
+      - name: Validate version
         run: |
           python .github/scripts/validate_version.py
       
@@ -159,8 +186,7 @@ jobs:
       - name: Build source distribution for zswag
         run: |
           # Create source distribution for pure Python package
-          cd libs
-          python ../setup.py ${{ steps.version.outputs.version }} sdist --dist-dir ../dist/
+          python setup.py ${{ needs.determine-version.outputs.version }} sdist --dist-dir dist/
       
       - name: Upload to PyPI
         env:

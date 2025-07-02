@@ -23,7 +23,14 @@ project(zswag)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZSWAG_VERSION 1.8.0)
+
+# Allow version override for development builds.
+# This enables PEP 440 compliant dev versions (e.g., 1.7.3.dev14) from setuptools_scm
+# without requiring CMakeLists.txt updates between releases.
+# For official releases, this value should match the git tag.
+if(NOT DEFINED ZSWAG_VERSION)
+  set(ZSWAG_VERSION 1.8.0)
+endif()
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
