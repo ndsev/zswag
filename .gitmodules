@@ -1,0 +1,33 @@
+[submodule "third_party/spdlog"]
+	path = third_party/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "third_party/pybind11"]
+	path = third_party/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "third_party/zlib"]
+	path = third_party/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "third_party/yaml-cpp"]
+	path = third_party/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "third_party/stx"]
+	path = third_party/stx
+	url = https://github.com/Klebert-Engineering/stx.git
+[submodule "third_party/speedyj"]
+	path = third_party/speedyj
+	url = https://github.com/Klebert-Engineering/speedyj.git
+[submodule "third_party/catch2"]
+	path = third_party/catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "third_party/httplib"]
+	path = third_party/httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "third_party/zserio-cmake-helper"]
+	path = third_party/zserio-cmake-helper
+	url = https://github.com/Klebert-Engineering/zserio-cmake-helper.git
+[submodule "third_party/keychain"]
+	path = third_party/keychain
+	url = https://github.com/Klebert-Engineering/keychain.git
+[submodule "third_party/python-cmake-wheel"]
+	path = third_party/python-cmake-wheel
+	url = https://github.com/Klebert-Engineering/python-cmake-wheel.git
