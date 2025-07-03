@@ -44,6 +44,10 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 include(ExternalProject)
 
 # Determine platform-specific OpenSSL configuration
+# Get number of processor cores for parallel builds
+include(ProcessorCount)
+ProcessorCount(N)
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure VC-WIN64A)
@@ -60,8 +64,13 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     else()
         set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure darwin64-x86_64-cc)
     endif()
-    set(OPENSSL_BUILD_COMMAND make)
-    set(OPENSSL_INSTALL_COMMAND make install_sw)
+    if(NOT N EQUAL 0)
+        set(OPENSSL_BUILD_COMMAND make -j${N})
+        set(OPENSSL_INSTALL_COMMAND make -j${N} install_sw)
+    else()
+        set(OPENSSL_BUILD_COMMAND make)
+        set(OPENSSL_INSTALL_COMMAND make install_sw)
+    endif()
     set(OPENSSL_LIB_PREFIX "lib")
     set(OPENSSL_LIB_SUFFIX ".a")
 else() # Linux and other Unix-like systems
@@ -70,8 +79,13 @@ else() # Linux and other Unix-like systems
     else()
         set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure linux-x86)
     endif()
-    set(OPENSSL_BUILD_COMMAND make)
-    set(OPENSSL_INSTALL_COMMAND make install_sw)
+    if(NOT N EQUAL 0)
+        set(OPENSSL_BUILD_COMMAND make -j${N})
+        set(OPENSSL_INSTALL_COMMAND make -j${N} install_sw)
+    else()
+        set(OPENSSL_BUILD_COMMAND make)
+        set(OPENSSL_INSTALL_COMMAND make install_sw)
+    endif()
     set(OPENSSL_LIB_PREFIX "lib")
     set(OPENSSL_LIB_SUFFIX ".a")
 endif()
@@ -90,6 +104,11 @@ ExternalProject_Add(openssl_build
     BUILD_COMMAND ${OPENSSL_BUILD_COMMAND}
     INSTALL_COMMAND ${OPENSSL_INSTALL_COMMAND}
     BUILD_IN_SOURCE 1
+    BUILD_BYPRODUCTS 
+        ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
+        ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
+        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
+        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
     LOG_CONFIGURE ON
     LOG_BUILD ON
     LOG_INSTALL ON
@@ -99,7 +118,7 @@ ExternalProject_Add(openssl_build
 add_library(OpenSSL::SSL STATIC IMPORTED GLOBAL)
 add_library(OpenSSL::Crypto STATIC IMPORTED GLOBAL)
 
-# Set target properties
+# Set target properties - use standard lib path
 set_target_properties(OpenSSL::SSL PROPERTIES
     IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
     INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
@@ -108,6 +127,21 @@ set_target_properties(OpenSSL::SSL PROPERTIES
 set_target_properties(OpenSSL::Crypto PROPERTIES
     IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
     INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
+)
+
+# Add a post-build command to handle lib64 vs lib directory issue
+# This ensures libraries are available in the expected lib/ directory
+add_custom_command(
+    TARGET openssl_build POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${OPENSSL_INSTALL_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX} 
+        ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX} 
+        ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
+    COMMENT "Ensuring OpenSSL libraries are available in lib/ directory"
+    VERBATIM
 )
 
 # Add dependencies
@@ -161,6 +195,8 @@ add_subdirectory(deps/httplib EXCLUDE_FROM_ALL)
 # Configure httplib with OpenSSL and zlib support
 target_compile_definitions(httplib INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
 target_link_libraries(httplib INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
+# Ensure httplib depends on OpenSSL build to establish correct build order
+add_dependencies(httplib openssl_build)
 
 # keychain
 if (ZSWAG_KEYCHAIN_SUPPORT)
