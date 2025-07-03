@@ -24,7 +24,7 @@ target_link_libraries(zswagcl
     httpcl
     speedyj
     httplib::httplib
-    yaml-cpp
+    yaml-cpp::yaml-cpp
     ZserioCppRuntime)
 
 target_compile_definitions(zswagcl
