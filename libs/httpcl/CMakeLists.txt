@@ -26,6 +26,9 @@ target_link_libraries(httpcl
     yaml-cpp::yaml-cpp
   )
 
+# Ensure httpcl depends on OpenSSL build to establish correct build order
+add_dependencies(httpcl openssl_build)
+
 target_include_directories(httpcl
   PRIVATE
     src

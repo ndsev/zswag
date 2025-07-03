@@ -27,6 +27,9 @@ target_link_libraries(zswagcl
     yaml-cpp::yaml-cpp
     ZserioCppRuntime)
 
+# Ensure zswagcl depends on OpenSSL build to establish correct build order
+add_dependencies(zswagcl openssl_build)
+
 target_compile_definitions(zswagcl
   PRIVATE
     -DZSWAG_BUILD=1)
