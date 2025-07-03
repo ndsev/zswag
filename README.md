@@ -1,8 +1,8 @@
 # Zswag
 
-[![CI](https://github.com/Klebert-Engineering/zswag/actions/workflows/build-deploy.yml/badge.svg)](https://github.com/Klebert-Engineering/zswag/actions/workflows/build-deploy.yml)
-[![Release](https://img.shields.io/github/release/Klebert-Engineering/zswag)](https://GitHub.com/Klebert-Engineering/zswag/releases/)
-[![License](https://img.shields.io/github/license/klebert-engineering/zswag)](https://github.com/Klebert-Engineering/zswag/blob/master/LICENSE)
+[![CI](https://github.com/ndsev/zswag/actions/workflows/build-deploy.yml/badge.svg)](https://github.com/ndsev/zswag/actions/workflows/build-deploy.yml)
+[![Release](https://img.shields.io/github/release/ndsev/zswag)](https://GitHub.com/ndsev/zswag/releases/)
+[![License](https://img.shields.io/github/license/ndsev/zswag)](https://github.com/ndsev/zswag/blob/master/LICENSE)
 
 zswag is a set of libraries for using/hosting zserio services through OpenAPI.
 
