@@ -29,6 +29,9 @@ endif()
 if (NOT MSVC)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   set(CMAKE_CXX_FLAGS -fPIC)
+else()
+  # Enable exception handling and suppress C4530 warnings on MSVC
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 endif()
 
 if (NOT ZSWAG_DEPLOY_DIR)
@@ -50,12 +53,12 @@ ProcessorCount(N)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure VC-WIN64A)
+        set(OPENSSL_CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure VC-WIN64A --prefix=${OPENSSL_INSTALL_DIR} --openssldir=${OPENSSL_INSTALL_DIR}/ssl no-shared no-tests)
     else()
-        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure VC-WIN32)
+        set(OPENSSL_CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/Configure VC-WIN32 --prefix=${OPENSSL_INSTALL_DIR} --openssldir=${OPENSSL_INSTALL_DIR}/ssl no-shared no-tests)
     endif()
     set(OPENSSL_BUILD_COMMAND nmake)
-    set(OPENSSL_INSTALL_COMMAND nmake install)
+    set(OPENSSL_INSTALL_COMMAND nmake install_sw)
     set(OPENSSL_LIB_PREFIX "")
     set(OPENSSL_LIB_SUFFIX ".lib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -97,22 +100,21 @@ set(OPENSSL_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/openssl-install)
 ExternalProject_Add(openssl_build
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl
     CONFIGURE_COMMAND ${OPENSSL_CONFIGURE_COMMAND}
-                      --prefix=${OPENSSL_INSTALL_DIR}
-                      --openssldir=${OPENSSL_INSTALL_DIR}/ssl
-                      no-shared
-                      no-tests
     BUILD_COMMAND ${OPENSSL_BUILD_COMMAND}
     INSTALL_COMMAND ${OPENSSL_INSTALL_COMMAND}
     BUILD_IN_SOURCE 1
     BUILD_BYPRODUCTS 
         ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
         ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
-        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
-        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
+        $<$<NOT:$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>>:${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}>
+        $<$<NOT:$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>>:${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}>
     LOG_CONFIGURE ON
     LOG_BUILD ON
     LOG_INSTALL ON
+    LOG_OUTPUT_ON_FAILURE ON
 )
+
+
 
 # Create imported targets for OpenSSL::SSL and OpenSSL::Crypto
 add_library(OpenSSL::SSL STATIC IMPORTED GLOBAL)
@@ -129,20 +131,22 @@ set_target_properties(OpenSSL::Crypto PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
 )
 
-# Add a post-build command to handle lib64 vs lib directory issue
+# Add a post-build command to handle lib64 vs lib directory issue on Unix systems
 # This ensures libraries are available in the expected lib/ directory
-add_custom_command(
-    TARGET openssl_build POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${OPENSSL_INSTALL_DIR}/lib
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX} 
-        ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX} 
-        ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
-    COMMENT "Ensuring OpenSSL libraries are available in lib/ directory"
-    VERBATIM
-)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    add_custom_command(
+        TARGET openssl_build POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${OPENSSL_INSTALL_DIR}/lib
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+            ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX} 
+            ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+            ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX} 
+            ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
+        COMMENT "Ensuring OpenSSL libraries are available in lib/ directory"
+        VERBATIM
+    )
+endif()
 
 # Add dependencies
 add_dependencies(OpenSSL::SSL openssl_build)
