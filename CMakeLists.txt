@@ -40,9 +40,95 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 ##############
 # Third-party dependencies via git submodules
 
-# OpenSSL - use system installation instead of submodule
-set(OPENSSL_USE_STATIC_LIBS ON)
-find_package(OpenSSL REQUIRED)
+# OpenSSL - build from source using ExternalProject
+include(ExternalProject)
+
+# Determine platform-specific OpenSSL configuration
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure VC-WIN64A)
+    else()
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure VC-WIN32)
+    endif()
+    set(OPENSSL_BUILD_COMMAND nmake)
+    set(OPENSSL_INSTALL_COMMAND nmake install)
+    set(OPENSSL_LIB_PREFIX "")
+    set(OPENSSL_LIB_SUFFIX ".lib")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure darwin64-arm64-cc)
+    else()
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure darwin64-x86_64-cc)
+    endif()
+    set(OPENSSL_BUILD_COMMAND make)
+    set(OPENSSL_INSTALL_COMMAND make install_sw)
+    set(OPENSSL_LIB_PREFIX "lib")
+    set(OPENSSL_LIB_SUFFIX ".a")
+else() # Linux and other Unix-like systems
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure linux-x86_64)
+    else()
+        set(OPENSSL_CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/Configure linux-x86)
+    endif()
+    set(OPENSSL_BUILD_COMMAND make)
+    set(OPENSSL_INSTALL_COMMAND make install_sw)
+    set(OPENSSL_LIB_PREFIX "lib")
+    set(OPENSSL_LIB_SUFFIX ".a")
+endif()
+
+# Set OpenSSL install directory
+set(OPENSSL_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/openssl-install)
+
+# Build OpenSSL using ExternalProject
+ExternalProject_Add(openssl_build
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl
+    CONFIGURE_COMMAND ${OPENSSL_CONFIGURE_COMMAND}
+                      --prefix=${OPENSSL_INSTALL_DIR}
+                      --openssldir=${OPENSSL_INSTALL_DIR}/ssl
+                      no-shared
+                      no-tests
+    BUILD_COMMAND ${OPENSSL_BUILD_COMMAND}
+    INSTALL_COMMAND ${OPENSSL_INSTALL_COMMAND}
+    BUILD_IN_SOURCE 1
+    LOG_CONFIGURE ON
+    LOG_BUILD ON
+    LOG_INSTALL ON
+)
+
+# Create imported targets for OpenSSL::SSL and OpenSSL::Crypto
+add_library(OpenSSL::SSL STATIC IMPORTED GLOBAL)
+add_library(OpenSSL::Crypto STATIC IMPORTED GLOBAL)
+
+# Set target properties
+set_target_properties(OpenSSL::SSL PROPERTIES
+    IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
+    INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
+)
+
+set_target_properties(OpenSSL::Crypto PROPERTIES
+    IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
+    INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
+)
+
+# Add dependencies
+add_dependencies(OpenSSL::SSL openssl_build)
+add_dependencies(OpenSSL::Crypto openssl_build)
+
+# Link SSL to Crypto
+set_target_properties(OpenSSL::SSL PROPERTIES
+    INTERFACE_LINK_LIBRARIES OpenSSL::Crypto
+)
+
+# Platform-specific system libraries
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        INTERFACE_LINK_LIBRARIES "ws2_32;gdi32;advapi32;crypt32;user32"
+    )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        INTERFACE_LINK_LIBRARIES "dl;pthread"
+    )
+endif()
 
 # zlib
 add_subdirectory(third_party/zlib EXCLUDE_FROM_ALL)
