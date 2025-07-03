@@ -1,0 +1,78 @@
+
+
+
+
+# Dependencies.cmake
+
+This file centralizes all dependency declarations using CMake's FetchContent module.
+
+## Features
+
+- Manages all project dependencies in one place
+- Supports version pinning using GIT_TAG
+- Supports offline builds using FETCHCONTENT_FULLY_DISCONNECTED
+- Supports local overrides using FETCHCONTENT_SOURCE_DIR_<NAME>
+
+## Usage
+
+In your project's CMakeLists.txt:
+
+```cmake
+include(cmake/Dependencies.cmake)
+FetchContent_MakeAvailable(
+  openssl
+  zlib
+  spdlog
+  yaml-cpp
+  stx
+  speedyj
+  catch2
+  httplib
+  zserio-cmake-helper
+  keychain
+  pybind11
+  python-cmake-wheel
+)
+```
+
+## Dependency List
+
+The following dependencies are declared in this file:
+
+- openssl
+- zlib
+- spdlog
+- yaml-cpp
+- stx
+- speedyj
+- catch2
+- httplib
+- zserio-cmake-helper
+- keychain
+- pybind11
+- python-cmake-wheel
+
+## CMake Variables
+
+The following CMake variables are available:
+
+- `FETCHCONTENT_FULLY_DISCONNECTED`: Set to `ON` to enable offline builds
+- `FETCHCONTENT_SOURCE_DIR_<NAME>`: Set to a local path to override a specific dependency
+
+## Example: Local Override
+
+To use a local copy of OpenSSL instead of fetching it from Git:
+
+```bash
+cmake -DFETCHCONTENT_SOURCE_DIR_OPENSSL=/path/to/local/openssl ..
+```
+
+## Example: Offline Build
+
+To build the project in offline mode (after dependencies have been prefetched):
+
+```bash
+cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
+```
+
+

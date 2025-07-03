@@ -1,0 +1,43 @@
+
+
+
+# fetch_dependencies.sh
+
+This script helps to prefetch all dependencies for offline builds.
+
+## Usage
+
+```bash
+./fetch_dependencies.sh
+```
+
+## What it does
+
+1. Creates a temporary build directory
+2. Configures CMake to fetch all dependencies
+3. Copies the fetched dependencies to the `_deps` directory in the project root
+4. Cleans up the temporary build directory
+
+## Result
+
+After running this script, you'll have a `_deps` directory containing all the dependencies. You can:
+
+1. Copy the `_deps` directory to another machine
+2. Build the project with `FETCHCONTENT_FULLY_DISCONNECTED=ON` to use the prefetched dependencies
+
+## Example
+
+```bash
+# On machine with internet access
+./fetch_dependencies.sh
+
+# Copy _deps directory to another machine
+scp -r _deps user@offline-machine:/path/to/project
+
+# On offline machine
+mkdir build
+cd build
+cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
+cmake --build .
+```
+

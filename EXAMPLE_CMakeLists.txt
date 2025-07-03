@@ -1,0 +1,70 @@
+
+
+# Example CMakeLists.txt showing how to use the FetchContent dependencies
+
+cmake_minimum_required(VERSION 3.22.3)
+project(MyProject)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Include the dependencies
+include(cmake/Dependencies.cmake)
+
+# Make the dependencies available
+FetchContent_MakeAvailable(
+  openssl
+  zlib
+  spdlog
+  yaml-cpp
+  stx
+  speedyj
+  catch2
+  httplib
+  zserio-cmake-helper
+  keychain
+  pybind11
+  python-cmake-wheel
+)
+
+# Create an executable that uses the dependencies
+add_executable(my_app main.cpp)
+
+# Link the dependencies
+target_link_libraries(my_app
+  PRIVATE
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    ZLIB::ZLIB
+    spdlog::spdlog
+    yaml-cpp
+    stx
+    speedyj
+    httplib
+    pybind11::module
+)
+
+# Add include directories if needed
+target_include_directories(my_app
+  PRIVATE
+    ${openssl_SOURCE_DIR}/include
+    ${zlib_SOURCE_DIR}
+    ${spdlog_SOURCE_DIR}/include
+    ${yaml_cpp_SOURCE_DIR}/include
+    ${stx_SOURCE_DIR}/include
+    ${speedyj_SOURCE_DIR}/include
+    ${httplib_SOURCE_DIR}/include
+    ${pybind11_SOURCE_DIR}/include
+)
+
+# Enable testing if needed
+option(ENABLE_TESTING "Enable testing" OFF)
+if(ENABLE_TESTING)
+  enable_testing()
+  add_subdirectory(${catch2_SOURCE_DIR})
+  add_executable(my_tests test_main.cpp)
+  target_link_libraries(my_tests PRIVATE Catch2::Catch2)
+  add_test(NAME MyTests COMMAND my_tests)
+endif()
+
