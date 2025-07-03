@@ -80,13 +80,6 @@ if(ZSWAG_BUILD_WHEELS)
     )
 endif()
 
-# zserio-cmake-helper
-FetchContent_Declare(
-    zserio-cmake-helper
-    GIT_REPOSITORY https://github.com/Klebert-Engineering/zserio-cmake-helper.git
-    GIT_TAG        "v1.1.4"
-)
-
 # keychain
 FetchContent_Declare(
     keychain
@@ -99,6 +92,13 @@ FetchContent_Declare(
     catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
     GIT_TAG        "v3.8.1"
+)
+
+# zserio-cmake-helper
+FetchContent_Declare(
+    zserio-cmake-helper
+    GIT_REPOSITORY https://github.com/Klebert-Engineering/zserio-cmake-helper.git
+    GIT_TAG        "v1.1.4"
 )
 
 # =============================================================================
@@ -131,17 +131,20 @@ check_fetchcontent_override(CATCH2)
 # =============================================================================
 
 # Configure zlib first - it's needed by httplib
+set(ZLIB_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(zlib)
 
 # Create ZLIB::ZLIB alias if it doesn't exist
 if(TARGET zlib AND NOT TARGET ZLIB::ZLIB)
     add_library(ZLIB::ZLIB ALIAS zlib)
-endif()
-if(TARGET zlibstatic AND NOT TARGET ZLIB::ZLIB)
+elseif(TARGET zlibstatic AND NOT TARGET ZLIB::ZLIB)
     add_library(ZLIB::ZLIB ALIAS zlibstatic)
 endif()
 
 # Configure spdlog
+set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(spdlog)
 
 # Configure yaml-cpp
@@ -166,10 +169,6 @@ if(ZSWAG_BUILD_WHEELS)
     FetchContent_MakeAvailable(pybind11)
     FetchContent_MakeAvailable(python-cmake-wheel)
 endif()
-
-# Configure zserio-cmake-helper
-set(ZSERIO_VERSION "2.16.1")
-FetchContent_MakeAvailable(zserio-cmake-helper)
 
 # Configure keychain (conditional)
 if(ZSWAG_KEYCHAIN_SUPPORT)
@@ -228,6 +227,11 @@ endif()
 # Configure zserio-cmake-helper
 # =============================================================================
 
+# Configure zserio-cmake-helper
+set(ZSERIO_VERSION "2.16.1")
+FetchContent_MakeAvailable(zserio-cmake-helper)
+
+# Add zserio C++ runtime target
 if(NOT TARGET ZserioCppRuntime)
     add_zserio_cpp_runtime()
 endif() 

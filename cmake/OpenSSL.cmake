@@ -19,7 +19,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     endif()
     set(OPENSSL_BUILD_COMMAND nmake)
     set(OPENSSL_INSTALL_COMMAND nmake install_sw)
-    set(OPENSSL_LIB_PREFIX "")
+    # On Windows, OpenSSL may generate libraries with lib prefix
+    set(OPENSSL_LIB_PREFIX "lib")
     set(OPENSSL_LIB_SUFFIX ".lib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
@@ -63,6 +64,8 @@ ExternalProject_Add(openssl_build
     BUILD_BYPRODUCTS 
         ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
         ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
+        $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:${OPENSSL_INSTALL_DIR}/lib/ssl${OPENSSL_LIB_SUFFIX}>
+        $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:${OPENSSL_INSTALL_DIR}/lib/crypto${OPENSSL_LIB_SUFFIX}>
         $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}>
         $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}>
     LOG_CONFIGURE ON
@@ -76,15 +79,26 @@ add_library(OpenSSL::SSL STATIC IMPORTED GLOBAL)
 add_library(OpenSSL::Crypto STATIC IMPORTED GLOBAL)
 
 # Set target properties - use standard lib path
-set_target_properties(OpenSSL::SSL PROPERTIES
-    IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
-    INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
-)
-
-set_target_properties(OpenSSL::Crypto PROPERTIES
-    IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
-    INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
-)
+# On Windows, try both naming conventions
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set_target_properties(OpenSSL::SSL PROPERTIES
+        IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/ssl${OPENSSL_LIB_SUFFIX}
+        INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
+    )
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/crypto${OPENSSL_LIB_SUFFIX}
+        INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
+    )
+else()
+    set_target_properties(OpenSSL::SSL PROPERTIES
+        IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}
+        INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
+    )
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        IMPORTED_LOCATION ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
+        INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INSTALL_DIR}/include
+    )
+endif()
 
 # Add a post-build command to handle lib64 vs lib directory issue on Linux systems only
 # This ensures libraries are available in the expected lib/ directory
@@ -100,6 +114,22 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             ${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX} 
             ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
         COMMENT "Ensuring OpenSSL libraries are available in lib/ directory"
+        VERBATIM
+    )
+endif()
+
+# Add a post-build command to handle library naming issues on Windows
+# OpenSSL may generate libraries with different names, so we create fallback copies
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    add_custom_command(
+        TARGET openssl_build POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+            ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX} 
+            ${OPENSSL_INSTALL_DIR}/lib/ssl${OPENSSL_LIB_SUFFIX}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+            ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX} 
+            ${OPENSSL_INSTALL_DIR}/lib/crypto${OPENSSL_LIB_SUFFIX}
+        COMMENT "Ensuring OpenSSL libraries are available with expected names"
         VERBATIM
     )
 endif()

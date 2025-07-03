@@ -21,6 +21,11 @@ target_compile_definitions(zswagcl-test
   PRIVATE
     -DTESTDATA="${CMAKE_CURRENT_LIST_DIR}/testdata/")
 
+# On Windows, ensure OpenSSL build completes before linking test executable
+if(WIN32)
+    add_dependencies(zswagcl-test openssl_build)
+endif()
+
 if (ZSWAG_ENABLE_TESTING)
   add_test(NAME zswagcl-test
     COMMAND "$<TARGET_FILE:zswagcl-test>")

@@ -30,9 +30,15 @@ target_link_libraries(zswagcl
 # Ensure zswagcl depends on OpenSSL build to establish correct build order
 add_dependencies(zswagcl openssl_build)
 
+# On Windows, make sure OpenSSL libraries are available before linking
+if(WIN32)
+    # Add dependencies on the actual OpenSSL targets to ensure proper build order
+    add_dependencies(zswagcl OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
 target_compile_definitions(zswagcl
   PRIVATE
-    -DZSWAG_BUILD=1)
+    -DZSWAGCL_BUILD=1)
 
 target_compile_features(zswagcl
   PUBLIC

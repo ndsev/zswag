@@ -1,14 +1,15 @@
 #include <regex>
 
 #include "zswagcl/private/openapi-config.hpp"
+#include "zswagcl/export.hpp"
 #include "stx/format.h"
 
 namespace zswagcl
 {
 
-const std::string ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
-const std::string ZSERIO_REQUEST_PART = "x-zserio-request-part";
-const std::string ZSERIO_REQUEST_PART_WHOLE = "*";
+ZSWAGCL_EXPORT const std::string ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
+ZSWAGCL_EXPORT const std::string ZSERIO_REQUEST_PART = "x-zserio-request-part";
+ZSWAGCL_EXPORT const std::string ZSERIO_REQUEST_PART_WHOLE = "*";
 
 bool OpenAPIConfig::BasicAuth::checkOrApply(httpcl::Config& config, std::string& err) const {
     if (config.auth.has_value())

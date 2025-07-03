@@ -3,6 +3,9 @@
 # fetch_dependencies.sh
 # Script to prefetch all FetchContent dependencies for offline builds
 # Automatically reads dependency information from cmake/Dependencies.cmake
+#
+# Usage: ./fetch_dependencies.sh [build_directory]
+#   build_directory: Optional path to build directory (default: _deps in project root)
 
 set -e
 
@@ -123,9 +126,28 @@ EOF
     fi
 }
 
+# Parse command line arguments
+BUILD_DIR=""
+if [ $# -gt 0 ]; then
+    BUILD_DIR="$1"
+    if [ ! -d "$BUILD_DIR" ]; then
+        print_error "Build directory '$BUILD_DIR' does not exist"
+        exit 1
+    fi
+fi
+
 # Create a temporary build directory for fetching dependencies
 TEMP_BUILD_DIR="temp_fetch_build"
 DEPS_DIR="_deps"
+
+# Determine target directory for dependencies
+if [ -n "$BUILD_DIR" ]; then
+    TARGET_DEPS_DIR="$BUILD_DIR/_deps"
+    print_status "Will fetch dependencies to: $TARGET_DEPS_DIR"
+else
+    TARGET_DEPS_DIR="$DEPS_DIR"
+    print_status "Will fetch dependencies to: $TARGET_DEPS_DIR (project root)"
+fi
 
 print_status "Parsing dependencies from cmake/Dependencies.cmake..."
 
@@ -167,15 +189,18 @@ done <<< "$dependencies"
 # Go back to project root
 cd ..
 
-# Move the _deps directory to the project root if it exists
+# Move the _deps directory to the target location if it exists
 if [ -d "$TEMP_BUILD_DIR/$DEPS_DIR" ]; then
-    print_status "Moving fetched dependencies to project root..."
-    if [ -d "$DEPS_DIR" ]; then
-        print_warning "Existing $DEPS_DIR directory found. Backing up to ${DEPS_DIR}.backup"
-        mv "$DEPS_DIR" "${DEPS_DIR}.backup"
+    print_status "Moving fetched dependencies to target location..."
+    if [ -d "$TARGET_DEPS_DIR" ]; then
+        print_warning "Existing $TARGET_DEPS_DIR directory found. Backing up to ${TARGET_DEPS_DIR}.backup"
+        mv "$TARGET_DEPS_DIR" "${TARGET_DEPS_DIR}.backup"
     fi
-    mv "$TEMP_BUILD_DIR/$DEPS_DIR" .
-    print_success "Dependencies moved to $DEPS_DIR/"
+    
+    # Create parent directory if it doesn't exist
+    mkdir -p "$(dirname "$TARGET_DEPS_DIR")"
+    mv "$TEMP_BUILD_DIR/$DEPS_DIR" "$TARGET_DEPS_DIR"
+    print_success "Dependencies moved to $TARGET_DEPS_DIR/"
 fi
 
 # Clean up temporary build directory
@@ -194,10 +219,22 @@ print_status "You can now build offline using: cmake -DFETCHCONTENT_FULLY_DISCON
 
 # Print usage information
 echo ""
-echo "Usage for offline builds:"
-echo "  mkdir build && cd build"
-echo "  cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON .."
-echo "  make"
+if [ -n "$BUILD_DIR" ]; then
+    echo "Usage for offline builds (dependencies are in build directory):"
+    echo "  cd $BUILD_DIR"
+    echo "  cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON .."
+    echo "  make"
+else
+    echo "Usage for offline builds:"
+    echo "  mkdir build && cd build"
+    echo "  cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON .."
+    echo "  make"
+    echo ""
+    echo "For better offline builds, prefetch to build directory:"
+    echo "  mkdir build"
+    echo "  ./fetch_dependencies.sh build"
+    echo "  cd build && cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON .."
+fi
 echo ""
 echo "Usage with local overrides:"
 echo "  cmake -DFETCHCONTENT_SOURCE_DIR_SPDLOG=/path/to/local/spdlog .."
