@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <regex>
 #include <future>
+#include <fstream>
+#include <filesystem>
 #include <spdlog/spdlog.h>
 
 using namespace httpcl;
@@ -350,7 +352,7 @@ void Settings::load()
         return;
     }
 
-    if (!httplib::detail::is_file(cookieJar)) {
+    if (!std::filesystem::is_regular_file(cookieJar)) {
         log().debug("The HTTP_SETTINGS_FILE path '{}' is not a file.", cookieJar);
         return;
     }

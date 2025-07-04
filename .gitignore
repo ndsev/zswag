@@ -136,3 +136,5 @@ dist/
 
 # CodeChecker stuff
 .codechecker/
+
+_deps/
