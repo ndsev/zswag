@@ -14,92 +14,124 @@ set(FETCHCONTENT_QUIET OFF)
 # =============================================================================
 
 # zlib
-FetchContent_Declare(
-    zlib
-    GIT_REPOSITORY https://github.com/madler/zlib.git
-    GIT_TAG        "v1.3.1"
-)
+if(NOT TARGET zlib AND NOT TARGET zlibstatic AND NOT TARGET ZLIB::ZLIB)
+    FetchContent_Declare(
+        zlib
+        GIT_REPOSITORY https://github.com/madler/zlib.git
+        GIT_TAG        "v1.3.1"
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # spdlog
-FetchContent_Declare(
-    spdlog
-    GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG        "v1.15.3"
-)
+if(NOT TARGET spdlog)
+    FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG        "v1.15.3"
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # yaml-cpp - use specific commit hash for stability
-FetchContent_Declare(
-    yaml-cpp
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-    GIT_TAG        "2f86d13775d119edbb69af52e5f566fd65c6953b"  # Latest commit on master as of Dec 2024
-)
+if(NOT TARGET yaml-cpp)
+    FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG        "2f86d13775d119edbb69af52e5f566fd65c6953b"  # Latest commit on master as of Dec 2024
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # stx - use specific commit hash for stability
-FetchContent_Declare(
-    stx
-    GIT_REPOSITORY https://github.com/Klebert-Engineering/stx.git
-    GIT_TAG        "019d7e4978a7e60ac90223a96ad87963840308ef"  # Latest commit on main as of Dec 2024
-)
+if(NOT TARGET stx)
+    FetchContent_Declare(
+        stx
+        GIT_REPOSITORY https://github.com/Klebert-Engineering/stx.git
+        GIT_TAG        "019d7e4978a7e60ac90223a96ad87963840308ef"  # Latest commit on main as of Dec 2024
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # speedyj - use specific commit hash for stability
-FetchContent_Declare(
-    speedyj
-    GIT_REPOSITORY https://github.com/Klebert-Engineering/speedyj.git
-    GIT_TAG        "d7d2087085b45411118d74f4d7353357cb54540d"  # Latest commit on master as of Dec 2024
-)
+if(NOT TARGET speedyj)
+    FetchContent_Declare(
+        speedyj
+        GIT_REPOSITORY https://github.com/Klebert-Engineering/speedyj.git
+        GIT_TAG        "d7d2087085b45411118d74f4d7353357cb54540d"  # Latest commit on master as of Dec 2024
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # httplib - configure to not install/export targets to avoid dependency issues
-FetchContent_Declare(
-    httplib
-    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-    GIT_TAG        "v0.15.3"
-)
+if(NOT TARGET httplib)
+    FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG        "v0.15.3"
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # OpenSSL
-FetchContent_Declare(
-    openssl
-    GIT_REPOSITORY https://github.com/openssl/openssl.git
-    GIT_TAG        "openssl-3.5.1"
-)
+if(NOT TARGET OpenSSL::SSL AND NOT TARGET OpenSSL::Crypto)
+    FetchContent_Declare(
+        openssl
+        GIT_REPOSITORY https://github.com/openssl/openssl.git
+        GIT_TAG        "openssl-3.5.1"
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # pybind11 (only needed when building wheels)
-if(ZSWAG_BUILD_WHEELS)
+if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11)
     FetchContent_Declare(
         pybind11
         GIT_REPOSITORY https://github.com/pybind/pybind11.git
         GIT_TAG        "v2.10.4"
+        GIT_SHALLOW    TRUE
     )
 endif()
 
 # python-cmake-wheel (only needed when building wheels)
-if(ZSWAG_BUILD_WHEELS)
+if(ZSWAG_BUILD_WHEELS AND NOT TARGET wheel)
     FetchContent_Declare(
         python-cmake-wheel
         GIT_REPOSITORY https://github.com/Klebert-Engineering/python-cmake-wheel.git
         GIT_TAG        "v0.9.0"
+        GIT_SHALLOW    TRUE
     )
 endif()
 
 # keychain
-FetchContent_Declare(
-    keychain
-    GIT_REPOSITORY https://github.com/hrantzsch/keychain
-    GIT_TAG        "v1.3.1"
-)
+if(NOT TARGET keychain)
+    FetchContent_Declare(
+        keychain
+        GIT_REPOSITORY https://github.com/hrantzsch/keychain
+        GIT_TAG        "v1.3.1"
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # Catch2 (for testing)
-FetchContent_Declare(
-    catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        "v3.8.1"
-)
+if(NOT TARGET Catch2::Catch2)
+    FetchContent_Declare(
+        catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        "v3.8.1"
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # zserio-cmake-helper
-FetchContent_Declare(
-    zserio-cmake-helper
-    GIT_REPOSITORY https://github.com/Klebert-Engineering/zserio-cmake-helper.git
-    GIT_TAG        "v1.1.4"
-)
+if(NOT COMMAND add_zserio_cpp_runtime)
+    FetchContent_Declare(
+        zserio-cmake-helper
+        GIT_REPOSITORY https://github.com/Klebert-Engineering/zserio-cmake-helper.git
+        GIT_TAG        "v1.1.4"
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # =============================================================================
 # Local override checks and messages
@@ -136,10 +168,12 @@ set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(zlib)
 
 # Create ZLIB::ZLIB alias if it doesn't exist
-if(TARGET zlib AND NOT TARGET ZLIB::ZLIB)
-    add_library(ZLIB::ZLIB ALIAS zlib)
-elseif(TARGET zlibstatic AND NOT TARGET ZLIB::ZLIB)
-    add_library(ZLIB::ZLIB ALIAS zlibstatic)
+if(NOT TARGET ZLIB::ZLIB)
+    if(TARGET zlib)
+        add_library(ZLIB::ZLIB ALIAS zlib)
+    elseif(TARGET zlibstatic)
+        add_library(ZLIB::ZLIB ALIAS zlibstatic)
+    endif()
 endif()
 
 # Configure spdlog
@@ -206,7 +240,9 @@ if(TARGET httplib)
     target_compile_definitions(httplib INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
     target_link_libraries(httplib INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
     # Ensure httplib depends on OpenSSL build to establish correct build order
-    add_dependencies(httplib openssl_build)
+    if(TARGET openssl_build)
+        add_dependencies(httplib openssl_build)
+    endif()
 endif()
 
 # =============================================================================

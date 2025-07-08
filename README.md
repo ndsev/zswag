@@ -105,39 +105,19 @@ cd build && ctest --verbose
 
 #### Offline/Disconnected Builds
 
-For environments without internet access or for reproducible builds, zswag supports offline builds using pre-fetched dependencies.
+For environments without internet access or for reproducible builds, zswag supports offline builds using CMake's FetchContent mechanism.
 
-**Step 1: Prefetch Dependencies**
+**Offline Build Process**
 
-The dependency prefetch script can fetch dependencies to different locations depending on your needs:
+For offline builds, you can pre-fetch all dependencies while online and then build without network access:
 
 ```bash
-# Option A: Fetch to build directory (recommended for offline builds)
-mkdir build
-./fetch_dependencies.sh build
-
-# Option B: Fetch to project root (for general use)
-./fetch_dependencies.sh
-```
-
-The script automatically reads `cmake/Dependencies.cmake` and downloads all dependencies to the specified location. It provides colored output showing the progress:
-- 🔵 **[INFO]** - General information
-- 🟢 **[SUCCESS]** - Successful operations  
-- 🟡 **[WARNING]** - Warnings or partial failures
-- 🔴 **[ERROR]** - Errors
-
-**Step 2: Build Offline**
-
-For optimal offline builds (using Option A above):
-```bash
-cd build
-cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
-cmake --build .
-```
-
-For offline builds with dependencies in project root (Option B):
-```bash
+# First, fetch all dependencies while online
 mkdir build && cd build
+cmake -DFETCHCONTENT_FULLY_DISCONNECTED=OFF ..
+# This will download all dependencies
+
+# Then build offline
 cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
 cmake --build .
 ```
@@ -174,11 +154,6 @@ Common build configuration options:
 # Minimal build (no wheels, no keychain, no tests)
 cmake -DZSWAG_BUILD_WHEELS=OFF -DZSWAG_KEYCHAIN_SUPPORT=OFF -DZSWAG_ENABLE_TESTING=OFF ..
 
-# Offline build with dependencies pre-fetched to build directory
-mkdir build
-./fetch_dependencies.sh build
-cd build && cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
-
 # Offline build with custom spdlog
 cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON -DFETCHCONTENT_SOURCE_DIR_SPDLOG=/path/to/spdlog ..
 
@@ -186,56 +161,6 @@ cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON -DFETCHCONTENT_SOURCE_DIR_SPDLOG=/pat
 cmake -DZSWAG_BUILD_WHEELS=ON -DZSWAG_ENABLE_TESTING=ON ..
 ```
 
-**Prefetch Script Usage**
-
-The `fetch_dependencies.sh` script supports flexible dependency management:
-
-```bash
-# Fetch to build directory (best for offline builds)
-./fetch_dependencies.sh build
-
-# Fetch to project root (general purpose)
-./fetch_dependencies.sh
-
-# Fetch to custom directory
-mkdir my_deps
-./fetch_dependencies.sh my_deps
-```
-
-**Benefits of each approach:**
-- **Build directory**: Dependencies are isolated per build, perfect for CI/CD and offline builds
-- **Project root**: Dependencies are shared across builds, saves space but less isolated
-
-**CI/CD Integration**
-
-The offline build system integrates seamlessly with CI/CD pipelines:
-- Dependencies are automatically cached based on `cmake/Dependencies.cmake` content hash
-- The `fetch_dependencies.sh build` approach provides perfect isolation for parallel builds
-- Cache hits enable fast offline builds with `FETCHCONTENT_FULLY_DISCONNECTED=ON`
-- Cache misses trigger automatic dependency prefetching using the script
-- Graceful fallback to online mode if prefetching fails
-- Support for both GitHub Actions, GitLab CI, and other CI systems
-
-**Example CI workflow:**
-```yaml
-- name: Cache dependencies
-  uses: actions/cache@v3
-  with:
-    path: build/_deps
-    key: deps-${{ hashFiles('cmake/Dependencies.cmake') }}
-
-- name: Fetch dependencies (on cache miss)
-  if: steps.cache.outputs.cache-hit != 'true'
-  run: |
-    mkdir -p build
-    ./fetch_dependencies.sh build
-
-- name: Build offline
-  run: |
-    cd build
-    cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
-    cmake --build .
-```
 
 ## CI/CD and Release Process
 
