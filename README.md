@@ -12,6 +12,7 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Setup](#setup)
     + [For Python Users](#for-python-users)
     + [For C++ Users](#for-c-users)
+      - [Offline/Disconnected Builds](#offlinedisconnected-builds)
   * [CI/CD and Release Process](#cicd-and-release-process)
     + [Continuous Integration](#continuous-integration)
     + [Release Process](#release-process)
@@ -84,8 +85,7 @@ Using CMake, you can ...
 * 🌟build the zswag wheels for a custom Python version.
 * 🌟[integrate the C++ client into a C++ project.](#c-client)
 
-Dependencies are managed via CMake's `FetchContent` mechanism and Conan 2.0.
-Make sure you have a recent version of CMake (>= 3.24) and Conan (>= 2.0.5) installed.
+Dependencies are managed via CMake's `FetchContent` mechanism. Make sure you have a recent version of CMake (>= 3.22.3) installed.
 
 The basic setup follows the usual CMake configure/build steps:
 ```bash
@@ -102,6 +102,65 @@ wheels under `build/bin/wheel`.
 ```bash
 cd build && ctest --verbose
 ```
+
+#### Offline/Disconnected Builds
+
+For environments without internet access or for reproducible builds, zswag supports offline builds using CMake's FetchContent mechanism.
+
+**Offline Build Process**
+
+For offline builds, you can pre-fetch all dependencies while online and then build without network access:
+
+```bash
+# First, fetch all dependencies while online
+mkdir build && cd build
+cmake -DFETCHCONTENT_FULLY_DISCONNECTED=OFF ..
+# This will download all dependencies
+
+# Then build offline
+cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
+cmake --build .
+```
+
+The `FETCHCONTENT_FULLY_DISCONNECTED=ON` option tells CMake to use only the pre-fetched dependencies and never attempt network access.
+
+**Local Development with Custom Dependencies**
+
+For development, you can override specific dependencies with local sources:
+```bash
+mkdir build && cd build
+cmake -DFETCHCONTENT_SOURCE_DIR_SPDLOG=/path/to/local/spdlog ..
+cmake --build .
+```
+
+Available override variables:
+- `FETCHCONTENT_SOURCE_DIR_ZLIB` - zlib compression library
+- `FETCHCONTENT_SOURCE_DIR_SPDLOG` - spdlog logging library  
+- `FETCHCONTENT_SOURCE_DIR_YAML_CPP` - yaml-cpp parsing library
+- `FETCHCONTENT_SOURCE_DIR_STX` - stx utility library
+- `FETCHCONTENT_SOURCE_DIR_SPEEDYJ` - speedyj JSON library
+- `FETCHCONTENT_SOURCE_DIR_HTTPLIB` - cpp-httplib HTTP library
+- `FETCHCONTENT_SOURCE_DIR_OPENSSL` - OpenSSL cryptography library
+- `FETCHCONTENT_SOURCE_DIR_PYBIND11` - pybind11 (when `ZSWAG_BUILD_WHEELS=ON`)
+- `FETCHCONTENT_SOURCE_DIR_PYTHON_CMAKE_WHEEL` - python-cmake-wheel (when `ZSWAG_BUILD_WHEELS=ON`)
+- `FETCHCONTENT_SOURCE_DIR_ZSERIO_CMAKE_HELPER` - zserio build helpers
+- `FETCHCONTENT_SOURCE_DIR_KEYCHAIN` - keychain library (when `ZSWAG_KEYCHAIN_SUPPORT=ON`)
+- `FETCHCONTENT_SOURCE_DIR_CATCH2` - Catch2 testing framework (when `ZSWAG_ENABLE_TESTING=ON`)
+
+**Build Options**
+
+Common build configuration options:
+```bash
+# Minimal build (no wheels, no keychain, no tests)
+cmake -DZSWAG_BUILD_WHEELS=OFF -DZSWAG_KEYCHAIN_SUPPORT=OFF -DZSWAG_ENABLE_TESTING=OFF ..
+
+# Offline build with custom spdlog
+cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON -DFETCHCONTENT_SOURCE_DIR_SPDLOG=/path/to/spdlog ..
+
+# Development build with wheels enabled
+cmake -DZSWAG_BUILD_WHEELS=ON -DZSWAG_ENABLE_TESTING=ON ..
+```
+
 
 ## CI/CD and Release Process
 
@@ -509,10 +568,9 @@ project(myapp)
 # libsecret, the following switch will disable keychain integration:
 # set(ZSWAG_KEYCHAIN_SUPPORT OFF)
 
-# In case you want to build zswag without using conan
-# make sure to provide targets for OpenSSL and spdlog
-# and set the following switch to OFF:
-# set(ZSWAG_WITH_CONAN OFF)
+# Optional: For offline/disconnected builds, you can
+# predefine dependency sources using FETCHCONTENT_SOURCE_DIR_*
+# variables (see README offline builds section for details)
 
 # This is how C++ will know about the zswag lib
 # and its dependencies, such as zserio.

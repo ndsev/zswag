@@ -10,6 +10,11 @@ add_executable(${PROJECT_NAME} client.cpp)
 target_link_libraries(${PROJECT_NAME}
   ${PROJECT_NAME}-zserio zswagcl stx)
 
+# On Windows, ensure OpenSSL build completes before linking test executable
+if(WIN32)
+    add_dependencies(${PROJECT_NAME} openssl_build)
+endif()
+
 if (ZSWAG_ENABLE_TESTING)
   add_wheel_test(zswag-server-integration
     WORKING_DIRECTORY

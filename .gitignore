@@ -136,3 +136,8 @@ dist/
 
 # CodeChecker stuff
 .codechecker/
+
+_deps/
+
+CLAUDE.md
+links

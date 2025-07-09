@@ -50,7 +50,7 @@ jobs:
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
-          pip install -U setuptools wheel pip conan==2.5.0
+          pip install -U setuptools wheel pip
           mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
       - name: Build
         working-directory: build
@@ -89,18 +89,11 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
-    - name: Cache Conan packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.conan/data
-        key: ${{ runner.os }}-conan-${{ hashFiles('**/conanfile.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-conan-
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
-    - run: python -m pip install setuptools wheel conan==2.5.0
+    - run: python -m pip install setuptools wheel
     - run: mkdir build
     - name: Build (macOS)
       if: startsWith(matrix.os, 'macos')
@@ -130,6 +123,12 @@ jobs:
       if: matrix.os == 'windows-latest'
       working-directory: build
       run: |
+        # Install NASM using chocolatey (required for OpenSSL build)
+        choco install nasm -y
+        # Add NASM to PATH for current session
+        $env:PATH = "$env:PATH;C:\Program Files\NASM"
+        # Verify NASM installation
+        nasm -v
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
         cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
         cmake --build . --config Release
