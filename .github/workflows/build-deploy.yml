@@ -37,8 +37,9 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-    runs-on: ubuntu-latest
-    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-x86_64:2025.1
+        arch: ["x86_64", "aarch64"]
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-${{ matrix.arch }}:2025.1
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
@@ -69,7 +70,7 @@ jobs:
       - name: Deploy
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-py${{ matrix.python-version }}
+          name: wheels-linux-${{ matrix.arch }}-py${{ matrix.python-version }}
           path: build/bin/wheel/*.whl
   
   build:

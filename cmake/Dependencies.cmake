@@ -134,7 +134,7 @@ if(ZSWAG_BUILD_WHEELS AND NOT TARGET wheel)
     FetchContent_Declare(
         python-cmake-wheel
         GIT_REPOSITORY https://github.com/Klebert-Engineering/python-cmake-wheel.git
-        GIT_TAG        "v0.9.0"
+        GIT_TAG        "v1.0.0"
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(python-cmake-wheel)

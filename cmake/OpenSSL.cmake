@@ -38,7 +38,10 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(OPENSSL_LIB_PREFIX "lib")
     set(OPENSSL_LIB_SUFFIX ".a")
 else() # Linux and other Unix-like systems
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    # Detect architecture for Linux
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+        set(OPENSSL_CONFIGURE_COMMAND ${OPENSSL_SOURCE_DIR}/Configure linux-aarch64 --prefix=${OPENSSL_INSTALL_DIR} --openssldir=${OPENSSL_INSTALL_DIR}/ssl no-shared no-tests)
+    elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(OPENSSL_CONFIGURE_COMMAND ${OPENSSL_SOURCE_DIR}/Configure linux-x86_64 --prefix=${OPENSSL_INSTALL_DIR} --openssldir=${OPENSSL_INSTALL_DIR}/ssl no-shared no-tests)
     else()
         set(OPENSSL_CONFIGURE_COMMAND ${OPENSSL_SOURCE_DIR}/Configure linux-x86 --prefix=${OPENSSL_INSTALL_DIR} --openssldir=${OPENSSL_INSTALL_DIR}/ssl no-shared no-tests)
@@ -54,6 +57,16 @@ else() # Linux and other Unix-like systems
     set(OPENSSL_LIB_SUFFIX ".a")
 endif()
 
+# Determine the library directory used by OpenSSL on Linux
+# x86_64 Linux uses lib64, but ARM64 uses lib
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    set(OPENSSL_LIBDIR "lib")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(OPENSSL_LIBDIR "lib64")
+else()
+    set(OPENSSL_LIBDIR "lib")
+endif()
+
 # Build OpenSSL using ExternalProject
 ExternalProject_Add(openssl_build
     SOURCE_DIR ${OPENSSL_SOURCE_DIR}
@@ -66,8 +79,8 @@ ExternalProject_Add(openssl_build
         ${OPENSSL_INSTALL_DIR}/lib/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}
         $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:${OPENSSL_INSTALL_DIR}/lib/ssl${OPENSSL_LIB_SUFFIX}>
         $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:${OPENSSL_INSTALL_DIR}/lib/crypto${OPENSSL_LIB_SUFFIX}>
-        $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}>
-        $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:${OPENSSL_INSTALL_DIR}/lib64/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}>
+        $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:${OPENSSL_INSTALL_DIR}/${OPENSSL_LIBDIR}/${OPENSSL_LIB_PREFIX}ssl${OPENSSL_LIB_SUFFIX}>
+        $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:${OPENSSL_INSTALL_DIR}/${OPENSSL_LIBDIR}/${OPENSSL_LIB_PREFIX}crypto${OPENSSL_LIB_SUFFIX}>
     LOG_CONFIGURE ON
     LOG_BUILD ON
     LOG_INSTALL ON
@@ -100,10 +113,10 @@ else()
     )
 endif()
 
-# Add a post-build command to handle lib64 vs lib directory issue on Linux systems only
+# Add a post-build command to handle lib64 vs lib directory issue on Linux x86_64 systems only
 # This ensures libraries are available in the expected lib/ directory
-# macOS installs directly to lib/, so this is only needed for Linux
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+# macOS and ARM64 Linux install directly to lib/, so this is only needed for x86_64 Linux
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
     add_custom_command(
         TARGET openssl_build POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${OPENSSL_INSTALL_DIR}/lib
