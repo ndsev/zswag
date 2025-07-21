@@ -52,7 +52,7 @@ jobs:
         run: |
           python3 -m venv venv && . ./venv/bin/activate
           pip install -U setuptools wheel pip
-          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
+          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
       - name: Build
         working-directory: build
         run: |
@@ -131,7 +131,7 @@ jobs:
         # Verify NASM installation
         nasm -v
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
-        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
+        cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
         cmake --build . --config Release
     - name: Deploy
       uses: actions/upload-artifact@v4
