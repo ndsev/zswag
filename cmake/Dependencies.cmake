@@ -46,6 +46,16 @@ if(NOT TARGET ZLIB::ZLIB)
     endif()
 endif()
 
+# fmt
+if (NOT TARGET fmt::fmt)
+    FetchContent_Declare(fmt
+            GIT_REPOSITORY "https://github.com/fmtlib/fmt.git"
+            GIT_TAG        "11.1.3"
+            GIT_SHALLOW    ON
+            CMAKE_ARGS     -DFMT_HEADER_ONLY=OFF)
+    FetchContent_MakeAvailable(fmt)
+endif()
+
 # spdlog
 if(NOT TARGET spdlog)
     check_fetchcontent_override(SPDLOG)
@@ -57,6 +67,7 @@ if(NOT TARGET spdlog)
     )
     set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
+    set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(spdlog)
 endif()
 
