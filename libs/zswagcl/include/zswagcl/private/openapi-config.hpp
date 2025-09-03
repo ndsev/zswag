@@ -21,46 +21,45 @@ struct OpenAPIConfig
         Header
     };
 
-    struct SecurityScheme {
-        std::string id;
-        explicit SecurityScheme(std::string id);
-        virtual ~SecurityScheme() = default;
-        virtual bool checkOrApply(httpcl::Config& config, std::string& err) const = 0;
+    enum class SecuritySchemeType {
+        HttpBasic,
+        HttpBearer,
+        ApiKeyQuery,
+        ApiKeyHeader,
+        ApiKeyCookie,
+        OAuth2ClientCredentials
     };
 
+    struct SecurityScheme
+    {
+        SecuritySchemeType type;
+        std::string oauthTokenUrl; // For oauth2
+        std::string oauthRefreshUrl; // For oauth2
+        std::map<std::string, std::string> oauthScopes; // Scope -> Description
+        std::string apiKeyName; // Header/Query/Cookie name
+        std::string id; // Scheme name for introspection/debugging
+    };
     using SecuritySchemePtr = std::shared_ptr<SecurityScheme>;
 
     /**
-     * Security Scheme References
+     * Security Scheme References by operations.
      *
      * Disjunctive normal form ([A [AND B]+][ OR C [AND D]+]+) of required
      * security schemes. An empty vector is used to encode that no auth
      * scheme is required.
      */
-    using SecurityAlternatives = std::vector<std::vector<SecuritySchemePtr>>;
+    struct SecurityRequirement
+    {
+        SecuritySchemePtr scheme;
+        // For each operation, a subset of scopes may be defined which are required for it.
+        std::vector<std::string> scopes;
+    };
+    using SecurityAlternative = std::vector<SecurityRequirement>;
+    using SecurityAlternatives = std::vector<SecurityAlternative>;
 
     /**
      * Supported Authentication Schemes
      */
-    struct BasicAuth : public SecurityScheme {
-        explicit BasicAuth(std::string id);
-        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
-    };
-    struct BearerAuth : public SecurityScheme {
-        explicit BearerAuth(std::string id);
-        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
-    };
-    struct APIKeyAuth : public SecurityScheme {
-        explicit APIKeyAuth(std::string id, ParameterLocation location, std::string keyName);
-        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
-        ParameterLocation location = ParameterLocation::Header;
-        std::string keyName;
-    };
-    struct CookieAuth : public SecurityScheme {
-        explicit CookieAuth(std::string id, std::string cookieName);
-        bool checkOrApply(httpcl::Config& config, std::string& err) const override;
-        std::string cookieName;
-    };
 
     struct Parameter {
         ParameterLocation location = ParameterLocation::Query;
