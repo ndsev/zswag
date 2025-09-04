@@ -27,7 +27,10 @@ public:
      * Checks if current HTTP settings can satisfy the derived Security scheme handler.
      * Potentially modifies the AuthContext::httpConfig.
      */
-    virtual void satisfy(const OpenAPIConfig::SecurityRequirement& req, AuthContext& ctx) = 0;
+    virtual bool satisfy(
+        const OpenAPIConfig::SecurityRequirement& req,
+        AuthContext& ctx,
+        std::string& mismatchReason) = 0;
 };
 
 class AuthRegistry
@@ -43,7 +46,7 @@ public:
      */
     void satisfySecurity(
         const OpenAPIConfig::SecurityAlternatives& alts,
-        AuthContext& ctx);
+        AuthContext const& ctx);
 
 private:
     std::unordered_map<OpenAPIConfig::SecuritySchemeType, std::shared_ptr<ISecurityHandler>>
