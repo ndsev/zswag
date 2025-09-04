@@ -46,6 +46,16 @@ struct Config
         std::string keychain;
     };
 
+    struct OAuth2 {
+        std::string clientId;
+        std::string clientSecret;
+        std::string clientSecretKeychain;
+        std::string tokenUrlOverride; // optional
+        std::string refreshUrlOverride; // optional
+        std::string audience; // optional
+        std::vector<std::string> scopesOverride; // optional
+    };
+
     std::optional<std::string> scope;
     std::regex urlPattern;
     std::string urlPatternString;
@@ -53,6 +63,7 @@ struct Config
     std::map<std::string, std::string> cookies;
     std::optional<BasicAuthentication> auth;
     std::optional<Proxy> proxy;
+    std::optional<OAuth2> oauth2;
     std::optional<std::string> apiKey;
     Headers headers;
     Query query;

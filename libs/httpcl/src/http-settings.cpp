@@ -180,6 +180,25 @@ YAML::Node configToNode(Config const& config) {
     if (config.apiKey)
         result["api-key"] = *config.apiKey;
 
+    if (config.oauth2) {
+        YAML::Node oauth2Node;
+        if (!config.oauth2->clientId.empty())
+            oauth2Node["clientId"] = config.oauth2->clientId;
+        if (!config.oauth2->clientSecret.empty())
+            oauth2Node["clientSecret"] = config.oauth2->clientSecret;
+        if (!config.oauth2->clientSecretKeychain.empty())
+            oauth2Node["clientSecretKeychain"] = config.oauth2->clientSecretKeychain;
+        if (!config.oauth2->tokenUrlOverride.empty())
+            oauth2Node["tokenUrl"] = config.oauth2->tokenUrlOverride;
+        if (!config.oauth2->refreshUrlOverride.empty())
+            oauth2Node["refreshUrl"] = config.oauth2->refreshUrlOverride;
+        if (!config.oauth2->audience.empty())
+            oauth2Node["audience"] = config.oauth2->audience;
+        if (!config.oauth2->scopesOverride.empty())
+            oauth2Node["scopes"] = config.oauth2->scopesOverride;
+        result["oauth2"] = oauth2Node;
+    }
+
     return result;
 }
 
@@ -220,6 +239,27 @@ Config configFromNode(YAML::Node const& node)
 
     if (auto apiKey = node["api-key"])
         conf.apiKey = apiKey.as<std::string>();
+
+    if (auto oauth2Node = node["oauth2"]) {
+        Config::OAuth2 oauth2;
+        if (auto v = oauth2Node["clientId"])
+            oauth2.clientId = v.as<std::string>();
+        if (auto v = oauth2Node["clientSecret"])
+            oauth2.clientSecret = v.as<std::string>();
+        if (auto v = oauth2Node["clientSecretKeychain"])
+            oauth2.clientSecretKeychain = v.as<std::string>();
+        if (auto v = oauth2Node["tokenUrl"])
+            oauth2.tokenUrlOverride = v.as<std::string>();
+        if (auto v = oauth2Node["refreshUrl"])
+            oauth2.refreshUrlOverride = v.as<std::string>();
+        if (auto v = oauth2Node["audience"])
+            oauth2.audience = v.as<std::string>();
+        if (auto v = oauth2Node["scope"]) {
+            for (auto const& scope : v)
+                oauth2.scopesOverride.emplace_back(v.as<std::string>());
+        }
+        conf.oauth2 = oauth2;
+    }
 
     return conf;
 }
@@ -520,5 +560,23 @@ Config& Config::operator |= (Config const& other) {
         proxy = other.proxy;
     if (other.apiKey)
         apiKey = other.apiKey;
+    if (other.oauth2) {
+        if (!oauth2)
+            oauth2.emplace();
+        if (!other.oauth2->clientId.empty())
+            oauth2->clientId = other.oauth2->clientId;
+        if (!other.oauth2->clientSecretKeychain.empty())
+            oauth2->clientSecretKeychain = other.oauth2->clientSecretKeychain;
+        if (!other.oauth2->clientSecret.empty())
+            oauth2->clientSecret = other.oauth2->clientSecret;
+        if (!other.oauth2->tokenUrlOverride.empty())
+            oauth2->tokenUrlOverride = other.oauth2->tokenUrlOverride;
+        if (!other.oauth2->refreshUrlOverride.empty())
+            oauth2->refreshUrlOverride = other.oauth2->refreshUrlOverride;
+        if (!other.oauth2->audience.empty())
+            oauth2->audience = other.oauth2->audience;
+        if (!other.oauth2->scopesOverride.empty())
+            oauth2->scopesOverride = other.oauth2->scopesOverride;
+    }
     return *this;
 }
