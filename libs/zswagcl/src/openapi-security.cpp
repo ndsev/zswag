@@ -1,4 +1,5 @@
 #include "private/openapi-security.hpp"
+#include "private/openapi-oauth.hpp"
 
 #include <stx/format.h>
 
@@ -13,8 +14,8 @@ using SecuritySchemeType = OpenAPIConfig::SecuritySchemeType;
 
 class HttpBasicHandler final : public ISecurityHandler {
 public:
-    bool satisfy(const SecurityRequirement& req, AuthContext& ctx, std::string& mismatchReason) override {
-        if (ctx.httpConfig.auth.has_value())
+    bool satisfy(const SecurityRequirement& req, AuthContext const& ctx, std::string& mismatchReason) override {
+        if (ctx.resultHttpConfigWithAuthorization.auth.has_value())
             return true;
 
         std::regex basicAuthValueRe{
@@ -22,7 +23,7 @@ public:
             std::regex_constants::ECMAScript|std::regex_constants::icase
         };
 
-        auto found = std::any_of(ctx.httpConfig.headers.begin(), ctx.httpConfig.headers.end(), [&](auto const& headerNameAndValue){
+        auto found = std::any_of(ctx.resultHttpConfigWithAuthorization.headers.begin(), ctx.resultHttpConfigWithAuthorization.headers.end(), [&](auto const& headerNameAndValue){
             return headerNameAndValue.first == "Authorization" &&
                    std::regex_match(headerNameAndValue.second, basicAuthValueRe);
         });
@@ -37,13 +38,13 @@ public:
 
 class HttpBearerHandler final : public ISecurityHandler {
 public:
-    bool satisfy(const SecurityRequirement& req, AuthContext& ctx, std::string& mismatchReason) override {
+    bool satisfy(const SecurityRequirement& req, AuthContext const& ctx, std::string& mismatchReason) override {
         std::regex bearerValueRe{
             "^Bearer .+$",
             std::regex_constants::ECMAScript|std::regex_constants::icase
         };
 
-        auto found = std::any_of(ctx.httpConfig.headers.begin(), ctx.httpConfig.headers.end(), [&](auto const& headerNameAndValue){
+        auto found = std::any_of(ctx.resultHttpConfigWithAuthorization.headers.begin(), ctx.resultHttpConfigWithAuthorization.headers.end(), [&](auto const& headerNameAndValue){
             return headerNameAndValue.first == "Authorization" &&
                    std::regex_match(headerNameAndValue.second, bearerValueRe);
         });
@@ -57,7 +58,7 @@ public:
 
 class ApiKeyHandler final : public ISecurityHandler {
 public:
-    bool satisfy(const SecurityRequirement& req, AuthContext& ctx, std::string& mismatchReason) override {
+    bool satisfy(const SecurityRequirement& req, AuthContext const& ctx, std::string& mismatchReason) override {
         const auto& s = *req.scheme;
 
         // Convenience: support the global apiKey shortcut if your Config has one (ctx.httpConfig.apiKey)
@@ -65,8 +66,8 @@ public:
             if (container.find(keyName) != container.end()) {
                 return true;
             }
-            if (ctx.httpConfig.apiKey) {
-                container.insert({keyName, *ctx.httpConfig.apiKey});
+            if (ctx.resultHttpConfigWithAuthorization.apiKey) {
+                container.insert({keyName, *ctx.resultHttpConfigWithAuthorization.apiKey});
                 return true;
             }
             mismatchReason = stx::format("API key ({}) missing: {}", containerName, s.apiKeyName);
@@ -75,11 +76,11 @@ public:
 
         switch (s.type) {
             case SecuritySchemeType::ApiKeyQuery:
-                return ensure(ctx.httpConfig.query, s.apiKeyName, "query");
+                return ensure(ctx.resultHttpConfigWithAuthorization.query, s.apiKeyName, "query");
             case SecuritySchemeType::ApiKeyHeader:
-                return ensure(ctx.httpConfig.headers, s.apiKeyName, "headers");
+                return ensure(ctx.resultHttpConfigWithAuthorization.headers, s.apiKeyName, "headers");
             case SecuritySchemeType::ApiKeyCookie:
-                return ensure(ctx.httpConfig.cookies, s.apiKeyName, "cookies");
+                return ensure(ctx.resultHttpConfigWithAuthorization.cookies, s.apiKeyName, "cookies");
             default:
                 mismatchReason = "Unsupported apiKey parameter location.";
                 return false;
@@ -96,6 +97,7 @@ AuthRegistry::AuthRegistry()
     handlers_.insert({SecuritySchemeType::ApiKeyQuery, std::make_unique<ApiKeyHandler>()});
     handlers_.insert({SecuritySchemeType::ApiKeyHeader, std::make_unique<ApiKeyHandler>()});
     handlers_.insert({SecuritySchemeType::ApiKeyCookie, std::make_unique<ApiKeyHandler>()});
+    handlers_.insert({SecuritySchemeType::OAuth2ClientCredentials, std::make_unique<OAuth2ClientCredentialsHandler>()});
 }
 
 void AuthRegistry::satisfySecurity(
@@ -116,19 +118,19 @@ void AuthRegistry::satisfySecurity(
         for (auto const& req : schemeSet) {
             std::string reasonForMismatch;
             auto handlerIt = handlers_.find(req.scheme->type);
-            if (handlerIt == handlers_.end()) {
+            if (handlerIt != handlers_.end()) {
+                // Note: Handlers may mutate ctx.httpConf
+                if (handlerIt->second->satisfy(req, ctx, reasonForMismatch))
+                    continue;
+            }
+            else {
                 reasonForMismatch = stx::format(
                     "No handler registered for required security scheme {}",
                     req.scheme->id);
-                continue;
             }
-
-            // Note: Handlers may mutate ctx.httpConf
-            if (!handlerIt->second->satisfy(req, ctx, reasonForMismatch)) {
-                error << "  In security configuration " << i << ": " << reasonForMismatch << "\n";
-                matched = false;
-                break;
-            }
+            error << "  In security configuration " << i << ": " << reasonForMismatch << "\n";
+            matched = false;
+            break;
         }
 
         if (matched) {

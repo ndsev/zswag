@@ -135,13 +135,13 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
         httpcl::log().debug("{} Checking required security schemes for method ...", debugContext);
         authHandlers_.satisfySecurity(
             *method.security,
-            {*client_, httpConfig, builtUri, settings_});
+            {*client_, builtUri, settings_, httpConfig});
     }
     else {
         httpcl::log().debug("{} Checking default security scheme ...", debugContext);
         authHandlers_.satisfySecurity(
             config_.defaultSecurityScheme,
-            {*client_, httpConfig, builtUri, settings_});
+            {*client_, builtUri, settings_, httpConfig});
     }
 
     const auto& httpMethod = method.httpMethod;

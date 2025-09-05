@@ -13,9 +13,9 @@ namespace zswagcl
 struct AuthContext
 {
     httpcl::IHttpClient& httpClient;
-    httpcl::Config& httpConfig;
-    const std::string& builtUri;
+    const std::string& targetResourceUri;
     httpcl::Settings const& httpSettings;
+    httpcl::Config& resultHttpConfigWithAuthorization;
 };
 
 class ISecurityHandler
@@ -29,7 +29,7 @@ public:
      */
     virtual bool satisfy(
         const OpenAPIConfig::SecurityRequirement& req,
-        AuthContext& ctx,
+        AuthContext const& ctx,
         std::string& mismatchReason) = 0;
 };
 

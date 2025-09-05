@@ -10,7 +10,7 @@ class OAuth2ClientCredentialsHandler final : public ISecurityHandler
 public:
     bool satisfy(
         const OpenAPIConfig::SecurityRequirement& req,
-        AuthContext& ctx,
+        AuthContext const& ctx,
         std::string& mismatchReason) override;
 
 private:
@@ -44,17 +44,15 @@ private:
     std::unordered_map<TokenKey, MintedToken, TokenKeyHash> cache_;
 
     MintedToken fetchToken(
-        httpcl::IHttpClient& http,
-        const httpcl::Config& requestConfForResource,
-        const std::string& tokenUrl,
-        const httpcl::Config::OAuth2& cc,
-        const std::vector<std::string>& scopes);
+        AuthContext const& httpCtx,
+        const httpcl::Config::OAuth2& oauthConfig,
+        const std::string& resolvedTokenUrl,
+        const std::vector<std::string>& resolvedScopes);
 
     MintedToken refreshToken(
-        httpcl::IHttpClient& http,
-        const httpcl::Config& requestConfForResource,
-        const std::string& refreshUrl,
-        const httpcl::Config::OAuth2& cc,
+        AuthContext const& httpCtx,
+        const httpcl::Config::OAuth2& oauthConfig,
+        const std::string& resolvedTokenUrl,
         const std::string& refreshToken);
 };
 
