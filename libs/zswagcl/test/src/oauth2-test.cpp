@@ -463,3 +463,4 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
     }
 }
+

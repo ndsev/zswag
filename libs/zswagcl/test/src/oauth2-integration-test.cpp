@@ -289,3 +289,4 @@ TEST_CASE("OAuth2 Integration with OpenAPI Parser", "[oauth2][integration]") {
         REQUIRE(tokenEndpointCalled);
     }
 }
+
