@@ -474,7 +474,11 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         
         auto client = std::make_unique<httpcl::MockHttpClient>();
         client->postFun = [&](auto uri, auto body, auto conf) {
-            // Should use override URL, not original
+            // API Request can just pass
+            if (uri == "https://api.example.com/test") {
+                return httpcl::IHttpClient::Result{200, "OK"};
+            }
+            // Token request should use override URL, not original
             REQUIRE(uri == "https://override.example.com/token");
             return mockServer.handleTokenRequest(uri, body, conf);
         };

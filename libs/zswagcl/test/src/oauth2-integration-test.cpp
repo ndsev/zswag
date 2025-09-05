@@ -148,11 +148,16 @@ TEST_CASE("OAuth2 Integration with OpenAPI Parser", "[oauth2][integration]") {
             if (uri.find("https://api.example.com") == 0) {
                 apiCalled = true;
                 
-                // Verify Bearer token is present
+                // Verify Bearer token is present depending on public or protected endpoint
                 auto authHeader = conf.headers.find("Authorization");
-                REQUIRE(authHeader != conf.headers.end());
-                REQUIRE(authHeader->second == "Bearer " + issuedToken);
-                
+                if (uri.find("/public") != std::string::npos) {
+                    REQUIRE(authHeader == conf.headers.end());
+                }
+                else {
+                    REQUIRE(authHeader != conf.headers.end());
+                    REQUIRE(authHeader->second == "Bearer " + issuedToken);
+                }
+
                 return {200, ""};
             }
             
