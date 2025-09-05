@@ -9,7 +9,9 @@ add_executable(zswagcl-test
   src/main.cpp
   src/oaclient.cpp
   src/openapi-parameter-helper.cpp
-  src/base64.cpp)
+  src/base64.cpp
+  src/oauth2-test.cpp
+  src/oauth2-integration-test.cpp)
 
 target_link_libraries(zswagcl-test
   PUBLIC

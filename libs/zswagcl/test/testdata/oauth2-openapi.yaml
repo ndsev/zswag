@@ -1,0 +1,59 @@
+openapi: 3.0.3
+info:
+  title: OAuth2 Test API
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+paths:
+  /protected:
+    post:
+      operationId: protectedEndpoint
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Success
+      security:
+        - oauth2: [read, write]
+  
+  /public:
+    post:
+      operationId: publicEndpoint
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Success
+  
+  /admin:
+    post:
+      operationId: adminEndpoint
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Success
+      security:
+        - oauth2: [admin]
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example.com/token
+          refreshUrl: https://auth.example.com/refresh
+          scopes:
+            read: Read access
+            write: Write access
+            admin: Admin access

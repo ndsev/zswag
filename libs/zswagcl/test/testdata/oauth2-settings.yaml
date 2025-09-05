@@ -1,0 +1,25 @@
+http-settings:
+  # OAuth2 client credentials configuration for testing
+  - scope: "https://auth.example.com/*"
+    oauth2:
+      clientId: test-client
+      clientSecret: test-secret
+      tokenUrl: https://auth.example.com/token
+      refreshUrl: https://auth.example.com/refresh
+      audience: https://api.example.com
+      scope:
+        - read
+        - write
+  
+  # OAuth2 with keychain for secret storage
+  - scope: "https://secure-auth.example.com/*"
+    oauth2:
+      clientId: secure-client
+      clientSecretKeychain: test-oauth-secret
+      tokenUrl: https://secure-auth.example.com/token
+  
+  # OAuth2 public client (no secret)
+  - scope: "https://public-auth.example.com/*"
+    oauth2:
+      clientId: public-client
+      tokenUrl: https://public-auth.example.com/token
