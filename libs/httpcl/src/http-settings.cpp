@@ -256,7 +256,7 @@ Config configFromNode(YAML::Node const& node)
             oauth2.audience = v.as<std::string>();
         if (auto v = oauth2Node["scope"]) {
             for (auto const& scope : v)
-                oauth2.scopesOverride.emplace_back(v.as<std::string>());
+                oauth2.scopesOverride.emplace_back(scope.as<std::string>());
         }
         conf.oauth2 = oauth2;
     }
