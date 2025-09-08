@@ -48,6 +48,8 @@ jobs:
           echo "Node at $(which node): $(node -v); npm: $(npm -v)"
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
@@ -155,7 +157,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
