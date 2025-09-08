@@ -7,7 +7,11 @@
 # =============================================================================
 
 # zlib
-CPMAddPackage("gh:madler/zlib@1.3.1")
+CPMAddPackage(
+    URI "gh:madler/zlib@1.3.1"
+    OPTIONS
+        "ZLIB_BUILD_EXAMPLES OFF"
+        "BUILD_TESTING OFF")
 if(zlib_ADDED)
     set_target_properties(zlib PROPERTIES EXCLUDE_FROM_ALL TRUE)
     set_target_properties(zlibstatic PROPERTIES EXCLUDE_FROM_ALL TRUE)
