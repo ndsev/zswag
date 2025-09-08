@@ -242,6 +242,39 @@ static OpenAPIConfig makeOAuth2Config(
     return config;
 }
 
+/**
+ * Helper to create an OAuth test client with mock server
+ */
+static std::unique_ptr<OAClient> makeOAuthTestClient(
+    MockOAuth2Server& mockServer,
+    const httpcl::Config& httpConfig,
+    const std::string& tokenUrl = "https://auth.example.com/token",
+    const std::string& refreshUrl = "",
+    const std::vector<std::string>& scopes = {},
+    std::function<httpcl::IHttpClient::Result(const std::string_view&, const httpcl::OptionalBodyAndContentType&, const httpcl::Config&)> customPostFun = nullptr)
+{
+    auto config = makeOAuth2Config(tokenUrl, refreshUrl, scopes);
+    auto client = std::make_unique<httpcl::MockHttpClient>();
+    
+    if (customPostFun) {
+        client->postFun = customPostFun;
+    } else {
+        // Default implementation that handles token/refresh requests and passes through API calls
+        client->postFun = [&mockServer, tokenUrl, refreshUrl](auto uri, auto body, auto conf) {
+            if (uri == tokenUrl) {
+                return mockServer.handleTokenRequest(uri, body, conf);
+            }
+            if (!refreshUrl.empty() && uri == refreshUrl) {
+                return mockServer.handleRefreshRequest(uri, body, conf);
+            }
+            // Default API response
+            return httpcl::IHttpClient::Result{200, ""};
+        };
+    }
+    
+    return std::make_unique<OAClient>(config, std::move(client), httpConfig);
+}
+
 TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
     MockOAuth2Server mockServer;
     
@@ -250,25 +283,22 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
     httpConfig.oauth2 = httpcl::Config::OAuth2{"test-client", "test-secret"};
     
     SECTION("Successful Token Request") {
-        auto config = makeOAuth2Config("https://auth.example.com/token");
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig, "https://auth.example.com/token", "", {},
+            [&](auto uri, auto body, auto conf) {
+                if (uri == "https://auth.example.com/token") {
+                    return mockServer.handleTokenRequest(uri, body, conf);
+                }
+                // API call after getting token
+                REQUIRE(conf.headers.count("Authorization") > 0);
+                auto authHeader = conf.headers.find("Authorization");
+                REQUIRE(authHeader->second == "Bearer " + mockServer.lastIssuedAccessToken);
+                return httpcl::IHttpClient::Result{200, ""};
+            });
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            // API call after getting token
-            REQUIRE(conf.headers.count("Authorization") > 0);
-            auto authHeader = conf.headers.find("Authorization");
-            REQUIRE(authHeader->second == "Bearer " + mockServer.lastIssuedAccessToken);
-            return httpcl::IHttpClient::Result{200, ""};
-        };
-        
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_NOTHROW(
-            oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr)
+            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr)
         );
         
         REQUIRE(mockServer.tokenRequestCount == 1);
@@ -277,28 +307,26 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
     
     SECTION("Token Caching") {
         mockServer.tokenExpirySeconds = 3600;
-        auto config = makeOAuth2Config("https://auth.example.com/token");
         
         int apiCallCount = 0;
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            apiCallCount++;
-            return httpcl::IHttpClient::Result{200, ""};
-        };
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig, "https://auth.example.com/token", "", {},
+            [&](auto uri, auto body, auto conf) {
+                if (uri == "https://auth.example.com/token") {
+                    return mockServer.handleTokenRequest(uri, body, conf);
+                }
+                apiCallCount++;
+                return httpcl::IHttpClient::Result{200, ""};
+            });
         
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         // First call should get token
-        oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1);
         REQUIRE(apiCallCount == 1);
         
         // Second call should use cached token
-        oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1); // No new token request
         REQUIRE(apiCallCount == 2);
     }
@@ -307,27 +335,14 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         mockServer.tokenExpirySeconds = 1; // Very short expiry
         mockServer.shouldReturnRefreshToken = true;
         
-        auto config = makeOAuth2Config(
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig, 
             "https://auth.example.com/token",
-            "https://auth.example.com/refresh"
-        );
+            "https://auth.example.com/refresh");
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            if (uri == "https://auth.example.com/refresh") {
-                return mockServer.handleRefreshRequest(uri, body, conf);
-            }
-            return httpcl::IHttpClient::Result{200, ""};
-        };
-        
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         // First call gets initial token
-        oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1);
         REQUIRE(mockServer.refreshRequestCount == 0);
         
@@ -335,7 +350,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         std::this_thread::sleep_for(2s);
         
         // Next call should trigger refresh
-        oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1);
         REQUIRE(mockServer.refreshRequestCount == 1);
         REQUIRE(mockServer.lastIssuedAccessToken.find("refreshed_") == 0);
@@ -343,20 +358,13 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
     
     SECTION("Scopes Handling") {
         std::vector<std::string> requestedScopes = {"read", "write"};
-        auto config = makeOAuth2Config("https://auth.example.com/token", "", requestedScopes);
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            return httpcl::IHttpClient::Result{200, ""};
-        };
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig, 
+            "https://auth.example.com/token", "", requestedScopes);
         
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
-        oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
         
         // Verify scopes were sent in the request
         REQUIRE((mockServer.lastTokenRequestBody.find("scope=read%20write") != std::string::npos ||
@@ -367,20 +375,11 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         mockServer.expectedAudience = "https://api.example.com";
         httpConfig.oauth2->audience = "https://api.example.com";
         
-        auto config = makeOAuth2Config("https://auth.example.com/token");
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig);
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            return httpcl::IHttpClient::Result{200, ""};
-        };
-        
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
-        oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
         
         // Verify audience was sent
         REQUIRE(mockServer.lastTokenRequestBody.find("audience=") != std::string::npos);
@@ -388,56 +387,36 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
     
     SECTION("Error Handling - Invalid Credentials") {
         mockServer.shouldFailTokenRequest = true;
-        auto config = makeOAuth2Config("https://auth.example.com/token");
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            return httpcl::IHttpClient::Result{200, ""};
-        };
-        
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_THROWS_AS(
-            oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
+            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
             std::runtime_error
         );
     }
     
     SECTION("Error Handling - Missing OAuth2 Config") {
-        auto config = makeOAuth2Config("https://auth.example.com/token");
         httpcl::Config emptyHttpConfig; // No OAuth2 config
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        auto oaClient = OAClient(config, std::move(client), emptyHttpConfig);
+        auto oaClient = makeOAuthTestClient(mockServer, emptyHttpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_THROWS_WITH(
-            oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
+            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
             Catch::Matchers::ContainsSubstring("OAuth2 client-credentials required but no oauth2 config present")
         );
     }
     
     SECTION("Error Handling - Invalid Token Response") {
         mockServer.shouldReturnInvalidResponse = true;
-        auto config = makeOAuth2Config("https://auth.example.com/token");
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            return httpcl::IHttpClient::Result{200, ""};
-        };
-        
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_THROWS_WITH(
-            oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
+            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
             Catch::Matchers::ContainsSubstring("access_token missing")
         );
     }
@@ -446,23 +425,20 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         httpcl::Config publicClientConfig;
         publicClientConfig.oauth2 = httpcl::Config::OAuth2{"test-client"};
         
-        auto config = makeOAuth2Config("https://auth.example.com/token");
+        auto oaClient = makeOAuthTestClient(mockServer, publicClientConfig, "https://auth.example.com/token", "", {},
+            [&](auto uri, auto body, auto conf) {
+                if (uri == "https://auth.example.com/token") {
+                    // Verify client_id is in body for public clients
+                    REQUIRE(body->body.find("client_id=test-client") != std::string::npos);
+                    return mockServer.handleTokenRequest(uri, body, conf);
+                }
+                return httpcl::IHttpClient::Result{200, ""};
+            });
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            if (uri == "https://auth.example.com/token") {
-                // Verify client_id is in body for public clients
-                REQUIRE(body->body.find("client_id=test-client") != std::string::npos);
-                return mockServer.handleTokenRequest(uri, body, conf);
-            }
-            return httpcl::IHttpClient::Result{200, ""};
-        };
-        
-        auto oaClient = OAClient(config, std::move(client), publicClientConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_NOTHROW(
-            oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr)
+            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr)
         );
     }
     
@@ -470,22 +446,20 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         httpConfig.oauth2->tokenUrlOverride = "https://override.example.com/token";
         httpConfig.oauth2->refreshUrlOverride = "https://override.example.com/refresh";
         
-        auto config = makeOAuth2Config("https://original.example.com/token");
+        // Note: Using original URL in config, but it should be overridden
+        auto oaClient = makeOAuthTestClient(mockServer, httpConfig, "https://original.example.com/token", "", {},
+            [&](auto uri, auto body, auto conf) {
+                // API Request can just pass
+                if (uri == "https://api.example.com/test") {
+                    return httpcl::IHttpClient::Result{200, "OK"};
+                }
+                // Token request should use override URL, not original
+                REQUIRE(uri == "https://override.example.com/token");
+                return mockServer.handleTokenRequest(uri, body, conf);
+            });
         
-        auto client = std::make_unique<httpcl::MockHttpClient>();
-        client->postFun = [&](auto uri, auto body, auto conf) {
-            // API Request can just pass
-            if (uri == "https://api.example.com/test") {
-                return httpcl::IHttpClient::Result{200, "OK"};
-            }
-            // Token request should use override URL, not original
-            REQUIRE(uri == "https://override.example.com/token");
-            return mockServer.handleTokenRequest(uri, body, conf);
-        };
-        
-        auto oaClient = OAClient(config, std::move(client), httpConfig);
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
-        oaClient.callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
     }
 }

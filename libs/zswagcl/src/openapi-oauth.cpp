@@ -72,8 +72,8 @@ bool OAuth2ClientCredentialsHandler::satisfy(
         if (it != cache_.end() && !it->second.refreshToken.empty()) {
             try {
                 httpcl::log().debug("Trying token refresh at {} ...", refreshUrl);
-                auto newTok =
-                    refreshToken(ctx, oauthConfig, refreshUrl, it->second.refreshToken);
+                auto newTok = requestToken(ctx, oauthConfig, refreshUrl, 
+                    GRANT_TYPE_REFRESH_TOKEN, {}, it->second.refreshToken);
                 it->second = newTok;
                 ctx.resultHttpConfigWithAuthorization.headers.insert({"Authorization", "Bearer " + newTok.accessToken});
                 httpcl::log().debug("  ... refresh successful.");
@@ -87,7 +87,8 @@ bool OAuth2ClientCredentialsHandler::satisfy(
         // Mint fresh
         try {
             httpcl::log().debug("Trying token mint at {} ...", tokenUrl);
-            auto minted = fetchToken(ctx, oauthConfig, tokenUrl, scopes);
+            auto minted = requestToken(ctx, oauthConfig, tokenUrl, 
+                GRANT_TYPE_CLIENT_CREDENTIALS, scopes);
             cache_[key] = minted;
             ctx.resultHttpConfigWithAuthorization.headers.insert({"Authorization", "Bearer " + minted.accessToken});
             httpcl::log().debug("  ... mint successful.");
@@ -120,58 +121,12 @@ static void addClientAuthIfSecretPresent(
     }
 }
 
-OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::fetchToken(
+OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requestToken(
     AuthContext const& httpCtx,
     const httpcl::Config::OAuth2& oauthConfig,
     const std::string& resolvedTokenUrl,
-    const std::vector<std::string>& resolvedScopes)
-{
-    auto tokenRequestConf = httpCtx.httpSettings[resolvedTokenUrl];
-
-    std::string secret;
-    addClientAuthIfSecretPresent(tokenRequestConf, oauthConfig, secret);
-
-    std::string body = "grant_type=client_credentials";
-    if (!resolvedScopes.empty())
-        body += "&scope=" + httplib::detail::encode_url(stx::join(resolvedScopes.begin(), resolvedScopes.end(), " "));
-    if (!oauthConfig.audience.empty())
-        body += "&audience=" + httplib::detail::encode_url(oauthConfig.audience);
-    if (secret.empty()) {  // public client: send id
-        body += "&client_id=" + httplib::detail::encode_url(oauthConfig.clientId);
-    }
-
-    auto res = httpCtx.httpClient.post(
-        resolvedTokenUrl,
-        httpcl::BodyAndContentType{body, "application/x-www-form-urlencoded"},
-        tokenRequestConf);
-
-    if (res.status < 200 || res.status >= 300) {
-        throw httpcl::IHttpClient::Error(res, "OAuth2 token endpoint returned non-2xx.");
-    }
-
-    auto jsonResult = YAML::Load(res.content);
-    MintedToken out;
-    if (auto accessTokenNode = jsonResult["access_token"])
-        out.accessToken = accessTokenNode.as<std::string>();
-    if (out.accessToken.empty())
-        throw std::runtime_error("OAuth2: access_token missing in response.");
-
-    int expiresIn = 3600;
-    if (auto expiresInNode = jsonResult["expires_in"])
-        expiresIn = expiresInNode.as<int>();
-    // Subtract a thirty-second jiggle period from the token TTL
-    out.expiresAt = steady_clock::now() + seconds(expiresIn - 30);
-
-    if (auto refreshTokenNode = jsonResult["refresh_token"])
-        out.refreshToken = refreshTokenNode.as<std::string>();
-
-    return out;
-}
-
-OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::refreshToken(
-    AuthContext const& httpCtx,
-    const httpcl::Config::OAuth2& oauthConfig,
-    const std::string& resolvedTokenUrl,
+    const std::string& grantType,
+    const std::vector<std::string>& resolvedScopes,
     const std::string& refreshToken)
 {
     auto tokenRequestConf = httpCtx.httpSettings[resolvedTokenUrl];
@@ -179,8 +134,21 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::refr
     std::string secret;
     addClientAuthIfSecretPresent(tokenRequestConf, oauthConfig, secret);
 
-    std::string body = "grant_type=refresh_token&refresh_token=" + httplib::detail::encode_url(refreshToken);
-    if (secret.empty()) {  // public client
+    // Build request body based on grant type
+    std::string body = "grant_type=" + grantType;
+    
+    if (grantType == GRANT_TYPE_CLIENT_CREDENTIALS) {
+        if (!resolvedScopes.empty())
+            body += "&scope=" + httplib::detail::encode_url(stx::join(resolvedScopes.begin(), resolvedScopes.end(), " "));
+        if (!oauthConfig.audience.empty())
+            body += "&audience=" + httplib::detail::encode_url(oauthConfig.audience);
+    }
+    else if (grantType == GRANT_TYPE_REFRESH_TOKEN) {
+        body += "&refresh_token=" + httplib::detail::encode_url(refreshToken);
+    }
+    
+    // Add client_id for public clients (no secret)
+    if (secret.empty()) {
         body += "&client_id=" + httplib::detail::encode_url(oauthConfig.clientId);
     }
 
@@ -190,27 +158,31 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::refr
         tokenRequestConf);
 
     if (res.status < 200 || res.status >= 300) {
-        throw httpcl::IHttpClient::Error(res, "OAuth2 refresh endpoint returned non-2xx.");
+        throw httpcl::IHttpClient::Error(res, 
+            stx::format("OAuth2 token endpoint returned non-2xx for grant_type={}.", grantType));
     }
 
-    // Parse like fetchToken (some issuers reissue refresh_token, some don't)
+    // Parse response - common for both grant types
     auto jsonResult = YAML::Load(res.content);
     MintedToken out;
     if (auto accessTokenNode = jsonResult["access_token"])
         out.accessToken = accessTokenNode.as<std::string>();
-    if (out.accessToken.empty())
-        throw std::runtime_error("OAuth2: access_token missing in refresh response.");
+    if (out.accessToken.empty()) {
+        throw std::runtime_error(
+            stx::format("OAuth2: access_token missing in response for grant_type={}.", grantType));
+    }
 
     int expiresIn = 3600;
     if (auto expiresInNode = jsonResult["expires_in"])
         expiresIn = expiresInNode.as<int>();
+    // Subtract a thirty-second jiggle period from the token TTL
     out.expiresAt = steady_clock::now() + seconds(expiresIn - 30);
 
-    // Prefer newly returned refresh_token if present, else keep the old one
+    // Handle refresh token in response
     if (auto refreshTokenNode = jsonResult["refresh_token"])
         out.refreshToken = refreshTokenNode.as<std::string>();
-    else
-        out.refreshToken = refreshToken;
+    else if (grantType == GRANT_TYPE_REFRESH_TOKEN && !refreshToken.empty())
+        out.refreshToken = refreshToken;  // Keep the old refresh token if not reissued
 
     return out;
 }

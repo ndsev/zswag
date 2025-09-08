@@ -14,6 +14,10 @@ public:
         std::string& mismatchReason) override;
 
 private:
+    // OAuth2 grant type constants
+    static constexpr const char* GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials";
+    static constexpr const char* GRANT_TYPE_REFRESH_TOKEN = "refresh_token";
+    
     struct TokenKey
     {
         std::string tokenUrl, clientId, audience, scopeKey;
@@ -43,17 +47,14 @@ private:
     std::shared_mutex m_;
     std::unordered_map<TokenKey, MintedToken, TokenKeyHash> cache_;
 
-    MintedToken fetchToken(
+    // Method for both token fetch and refresh requests
+    MintedToken requestToken(
         AuthContext const& httpCtx,
         const httpcl::Config::OAuth2& oauthConfig,
         const std::string& resolvedTokenUrl,
-        const std::vector<std::string>& resolvedScopes);
-
-    MintedToken refreshToken(
-        AuthContext const& httpCtx,
-        const httpcl::Config::OAuth2& oauthConfig,
-        const std::string& resolvedTokenUrl,
-        const std::string& refreshToken);
+        const std::string& grantType,
+        const std::vector<std::string>& resolvedScopes = {},
+        const std::string& refreshToken = "");
 };
 
 }  // namespace zswagcl
