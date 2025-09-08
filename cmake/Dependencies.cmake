@@ -8,7 +8,7 @@
 
 # zlib
 CPMAddPackage("gh:madler/zlib@1.3.1")
-if(ZLIB_ADDED)
+if(zlib_ADDED)
     set_target_properties(zlib PROPERTIES EXCLUDE_FROM_ALL TRUE)
     set_target_properties(zlibstatic PROPERTIES EXCLUDE_FROM_ALL TRUE)
     # Create ZLIB::ZLIB alias if it doesn't exist
@@ -96,7 +96,7 @@ endif()
 # Configure httplib with OpenSSL and zlib support
 # =============================================================================
 
-if(httplib_ADDED AND TARGET httplib)
+if (TARGET httplib)
     target_compile_definitions(httplib INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
     target_link_libraries(httplib INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
 endif()
