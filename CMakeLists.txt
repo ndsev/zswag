@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # without requiring CMakeLists.txt updates between releases.
 # For official releases, this value should match the git tag.
 if(NOT DEFINED ZSWAG_VERSION)
-  set(ZSWAG_VERSION 1.9.1)
+  set(ZSWAG_VERSION 1.10.0)
 endif()
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)

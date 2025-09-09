@@ -60,17 +60,18 @@ CPMAddPackage(
         "HTTPLIB_INSTALL OFF"
 )
 
-# OpenSSL - Using jimmy-park/openssl-cmake for better integration
-CPMAddPackage("gh:klebert-engineering/openssl-cmake-fetchcontent@3.5.1")
+# OpenSSL
+set (OPENSSL_VERSION openssl-3.5.2)
+CPMAddPackage("gh:klebert-engineering/openssl-cmake@1.0.0")
 
 # pybind11 (only needed when building wheels)
 if(ZSWAG_BUILD_WHEELS)
-    CPMAddPackage("gh:pybind/pybind11@2.10.4")
+    CPMAddPackage("gh:pybind/pybind11@2.13.6")
 endif()
 
 # python-cmake-wheel (only needed when building wheels)
 if(ZSWAG_BUILD_WHEELS)
-    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel@1.0.0")
+    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel@1.0.1")
 endif()
 
 # keychain
