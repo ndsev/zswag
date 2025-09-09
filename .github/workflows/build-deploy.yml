@@ -48,6 +48,8 @@ jobs:
           echo "Node at $(which node): $(node -v); npm: $(npm -v)"
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
@@ -124,8 +126,8 @@ jobs:
       if: matrix.os == 'windows-latest'
       working-directory: build
       run: |
-        # Install NASM using chocolatey (required for OpenSSL build)
-        choco install nasm -y
+        # Install NASM and jom using chocolatey (required for OpenSSL build)
+        choco install nasm jom -y
         # Add NASM to PATH for current session
         $env:PATH = "$env:PATH;C:\Program Files\NASM"
         # Verify NASM installation
@@ -155,7 +157,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

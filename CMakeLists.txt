@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # without requiring CMakeLists.txt updates between releases.
 # For official releases, this value should match the git tag.
 if(NOT DEFINED ZSWAG_VERSION)
-  set(ZSWAG_VERSION 1.9.1)
+  set(ZSWAG_VERSION 1.10.0)
 endif()
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
@@ -41,9 +41,14 @@ set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 
 ##############
-# Dependencies via FetchContent
+# Dependencies via CPM (CMake Package Manager)
 
-# Include centralized dependency management
+set(CPM_DOWNLOAD_ALL ON)
+set(CPM_USE_LOCAL_PACKAGES OFF)
+# Include CPM.cmake
+if (NOT CPM_INITIALIZED)
+  add_subdirectory(cmake/CPM.cmake)
+endif ()
 include(cmake/Dependencies.cmake)
 
 ##############
