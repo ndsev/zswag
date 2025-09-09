@@ -46,7 +46,9 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ZSWAG_DEPLOY_DIR}")
 set(CPM_DOWNLOAD_ALL ON)
 set(CPM_USE_LOCAL_PACKAGES OFF)
 # Include CPM.cmake
-add_subdirectory(cmake/CPM.cmake)
+if (NOT CPM_INITIALIZED)
+  add_subdirectory(cmake/CPM.cmake)
+endif ()
 include(cmake/Dependencies.cmake)
 
 ##############
