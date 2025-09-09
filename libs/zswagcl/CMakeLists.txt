@@ -10,13 +10,17 @@ add_library(zswagcl SHARED
   include/zswagcl/private/openapi-parameter-helper.hpp
   include/zswagcl/private/openapi-parser.hpp
   include/zswagcl/oaclient.hpp
+  include/zswagcl/private/openapi-security.hpp
+  include/zswagcl/private/openapi-oauth.hpp
 
   src/base64.cpp
   src/openapi-client.cpp
   src/openapi-config.cpp
   src/openapi-parameter-helper.cpp
   src/openapi-parser.cpp
-  src/oaclient.cpp)
+  src/openapi-security.cpp
+  src/oaclient.cpp
+  src/openapi-oauth.cpp)
 
 target_link_libraries(zswagcl
   PUBLIC

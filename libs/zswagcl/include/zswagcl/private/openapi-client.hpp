@@ -5,6 +5,7 @@
 #include "openapi-parser.hpp"
 #include "openapi-config.hpp"
 #include "openapi-parameter-helper.hpp"
+#include "openapi-security.hpp"
 
 #include "httpcl/uri.hpp"
 #include "httpcl/http-client.hpp"
@@ -17,6 +18,7 @@ class OpenAPIClient
 public:
     OpenAPIConfig config_;
     httpcl::Config httpConfig_;
+    AuthRegistry authHandlers_;
 
     OpenAPIClient(OpenAPIConfig config,
                   httpcl::Config httpConfig,

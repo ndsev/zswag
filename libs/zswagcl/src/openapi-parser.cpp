@@ -297,8 +297,12 @@ static OpenAPIConfig::SecurityAlternatives parseSecurity(
         for (auto const& requiredScheme : alternative) {
             auto schemeName = requiredScheme.first.as<std::string>();
             auto scheme = config.securitySchemes.find(schemeName);
-            if (scheme != config.securitySchemes.end())
-                newAlternativeAuthSet.emplace_back(scheme->second);
+            if (scheme != config.securitySchemes.end()) {
+                newAlternativeAuthSet.emplace_back(OpenAPIConfig::SecurityRequirement{scheme->second, {}});
+                for (auto roleName : requiredScheme.second) {
+                    newAlternativeAuthSet.back().scopes.emplace_back(roleName.as<std::string>());
+                }
+            }
             else {
                 std::vector<std::string> schemeNames;
                 std::transform(config.securitySchemes.begin(),
@@ -346,39 +350,67 @@ static void parseSecurityScheme(
     OpenAPIConfig& config)
 {
     auto& name = schemeNode.name_;
-    OpenAPIConfig::SecuritySchemePtr newScheme;
     auto schemeTypeNode = schemeNode.mandatoryChild("type");
     auto schemeType = schemeTypeNode.as<std::string>();
+
+    auto info = std::make_shared<OpenAPIConfig::SecurityScheme>();
+    info->id = name;
 
     if (schemeType == "http") {
         auto schemeHttpTypeNode = schemeNode.mandatoryChild("scheme");
         auto schemeHttpType = schemeHttpTypeNode.as<std::string>();
+
         if (schemeHttpType == "basic")
-            newScheme = std::make_shared<OpenAPIConfig::BasicAuth>(name);
+            info->type = OpenAPIConfig::SecuritySchemeType::HttpBasic;
         else if (schemeHttpType == "bearer")
-            newScheme = std::make_shared<OpenAPIConfig::BearerAuth>(name);
+            info->type = OpenAPIConfig::SecuritySchemeType::HttpBearer;
         else
             throw schemeHttpTypeNode.valueError(schemeHttpType, {"basic", "bearer"});
     }
     else if (schemeType == "apiKey") {
         auto keyLocationNode = schemeNode.mandatoryChild("in");
-        auto keyLocationString = keyLocationNode.as<std::string>();
+        auto keyLocation = keyLocationNode.as<std::string>();
         auto parameterNameNode = schemeNode.mandatoryChild("name");
-        auto parameterName = parameterNameNode.as<std::string>();
+        info->apiKeyName = parameterNameNode.as<std::string>();
 
-        if (keyLocationString == "query")
-            newScheme = std::make_shared<OpenAPIConfig::APIKeyAuth>(name, OpenAPIConfig::ParameterLocation::Query, parameterName);
-        else if (keyLocationString == "header")
-            newScheme = std::make_shared<OpenAPIConfig::APIKeyAuth>(name, OpenAPIConfig::ParameterLocation::Header, parameterName);
-        else if (keyLocationString == "cookie")
-            newScheme = std::make_shared<OpenAPIConfig::CookieAuth>(name, parameterName);
+        if (keyLocation == "query")
+            info->type = OpenAPIConfig::SecuritySchemeType::ApiKeyQuery;
+        else if (keyLocation == "header")
+            info->type = OpenAPIConfig::SecuritySchemeType::ApiKeyHeader;
+        else if (keyLocation == "cookie")
+            info->type = OpenAPIConfig::SecuritySchemeType::ApiKeyCookie;
         else
-            throw keyLocationNode.valueError(keyLocationString, {"query", "header", "cookie"});
+            throw keyLocationNode.valueError(keyLocation, {"query", "header", "cookie"});
     }
-    else
-        throw schemeTypeNode.valueError(schemeType, {"http", "apiKey"});
+    else if (schemeType == "oauth2") {
+        auto flows = schemeNode.mandatoryChild("flows");
+        auto cc = flows["clientCredentials"];
+        if (!cc)
+            throw flows.missingFieldError("clientCredentials");  // we only support CC for now
 
-    config.securitySchemes[name] = newScheme;
+        info->type = OpenAPIConfig::SecuritySchemeType::OAuth2ClientCredentials;
+        info->oauthTokenUrl = cc.mandatoryChild("tokenUrl").as<std::string>();
+
+        // Optional refresh URL
+        if (auto refreshUrl = cc["refreshUrl"]) {
+            info->oauthRefreshUrl = refreshUrl.as<std::string>();
+        }
+
+        // Optional documentation of scopes (name -> description)
+        if (auto scopes = cc["scopes"]) {
+            scopes.forEach(
+                [&](auto const& kv)
+                {
+                    info->oauthScopes[kv.name_] = kv.template as<std::string>();
+                });
+        }
+    }
+    else {
+        throw schemeTypeNode.valueError(schemeType, {"http", "apiKey", "oauth2"});
+    }
+
+    // Store in the config map
+    config.securitySchemes[name] = std::move(info);
 }
 
 static void parsePath(const YAMLScope& pathNode,

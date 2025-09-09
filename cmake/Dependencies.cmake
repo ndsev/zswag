@@ -77,7 +77,7 @@ if(NOT TARGET yaml-cpp)
     FetchContent_Declare(
         yaml-cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-        GIT_TAG        "2f86d13775d119edbb69af52e5f566fd65c6953b"  # Latest commit on master as of Dec 2024
+        GIT_TAG        "aa8d4e4750ec9fe9f8cc680eb90f1b15955c817e"  # Latest commit on master as of Dec 2024
         GIT_SHALLOW    TRUE
     )
     set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)

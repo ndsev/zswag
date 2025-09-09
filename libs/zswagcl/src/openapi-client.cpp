@@ -79,40 +79,6 @@ void resolveHeaderAndQueryParameters(httpcl::Config& result,
     }
 }
 
-void checkSecurityAlternativesAndApplyApiKey(OpenAPIConfig::SecurityAlternatives const& alts, httpcl::Config& conf)
-{
-    if (alts.empty())
-        return; // Nothing to check
-
-    bool anyAlternativeMatched = false;
-    std::stringstream error;
-    error << "The provided HTTP configuration does not satisfy authentication requirements:\n";
-
-    int i = 0;
-    for (auto const& schemeSet : alts)
-    {
-        bool matched = true;
-
-        for (auto const& scheme : schemeSet) {
-            std::string reasonForMismatch;
-            if (!scheme->checkOrApply(conf, reasonForMismatch)) {
-                error << "  In security configuration " << i << ": " << reasonForMismatch << "\n";
-                matched = false;
-                break;
-            }
-        }
-
-        if (matched) {
-            anyAlternativeMatched = true;
-            break;
-        }
-        ++i;
-    }
-
-    if (!anyAlternativeMatched)
-        throw std::runtime_error(error.str());
-}
-
 }
 
 OpenAPIClient::OpenAPIClient(OpenAPIConfig config,
@@ -167,11 +133,15 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     // Throws if the http config does not fulfill any allowed scheme.
     if (method.security) {
         httpcl::log().debug("{} Checking required security schemes for method ...", debugContext);
-        checkSecurityAlternativesAndApplyApiKey(*method.security, httpConfig);
+        authHandlers_.satisfySecurity(
+            *method.security,
+            {*client_, builtUri, settings_, httpConfig});
     }
     else {
         httpcl::log().debug("{} Checking default security scheme ...", debugContext);
-        checkSecurityAlternativesAndApplyApiKey(config_.defaultSecurityScheme, httpConfig);
+        authHandlers_.satisfySecurity(
+            config_.defaultSecurityScheme,
+            {*client_, builtUri, settings_, httpConfig});
     }
 
     const auto& httpMethod = method.httpMethod;

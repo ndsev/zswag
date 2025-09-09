@@ -690,11 +690,13 @@ http-settings:
     basic-auth:  # Basic auth credentials for matching requests.
       user: johndoe
       keychain: keychain-service-string
+      password: cleartext-password  # alternative to keychain
     proxy:      # Proxy settings for matching requests.
       host: localhost
       port: 8888
       user: test
       keychain: ...
+      password: cleartext-password  # alternative to keychain
     cookies:    # Additional Cookies for matching requests.
       key: value
     headers:    # Additional Headers for matching requests.
@@ -702,6 +704,14 @@ http-settings:
     query:      # Additional Query parameters for matching requests.
       key: value
     api-key: value  # API Key as required by OpenAPI config - see description below.
+    oauth2:
+      clientId: my-client-id                               # For OAuth2 client-credentials auth
+      clientSecretKeychain: keychain-service-string        # Prefer a keychain entry over cleartext
+      clientSecret: cleartext-secret                       # discouraged, use keychain
+      tokenUrl: https://issuer.example.com/oauth/token     # optional override; defaults to tokenUrl from OpenAPI
+      refreshUrl: https://issuer.example.com/oauth/token   # optional override; defaults to refreshUrl from OpenAPI, then tokenUrl
+      audience: https://api.example.com/  # Optional (some providers require it)
+      scope: ["orders.read", ...]  # Optional scope override; defaults to OpenAPI setting per operation
 ```
 
 **Note:** For `proxy` configs, the credentials are optional.
@@ -950,10 +960,11 @@ constructor in C++/Python with the relevant detail.
 
 #### Component Support
 
-| Feature            | C++ Client | Python Client | OAServer | zswag.gen |
-| ------------------ | ---------- | ------------- | -------- | --------- |
-| `HTTP Basic-Auth` `HTTP Bearer-Auth` `Cookie API-Key` `Header API-Key` `Query API-Key`  | ✔️ | ✔️ | ✔️(**) | ✔️ |
-| `OpenID Connect` `OAuth2`  | ❌️ | ❌️ | ✔️(**) | ❌️ |
+| Feature                                                                                | C++ Client | Python Client | OAServer | zswag.gen |
+|----------------------------------------------------------------------------------------| ---------- | ------------- | -------- | --------- |
+| `HTTP Basic-Auth` `HTTP Bearer-Auth` `Cookie API-Key` `Header API-Key` `Query API-Key` | ✔️ | ✔️ | ✔️(**) | ✔️ |
+| `OAuth2[clientCredentials]`                                                            | ✔️ | ✔️ | ✔️(**) | ✔️ |
+| `OpenID Connect` `OAuth2[authorizationCode]` `OAuth2[implicit]` `OAuth2[password]`     | ❌️ | ❌️ | ✔️(**) | ❌️ |
 
 **(\*\*)**: The server support for all authentication schemes depends on your
 configuration of the WSGI server (Apache/Nginx/...) which wraps the zswag Flask app.
