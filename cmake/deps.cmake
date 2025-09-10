@@ -1,4 +1,4 @@
-# Dependencies.cmake
+# deps.cmake
 # Centralized dependency management using CPM (CMake Package Manager)
 # CPM provides better version management and diagnostics compared to raw FetchContent
 
