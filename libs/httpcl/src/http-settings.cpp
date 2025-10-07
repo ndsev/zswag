@@ -196,6 +196,23 @@ YAML::Node configToNode(Config const& config) {
             oauth2Node["audience"] = config.oauth2->audience;
         if (!config.oauth2->scopesOverride.empty())
             oauth2Node["scopes"] = config.oauth2->scopesOverride;
+        if (config.oauth2->tokenEndpointAuth) {
+            YAML::Node authNode;
+            const auto& auth = *config.oauth2->tokenEndpointAuth;
+
+            // Write method
+            std::string methodStr = (auth.method == Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature)
+                ? "rfc5849-oauth1-signature"
+                : "rfc6749-client-secret-basic";
+            authNode["method"] = methodStr;
+
+            // Write nonceLength only if non-default
+            if (auth.nonceLength != 16) {
+                authNode["nonceLength"] = auth.nonceLength;
+            }
+
+            oauth2Node["tokenEndpointAuth"] = authNode;
+        }
         result["oauth2"] = oauth2Node;
     }
 
@@ -257,6 +274,29 @@ Config configFromNode(YAML::Node const& node)
         if (auto v = oauth2Node["scope"]) {
             for (auto const& scope : v)
                 oauth2.scopesOverride.emplace_back(scope.as<std::string>());
+        }
+        if (auto authNode = oauth2Node["tokenEndpointAuth"]) {
+            Config::OAuth2::TokenEndpointAuth auth;
+
+            if (auto methodNode = authNode["method"]) {
+                std::string method = methodNode.as<std::string>();
+                if (method == "rfc5849-oauth1-signature") {
+                    auth.method = Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature;
+                } else if (method == "rfc6749-client-secret-basic") {
+                    auth.method = Config::OAuth2::TokenEndpointAuthMethod::Rfc6749_ClientSecretBasic;
+                } else {
+                    throw std::runtime_error("Unknown tokenEndpointAuth method: " + method);
+                }
+            }
+
+            if (auto nonceLengthNode = authNode["nonceLength"]) {
+                auth.nonceLength = nonceLengthNode.as<int>();
+                if (auth.nonceLength < 8 || auth.nonceLength > 64) {
+                    throw std::runtime_error("tokenEndpointAuth.nonceLength must be between 8 and 64");
+                }
+            }
+
+            oauth2.tokenEndpointAuth = auth;
         }
         conf.oauth2 = oauth2;
     }
@@ -577,6 +617,8 @@ Config& Config::operator |= (Config const& other) {
             oauth2->audience = other.oauth2->audience;
         if (!other.oauth2->scopesOverride.empty())
             oauth2->scopesOverride = other.oauth2->scopesOverride;
+        if (other.oauth2->tokenEndpointAuth)
+            oauth2->tokenEndpointAuth = other.oauth2->tokenEndpointAuth;
     }
     return *this;
 }

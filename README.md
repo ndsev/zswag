@@ -712,9 +712,27 @@ http-settings:
       refreshUrl: https://issuer.example.com/oauth/token   # optional override; defaults to refreshUrl from OpenAPI, then tokenUrl
       audience: https://api.example.com/  # Optional (some providers require it)
       scope: ["orders.read", ...]  # Optional scope override; defaults to OpenAPI setting per operation
+      tokenEndpointAuth:  # Optional: how to authenticate with token endpoint
+        method: rfc6749-client-secret-basic  # Options: rfc6749-client-secret-basic (default), rfc5849-oauth1-signature
+        nonceLength: 16  # For rfc5849-oauth1-signature: nonce length (8-64, default: 16)
 ```
 
 **Note:** For `proxy` configs, the credentials are optional.
+
+#### OAuth2 Token Endpoint Authentication Methods
+
+The `tokenEndpointAuth` field controls how the client authenticates when requesting OAuth2 tokens. Two methods are supported:
+
+**`rfc6749-client-secret-basic` (default):** HTTP Basic Authentication (RFC 6749 Section 2.3.1)
+- Both `clientId` and `clientSecret` are sent in the `Authorization: Basic` header
+- Works with most OAuth2 providers
+
+**`rfc5849-oauth1-signature`:** OAuth 1.0 HMAC-SHA256 request signing (RFC 5849)
+- `clientId` is sent as `oauth_consumer_key` in both header and body
+- `clientSecret` is used only for HMAC-SHA256 signature computation (never transmitted)
+- Required by some providers that use OAuth 1.0 signature-based token authentication
+- Provides enhanced security through cryptographic request signing
+- **Note:** Only HMAC-SHA256 signature method is supported
 
 The **`api-key`** setting will be applied under the correct
 cookie/header/query parameter, if the service
