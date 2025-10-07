@@ -3,6 +3,7 @@
 #include <stx/format.h>
 
 #include "base64.hpp"
+#include "httpcl/oauth1-signature.hpp"
 
 #include <stx/string.h>
 #include "yaml-cpp/yaml.h"
@@ -102,18 +103,74 @@ bool OAuth2ClientCredentialsHandler::satisfy(
     }
 }
 
-static void addClientAuthIfSecretPresent(
+/**
+ * Parse URL-encoded body into parameter map.
+ */
+static std::map<std::string, std::string> parseBodyParams(const std::string& body)
+{
+    std::map<std::string, std::string> params;
+    size_t start = 0;
+    while (start < body.length()) {
+        size_t amp = body.find('&', start);
+        if (amp == std::string::npos) amp = body.length();
+
+        std::string pair = body.substr(start, amp - start);
+        size_t eq = pair.find('=');
+        if (eq != std::string::npos) {
+            std::string key = pair.substr(0, eq);
+            std::string value = pair.substr(eq + 1);
+            // Decode URL-encoded values
+            value = httplib::detail::decode_url(value, false);
+            params[key] = value;
+        }
+
+        start = amp + 1;
+    }
+    return params;
+}
+
+/**
+ * Add client authentication to token request based on configured method.
+ */
+static void addClientAuthentication(
     httpcl::Config& conf,
-    const httpcl::Config::OAuth2& cc,
+    const httpcl::Config::OAuth2& oauthConfig,
+    const std::string& tokenUrl,
+    const std::string& body,
     std::string& outSecret)
 {
-    outSecret = cc.clientSecret;
-    if (!cc.clientSecretKeychain.empty()) {
-        outSecret = httpcl::secret::load(cc.clientSecretKeychain, cc.clientId);
+    // Load secret from keychain if configured
+    outSecret = oauthConfig.clientSecret;
+    if (!oauthConfig.clientSecretKeychain.empty()) {
+        outSecret = httpcl::secret::load(oauthConfig.clientSecretKeychain, oauthConfig.clientId);
     }
 
-    if (!outSecret.empty()) {
-        const auto cred = cc.clientId + ":" + outSecret;
+    if (outSecret.empty()) {
+        return;  // Public client, no authentication
+    }
+
+    auto authMethod = oauthConfig.getTokenEndpointAuthMethod();
+
+    if (authMethod == httpcl::Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature) {
+        // OAuth 1.0 signature-based authentication
+        auto bodyParams = parseBodyParams(body);
+        int nonceLength = oauthConfig.tokenEndpointAuth
+            ? oauthConfig.tokenEndpointAuth->nonceLength
+            : 16;
+
+        std::string authHeader = httpcl::oauth1::buildAuthorizationHeader(
+            "POST",
+            tokenUrl,
+            oauthConfig.clientId,
+            outSecret,
+            bodyParams,
+            nonceLength);
+
+        conf.headers.insert({"Authorization", authHeader});
+    }
+    else {
+        // RFC 6749 HTTP Basic Authentication (default)
+        const auto cred = oauthConfig.clientId + ":" + outSecret;
         const auto b64 = base64_encode(
             reinterpret_cast<const unsigned char*>(cred.data()),
             static_cast<unsigned>(cred.size()));
@@ -131,12 +188,9 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requ
 {
     auto tokenRequestConf = httpCtx.httpSettings[resolvedTokenUrl];
 
-    std::string secret;
-    addClientAuthIfSecretPresent(tokenRequestConf, oauthConfig, secret);
-
     // Build request body based on grant type
     std::string body = "grant_type=" + grantType;
-    
+
     if (grantType == GRANT_TYPE_CLIENT_CREDENTIALS) {
         if (!resolvedScopes.empty())
             body += "&scope=" + httplib::detail::encode_url(stx::join(resolvedScopes.begin(), resolvedScopes.end(), " "));
@@ -146,7 +200,11 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requ
     else if (grantType == GRANT_TYPE_REFRESH_TOKEN) {
         body += "&refresh_token=" + httplib::detail::encode_url(refreshToken);
     }
-    
+
+    // Add client authentication (Basic or OAuth1 signature)
+    std::string secret;
+    addClientAuthentication(tokenRequestConf, oauthConfig, resolvedTokenUrl, body, secret);
+
     // Add client_id for public clients (no secret)
     if (secret.empty()) {
         body += "&client_id=" + httplib::detail::encode_url(oauthConfig.clientId);

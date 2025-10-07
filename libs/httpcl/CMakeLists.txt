@@ -8,10 +8,12 @@ add_library(httpcl STATIC
   include/httpcl/http-settings.hpp
   include/httpcl/uri.hpp
   include/httpcl/log.hpp
+  include/httpcl/oauth1-signature.hpp
   src/http-client.cpp
   src/http-settings.cpp
   src/uri.cpp
-  src/log.cpp)
+  src/log.cpp
+  src/oauth1-signature.cpp)
 
 target_compile_features(httpcl
   INTERFACE
@@ -24,6 +26,8 @@ target_link_libraries(httpcl
     spdlog::spdlog
     httplib::httplib
     yaml-cpp::yaml-cpp
+    OpenSSL::SSL
+    OpenSSL::Crypto
   )
 
 # Ensure httpcl depends on OpenSSL build to establish correct build order
