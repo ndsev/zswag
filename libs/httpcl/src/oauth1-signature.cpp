@@ -50,11 +50,25 @@ std::string generateTimestamp()
 /**
  * RFC 3986 percent encoding.
  * OAuth 1.0 requires unreserved characters (A-Z, a-z, 0-9, -, ., _, ~) to NOT be encoded.
+ * All other characters MUST be encoded.
  */
 static std::string percentEncode(const std::string& input)
 {
-    // Use httplib's URL encoding which should be RFC 3986 compliant
-    return httplib::detail::encode_url(input);
+    std::ostringstream encoded;
+    encoded.fill('0');
+    encoded << std::hex << std::uppercase;
+
+    for (unsigned char c : input) {
+        // RFC 3986 unreserved characters
+        if (std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
+            encoded << c;
+        } else {
+            // Percent-encode everything else
+            encoded << '%' << std::setw(2) << static_cast<int>(c);
+        }
+    }
+
+    return encoded.str();
 }
 
 /**
