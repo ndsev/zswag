@@ -69,6 +69,12 @@ jobs:
         run: |
           . ../venv/bin/activate
           ctest -C Release --verbose --no-tests=error
+      - name: Test OAuth Authentication
+        working-directory: build
+        run: |
+          . ../venv/bin/activate
+          pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+          python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
       - name: Deploy
         uses: actions/upload-artifact@v4
         with:
@@ -144,6 +150,11 @@ jobs:
       working-directory: build
       run: |
         ctest -C Release --verbose --no-tests=error
+    - name: Test OAuth Authentication
+      working-directory: build
+      run: |
+        pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+        python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
 
   deploy:
     needs: [determine-version, build-manylinux, build]
