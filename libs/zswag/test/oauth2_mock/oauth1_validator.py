@@ -8,6 +8,9 @@ import hashlib
 import base64
 from urllib.parse import quote, unquote, parse_qs
 from typing import Dict, Optional
+import logging
+
+logger = logging.getLogger('oauth2-mock')
 
 
 def percent_encode(value: str) -> str:
@@ -42,18 +45,22 @@ def build_signature_base_string(
     oauth_params: Dict[str, str],
     body_params: Dict[str, str]
 ) -> str:
-    """Build OAuth 1.0 signature base string."""
+    """Build OAuth 1.0 signature base string per RFC 5849 Section 3.4.1."""
     # Combine OAuth and body parameters
     all_params = {**oauth_params, **body_params}
 
-    # Sort parameters
-    sorted_params = sorted(all_params.items())
-
-    # Build parameter string
-    param_string = '&'.join(
+    # RFC 5849: Encode each parameter FIRST, then sort
+    # "The parameters are sorted by name, using ascending byte value ordering"
+    encoded_pairs = [
         f"{percent_encode(k)}={percent_encode(v)}"
-        for k, v in sorted_params
-    )
+        for k, v in all_params.items()
+    ]
+
+    # Sort the ENCODED parameter strings
+    encoded_pairs.sort()
+
+    # Build parameter string by joining sorted encoded pairs
+    param_string = '&'.join(encoded_pairs)
 
     # Build signature base string: METHOD&URL&PARAMS
     base_string = (
@@ -137,5 +144,6 @@ def validate_oauth1_signature(
 
         return None
 
-    except Exception:
+    except Exception as e:
+        logger.warning(f"OAuth 1.0 signature validation error: {e}")
         return None

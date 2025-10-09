@@ -1,16 +1,18 @@
 """
-OAuth2 Mock Server with OAuth 1.0 signature and HTTP Basic Auth support.
+OAuth2 Mock Server with zserio service, OAuth 1.0 signature and HTTP Basic Auth support.
 """
 
-from flask import Flask, request, jsonify
-from functools import wraps
+from flask import request, jsonify
+from connexion.exceptions import Unauthorized
 import base64
 import secrets
 import time
+import os
 from typing import Dict, Optional, Tuple
 import logging
 
 from .oauth1_validator import validate_oauth1_signature
+import oauth_test.api as api
 
 # Configure logging
 logging.basicConfig(
@@ -19,8 +21,6 @@ logging.basicConfig(
     datefmt='%H:%M:%S'
 )
 logger = logging.getLogger('oauth2-mock')
-
-app = Flask(__name__)
 
 # Mock configuration
 MOCK_CLIENTS = {
@@ -49,56 +49,49 @@ def generate_token(client_id: str, scopes: list, expires_in: int = 3600) -> str:
     return token
 
 
-def validate_bearer_token(token: str) -> Optional[dict]:
-    """Validate Bearer token and return token info if valid."""
+def validate_bearer_token(token: str) -> dict:
+    """
+    Validate Bearer token for Connexion/OAServer.
+    Called automatically by Connexion when security is required.
+
+    Returns:
+        Token info dict if valid
+
+    Raises:
+        Unauthorized: If token is invalid or expired
+    """
     token_info = tokens.get(token)
     if not token_info:
-        return None
+        logger.warning(f"[API] Invalid Bearer token: {token[:20]}...")
+        raise Unauthorized()
 
     if time.time() > token_info['expires_at']:
         del tokens[token]
-        return None
+        logger.warning(f"[API] Expired Bearer token")
+        raise Unauthorized()
 
+    logger.info(f"[API] ✓ Bearer token valid for client={token_info['client_id']}, scopes={token_info['scopes']}")
     return token_info
 
 
-def require_bearer_token(required_scopes: list = None):
-    """Decorator to require valid Bearer token."""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            auth_header = request.headers.get('Authorization', '')
-
-            if not auth_header.startswith('Bearer '):
-                logger.warning("[API] Missing or invalid Authorization header")
-                return jsonify({'error': 'unauthorized'}), 401
-
-            token = auth_header[7:]  # Remove "Bearer " prefix
-            token_info = validate_bearer_token(token)
-
-            if not token_info:
-                logger.warning("[API] Invalid or expired Bearer token")
-                return jsonify({'error': 'invalid_token'}), 401
-
-            # Check scopes if required
-            if required_scopes:
-                if not any(scope in token_info['scopes'] for scope in required_scopes):
-                    logger.warning(f"[API] Insufficient scopes. Required: {required_scopes}, Got: {token_info['scopes']}")
-                    return jsonify({'error': 'insufficient_scope'}), 403
-
-            logger.info(f"[API] Bearer token valid for client={token_info['client_id']}, scopes={token_info['scopes']}")
-            return f(*args, **kwargs)
-
-        return decorated_function
-    return decorator
-
-
-@app.route('/oauth2/token', methods=['POST'])
-def token_endpoint():
+def token_endpoint_handler():
     """OAuth2 token endpoint supporting both Basic Auth and OAuth 1.0 signature."""
     logger.info(f"[TOKEN] Request from {request.remote_addr}")
 
-    # Parse request body
+    # NOTE: We must authenticate BEFORE accessing request.form because
+    # OAuth 1.0 signature validation needs the raw request body.
+    # Once request.form is accessed, the body is consumed and can't be read again.
+
+    # Authenticate client first
+    client_id, auth_method = authenticate_client(request)
+
+    if not client_id:
+        logger.error("[TOKEN] Authentication failed")
+        return jsonify({'error': 'invalid_client'}), 401
+
+    logger.info(f"[TOKEN] ✓ Authenticated via {auth_method}: client_id={client_id}")
+
+    # Now we can safely parse request body
     grant_type = request.form.get('grant_type')
     if grant_type != 'client_credentials':
         logger.error(f"[TOKEN] Unsupported grant_type: {grant_type}")
@@ -108,15 +101,6 @@ def token_endpoint():
     audience = request.form.get('audience', '')
 
     logger.info(f"[TOKEN] grant_type={grant_type}, scope={scope}, audience={audience}")
-
-    # Authenticate client
-    client_id, auth_method = authenticate_client(request)
-
-    if not client_id:
-        logger.error("[TOKEN] Authentication failed")
-        return jsonify({'error': 'invalid_client'}), 401
-
-    logger.info(f"[TOKEN] ✓ Authenticated via {auth_method}: client_id={client_id}")
 
     # Verify client exists
     if client_id not in MOCK_CLIENTS:
@@ -206,107 +190,72 @@ def authenticate_client(req) -> Tuple[Optional[str], Optional[str]]:
         return None, None
 
 
-@app.route('/api/protected', methods=['GET', 'POST'])
-@require_bearer_token(required_scopes=['read'])
-def protected_endpoint():
-    """Protected API endpoint requiring Bearer token."""
-    return jsonify({
-        'message': 'Access granted to protected resource',
-        'data': {'value': 42}
-    })
-
-
-@app.route('/api/public', methods=['GET'])
 def public_endpoint():
-    """Public API endpoint (no authentication required)."""
+    """Public endpoint - no authentication required."""
     logger.info("[API] Public endpoint accessed")
     return jsonify({
-        'message': 'Public resource',
-        'data': {'info': 'No authentication required'}
+        'message': 'Public resource - no authentication required',
+        'info': 'This endpoint demonstrates public access'
     })
 
 
-@app.route('/openapi.json', methods=['GET'])
-def openapi_spec():
-    """Serve OpenAPI specification."""
-    base_url = request.url_root.rstrip('/')
+# ==================== Zserio Service Implementation ====================
 
-    spec = {
-        "openapi": "3.0.0",
-        "info": {
-            "title": "OAuth2 Mock API",
-            "version": "1.0.0",
-            "description": "Mock OAuth2 server supporting OAuth 1.0 signature and HTTP Basic Auth"
-        },
-        "servers": [
-            {"url": base_url}
-        ],
-        "paths": {
-            "/api/protected": {
-                "get": {
-                    "summary": "Protected endpoint",
-                    "security": [{"oauth2": ["read"]}],
-                    "responses": {
-                        "200": {"description": "Success"},
-                        "401": {"description": "Unauthorized"}
-                    }
-                }
-            },
-            "/api/public": {
-                "get": {
-                    "summary": "Public endpoint",
-                    "responses": {
-                        "200": {"description": "Success"}
-                    }
-                }
-            }
-        },
-        "components": {
-            "securitySchemes": {
-                "oauth2": {
-                    "type": "oauth2",
-                    "flows": {
-                        "clientCredentials": {
-                            "tokenUrl": f"{base_url}/oauth2/token",
-                            "scopes": {
-                                "read": "Read access",
-                                "write": "Write access",
-                                "admin": "Admin access"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+def get_data(request: api.DataRequest) -> api.DataResponse:
+    """
+    Zserio service method - protected by OAuth2.
+    This is called automatically by OAServer after Bearer token validation.
+    """
+    try:
+        logger.info(f"[SERVICE] getData called with request: {request.client_name}")
 
-    return jsonify(spec)
+        response = api.DataResponse(
+            message_=f"Hello {request.client_name}! You have been authenticated.",
+            secret_value_=42
+        )
+
+        logger.info(f"[SERVICE] getData returning response: {response}")
+        return response
+    except Exception as e:
+        logger.error(f"[SERVICE] Exception in getData: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
-@app.route('/', methods=['GET'])
-def index():
-    """Server info page."""
-    return jsonify({
-        'name': 'OAuth2 Mock Server',
-        'version': '1.0.0',
-        'endpoints': {
-            'token': '/oauth2/token',
-            'protected': '/api/protected',
-            'public': '/api/public',
-            'openapi': '/openapi.json'
-        },
-        'supported_auth': [
-            'OAuth 1.0 HMAC-SHA256 Signature',
-            'HTTP Basic Auth',
-            'Public Client (no secret)'
-        ],
-        'test_clients': list(MOCK_CLIENTS.keys())
-    })
+# ==================== Server Setup ====================
+
+def create_app():
+    """Create and configure the OAServer with zserio service and OAuth2 token endpoint."""
+    from zswag import OAServer
+    import sys
+
+    # Get current directory
+    working_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Create OAServer with zserio service
+    server = OAServer(
+        controller_module=sys.modules[__name__],  # This module
+        service_type=api.OAuthTestService.Service,
+        yaml_path=os.path.join(working_dir, 'oauth_test.yaml'),
+        zs_pkg_path=working_dir
+    )
+
+    # Add custom OAuth2 token endpoint to the Flask app
+    server.app.route('/oauth2/token', methods=['POST'])(token_endpoint_handler)
+
+    # Add public endpoint
+    server.app.route('/public', methods=['GET'])(public_endpoint)
+
+    return server
 
 
 def run_server(host='127.0.0.1', port=8080):
-    """Run the OAuth2 mock server."""
-    logger.info(f"Starting OAuth2 Mock Server on {host}:{port}")
+    """Run the OAuth2 + Zserio mock server."""
+    logger.info(f"Starting OAuth2 + Zserio Mock Server on {host}:{port}")
     logger.info(f"OpenAPI spec: http://{host}:{port}/openapi.json")
+    logger.info(f"Token endpoint: http://{host}:{port}/oauth2/token")
     logger.info(f"Test clients: {', '.join(MOCK_CLIENTS.keys())}")
-    app.run(host=host, port=port, debug=False)
+
+    server = create_app()
+    server.run(host=host, port=port)
