@@ -152,6 +152,9 @@ jobs:
         ctest -C Release --verbose --no-tests=error
     - name: Test OAuth Authentication
       working-directory: build
+      shell: bash  # Use bash on all platforms for consistent wildcard expansion
+      env:
+        PYTHONIOENCODING: utf-8
       run: |
         pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
         python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py

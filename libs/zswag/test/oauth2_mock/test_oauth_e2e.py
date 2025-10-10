@@ -214,12 +214,17 @@ def main():
     try:
         # Start server
         print(f"Starting server on port {port}...")
+        # Ensure UTF-8 encoding for subprocess on all platforms (especially Windows)
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
         server_process = subprocess.Popen(
             [sys.executable, '-m', 'zswag.test.oauth2_mock', '--port', str(port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            bufsize=1
+            encoding='utf-8',
+            bufsize=1,
+            env=env
         )
 
         # Wait for server to start
