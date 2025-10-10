@@ -734,6 +734,63 @@ The `tokenEndpointAuth` field controls how the client authenticates when request
 - Provides enhanced security through cryptographic request signing
 - **Note:** Only HMAC-SHA256 signature method is supported
 
+#### Testing OAuth 1.0 Signature with Your Service
+
+To verify OAuth 1.0 signature authentication with your service:
+
+**1. Install zswag:**
+
+For official releases:
+```bash
+pip install zswag
+```
+
+For custom builds or development snapshots:
+```bash
+pip install /path/to/pyzswagcl-*.whl /path/to/zswag-*.whl
+```
+
+**2. Create `http-settings.yaml`** with your service details:
+```yaml
+- scope: https://your-api.example.com/*
+  oauth2:
+    clientId: your-client-id
+    clientSecret: your-client-secret
+    tokenUrl: https://your-api.example.com/oauth/token
+    tokenEndpointAuth:
+      method: rfc5849-oauth1-signature
+      nonceLength: 16
+```
+
+**3. Create a test script** (`test_oauth1.py`):
+```python
+import os
+from zswag import OAClient
+
+# Point to your http-settings file
+os.environ['HTTP_SETTINGS_FILE'] = '/path/to/http-settings.yaml'
+
+# Create client with your OpenAPI spec
+client = OAClient("https://your-api.example.com/openapi.json")
+
+# Import your generated zserio service
+import your_service.api as api
+
+# Create service client and make a test call
+service = api.YourService.Client(client)
+request = api.YourRequest(...)
+response = service.your_method(request)
+
+print(f"Success! Response: {response}")
+```
+
+**4. Run the test:**
+```bash
+python test_oauth1.py
+```
+
+**Verification:** Check your server logs to confirm OAuth 1.0 HMAC-SHA256 signatures are being validated correctly and the token endpoint receives properly signed requests.
+
 The **`api-key`** setting will be applied under the correct
 cookie/header/query parameter, if the service
 you are connecting to uses an [OpenAPI `apiKey` auth scheme](#authentication-schemes).
