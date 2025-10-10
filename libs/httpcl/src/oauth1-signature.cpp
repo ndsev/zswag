@@ -3,13 +3,14 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/buffer.h>
+#include <openssl/rand.h>
 #include <httplib.h>
-#include <random>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
 #include <chrono>
 #include <stdexcept>
+#include <vector>
 
 namespace httpcl
 {
@@ -27,14 +28,16 @@ std::string generateNonce(int length)
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz";
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, sizeof(alphanum) - 2);
+    // Use OpenSSL's cryptographically secure random number generator
+    std::vector<unsigned char> randomBytes(length);
+    if (RAND_bytes(randomBytes.data(), length) != 1) {
+        throw std::runtime_error("Failed to generate cryptographically secure random bytes");
+    }
 
     std::string nonce;
     nonce.reserve(length);
     for (int i = 0; i < length; ++i) {
-        nonce += alphanum[dis(gen)];
+        nonce += alphanum[randomBytes[i] % (sizeof(alphanum) - 1)];
     }
     return nonce;
 }
