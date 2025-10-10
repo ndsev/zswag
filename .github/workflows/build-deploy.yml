@@ -123,11 +123,11 @@ jobs:
               -DZSWAG_ENABLE_TESTING=ON \
               -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
         cmake --build .
-        mv bin/wheel bin/wheel-auditme  # Same as on Linux
-        mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
-        _deps/python-cmake-wheel-src/repair-wheel-macos.bash \
-              "$(pwd)"/bin/wheel-auditme/pyzswagcl*.whl \
-              "$(pwd)"/bin/wheel pyzswagcl
+        # No wheel repair needed with python-cmake-wheel commit b1d399e
+        mv bin/wheel bin/wheel-final
+        mkdir bin/wheel
+        mv bin/wheel-final/zswag*.whl bin/wheel/
+        mv bin/wheel-final/pyzswagcl*.whl bin/wheel/
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       working-directory: build
