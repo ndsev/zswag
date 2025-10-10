@@ -5,6 +5,15 @@ on:
     branches: [master]
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to build a snapshot from
+        default: master
+        required: true
+      release_notes:
+        description: Optional notes for this snapshot release
+        required: false
 
 jobs:
   determine-version:
@@ -14,6 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
       
@@ -22,15 +32,15 @@ jobs:
         with:
           python-version: '3.10'
       
-      - name: Install setuptools_scm
-        run: pip install setuptools_scm
+      - name: Install dependencies
+        run: pip install setuptools_scm packaging
       
       - name: Get version
         id: version
         run: |
-          VERSION=$(python -c "import setuptools_scm; print(setuptools_scm.get_version(local_scheme='no-local-version'))")
-          echo "Version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          python .github/scripts/determine_version.py \
+            --event "${{ github.event_name }}" \
+            --ref "${{ github.event.inputs.ref || github.ref_name }}"
 
   build-manylinux:
     needs: [determine-version]
@@ -42,6 +52,7 @@ jobs:
     container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-${{ matrix.arch }}:2025.1
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.determine-version.outputs.version }}
     steps:
       - name: Which Node.js?
         run: |
@@ -49,6 +60,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref }}
           submodules: recursive
       - name: Configure
         run: |
@@ -88,9 +100,12 @@ jobs:
           # Python 3.10 doesn't have ARM64 builds for macOS
           - os: macos-14
             python-version: "3.10"
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.determine-version.outputs.version }}
     steps:
     - uses: actions/checkout@v4
       with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref }}
         submodules: recursive
     - uses: actions/setup-python@v5
       with:
@@ -207,4 +222,113 @@ jobs:
             --non-interactive \
             --skip-existing \
             --verbose \
+            dist/*
+
+  manual-snapshot:
+    needs: [determine-version, build-manylinux, build]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.determine-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install setuptools wheel setuptools_scm
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist/
+          merge-multiple: true
+
+      - name: Build source distribution for zswag
+        run: |
+          python setup.py ${{ needs.determine-version.outputs.version }} sdist --dist-dir dist/
+
+      - name: Create release tag name
+        id: release_info
+        run: |
+          # Sanitize branch name for release tag
+          REF_NAME="${{ github.event.inputs.ref }}"
+          SLUG=$(echo "$REF_NAME" | sed 's/[^A-Za-z0-9]/-/g' | sed 's/^-*//' | sed 's/-*$//' | tr '[:upper:]' '[:lower:]')
+          if [ -z "$SLUG" ]; then
+            SLUG="snapshot"
+          fi
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          RELEASE_TAG="snapshot-${SLUG}-${SHORT_SHA}"
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          RELEASE_TAG="${{ steps.release_info.outputs.release_tag }}"
+          SHORT_SHA="${{ steps.release_info.outputs.short_sha }}"
+          CUSTOM_NOTES="${{ github.event.inputs.release_notes }}"
+
+          # Build release notes
+          cat > release_notes.md <<'EOF'
+          ## Test Snapshot from ${{ github.event.inputs.ref }}
+
+          **Version:** `${{ needs.determine-version.outputs.version }}`
+          **Commit:** `${{ steps.release_info.outputs.short_sha }}`
+          **Build:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ### Installation Instructions
+
+          This is a test snapshot for customer verification. To install:
+
+          1. **Use a virtual environment** (recommended):
+             ```bash
+             python -m venv venv
+             source venv/bin/activate  # On Windows: venv\Scripts\activate
+             ```
+             [Learn more about virtual environments](https://docs.python.org/3/tutorial/venv.html)
+
+          2. **Install/upgrade both packages** (force reinstall to ensure version consistency):
+             ```bash
+             pip install --force-reinstall dist/pyzswagcl-${VERSION}-*.whl dist/zswag-${VERSION}-*.whl
+             ```
+
+          ⚠️ **Warning:** This will remove any existing `zswag` and `pyzswagcl` installations.
+
+          ### Direct Installation from Release
+
+          You can install directly from this release (replace `<platform-python>` with your platform, e.g., `cp310-manylinux_x86_64`):
+          ```bash
+          pip install --force-reinstall \
+            https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/pyzswagcl-${VERSION}-<platform-python>.whl \
+            https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/zswag-${VERSION}-py3-none-any.whl
+          ```
+
+          EOF
+
+          # Add custom notes if provided
+          if [ -n "$CUSTOM_NOTES" ]; then
+            echo "" >> release_notes.md
+            echo "### Release Notes" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "$CUSTOM_NOTES" >> release_notes.md
+          fi
+
+          # Create the pre-release
+          gh release create "${RELEASE_TAG}" \
+            --prerelease \
+            --target "${{ github.event.inputs.ref }}" \
+            --title "Test Snapshot: ${{ github.event.inputs.ref }} (${SHORT_SHA})" \
+            --notes-file release_notes.md \
             dist/*
