@@ -22,6 +22,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger('oauth2-mock')
 
+
+def sanitize_for_logging(value, max_length: int = 100) -> str:
+    """
+    Sanitize user input for safe logging to prevent log injection attacks.
+
+    Removes control characters, newlines, and truncates long values.
+    """
+    if value is None:
+        return 'None'
+    if not isinstance(value, str):
+        value = str(value)
+    # Remove control characters and newlines that could be used for log injection
+    sanitized = ''.join(c if c.isprintable() and c not in '\r\n' else '?' for c in value)
+    # Truncate if too long
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + '...'
+    return sanitized
+
+
 # Mock configuration
 MOCK_CLIENTS = {
     'test-client': {
@@ -62,7 +81,8 @@ def validate_bearer_token(token: str) -> dict:
     """
     token_info = tokens.get(token)
     if not token_info:
-        logger.warning(f"[API] Invalid Bearer token: {token[:20]}...")
+        sanitized_token = sanitize_for_logging(token, max_length=20)
+        logger.warning(f"[API] Invalid Bearer token: {sanitized_token}...")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
         raise Unauthorized()
 
     if time.time() > token_info['expires_at']:
@@ -70,7 +90,8 @@ def validate_bearer_token(token: str) -> dict:
         logger.warning(f"[API] Expired Bearer token")
         raise Unauthorized()
 
-    logger.info(f"[API] ✓ Bearer token valid for client={token_info['client_id']}, scopes={token_info['scopes']}")
+    sanitized_client_id = sanitize_for_logging(token_info['client_id'])
+    logger.info(f"[API] ✓ Bearer token valid for client={sanitized_client_id}, scopes={token_info['scopes']}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
     return token_info
 
 
@@ -89,22 +110,28 @@ def token_endpoint_handler():
         logger.error("[TOKEN] Authentication failed")
         return jsonify({'error': 'invalid_client'}), 401
 
-    logger.info(f"[TOKEN] ✓ Authenticated via {auth_method}: client_id={client_id}")
+    sanitized_client_id = sanitize_for_logging(client_id)
+    logger.info(f"[TOKEN] ✓ Authenticated via {auth_method}: client_id={sanitized_client_id}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
 
     # Now we can safely parse request body
     grant_type = request.form.get('grant_type')
     if grant_type != 'client_credentials':
-        logger.error(f"[TOKEN] Unsupported grant_type: {grant_type}")
+        sanitized_grant_type = sanitize_for_logging(grant_type)
+        logger.error(f"[TOKEN] Unsupported grant_type: {sanitized_grant_type}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
         return jsonify({'error': 'unsupported_grant_type'}), 400
 
     scope = request.form.get('scope', '').split()
     audience = request.form.get('audience', '')
 
-    logger.info(f"[TOKEN] grant_type={grant_type}, scope={scope}, audience={audience}")
+    sanitized_grant_type = sanitize_for_logging(grant_type)
+    sanitized_scope = sanitize_for_logging(str(scope))
+    sanitized_audience = sanitize_for_logging(audience)
+    logger.info(f"[TOKEN] grant_type={sanitized_grant_type}, scope={sanitized_scope}, audience={sanitized_audience}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
 
     # Verify client exists
     if client_id not in MOCK_CLIENTS:
-        logger.error(f"[TOKEN] Unknown client_id: {client_id}")
+        sanitized_client_id = sanitize_for_logging(client_id)
+        logger.error(f"[TOKEN] Unknown client_id: {sanitized_client_id}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
         return jsonify({'error': 'invalid_client'}), 401
 
     client_config = MOCK_CLIENTS[client_id]
@@ -113,14 +140,16 @@ def token_endpoint_handler():
     if scope:
         invalid_scopes = [s for s in scope if s not in client_config['allowed_scopes']]
         if invalid_scopes:
-            logger.error(f"[TOKEN] Invalid scopes requested: {invalid_scopes}")
+            sanitized_invalid_scopes = sanitize_for_logging(str(invalid_scopes))
+            logger.error(f"[TOKEN] Invalid scopes requested: {sanitized_invalid_scopes}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
             return jsonify({'error': 'invalid_scope'}), 400
     else:
         scope = client_config['allowed_scopes']
 
     # Generate token
     access_token = generate_token(client_id, scope)
-    logger.info(f"[TOKEN] ✓ Issued token for client={client_id}, scopes={scope}")
+    sanitized_client_id = sanitize_for_logging(client_id)
+    logger.info(f"[TOKEN] ✓ Issued token for client={sanitized_client_id}, scopes={scope}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
 
     return jsonify({
         'access_token': access_token,
@@ -172,9 +201,11 @@ def authenticate_client(req) -> Tuple[Optional[str], Optional[str]]:
             if client_id in MOCK_CLIENTS and MOCK_CLIENTS[client_id]['secret'] == client_secret:
                 return client_id, "HTTP Basic Auth (RFC 6749)"
 
-            logger.warning(f"[TOKEN] Invalid credentials for client_id={client_id}")
+            sanitized_client_id = sanitize_for_logging(client_id)
+            logger.warning(f"[TOKEN] Invalid credentials for client_id={sanitized_client_id}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
         except Exception as e:
-            logger.error(f"[TOKEN] Basic auth parsing error: {e}")
+            sanitized_error = sanitize_for_logging(str(e))
+            logger.error(f"[TOKEN] Basic auth parsing error: {sanitized_error}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
 
         return None, None
 
@@ -207,17 +238,20 @@ def get_data(request: api.DataRequest) -> api.DataResponse:
     This is called automatically by OAServer after Bearer token validation.
     """
     try:
-        logger.info(f"[SERVICE] getData called with request: {request.client_name}")
+        sanitized_client_name = sanitize_for_logging(request.client_name)
+        logger.info(f"[SERVICE] getData called with request: {sanitized_client_name}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
 
         response = api.DataResponse(
             message_=f"Hello {request.client_name}! You have been authenticated.",
             secret_value_=42
         )
 
-        logger.info(f"[SERVICE] getData returning response: {response}")
+        sanitized_response = sanitize_for_logging(str(response))
+        logger.info(f"[SERVICE] getData returning response: {sanitized_response}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
         return response
     except Exception as e:
-        logger.error(f"[SERVICE] Exception in getData: {e}")
+        sanitized_error = sanitize_for_logging(str(e))
+        logger.error(f"[SERVICE] Exception in getData: {sanitized_error}")  # NOSONAR(S5145) - data sanitized by sanitize_for_logging
         import traceback
         traceback.print_exc()
         raise
