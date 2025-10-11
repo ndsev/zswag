@@ -6,6 +6,7 @@ This test demonstrates:
 - Starting the OAuth2 + Zserio server as a subprocess
 - Testing OAuth 1.0 signature-based token authentication
 - Testing HTTP Basic Auth token authentication
+- Testing OAuth2 token acquisition for OpenAPI spec fetch (useForSpecFetch flag)
 - Using OAClient to call protected zserio service
 - Verifying server logs show correct authentication methods
 """
@@ -16,6 +17,7 @@ import sys
 import os
 import tempfile
 import re
+import threading
 from pathlib import Path
 
 # Import zswag.test.oauth2_mock to trigger oauth_test API generation
@@ -35,10 +37,10 @@ class TestResults:
         self.tests.append((name, success, message))
         if success:
             self.passed += 1
-            print(f"  ✓ {name}")
+            print(f"  ✓ {name}", flush=True)
         else:
             self.failed += 1
-            print(f"  ✗ {name}: {message}")
+            print(f"  ✗ {name}: {message}", flush=True)
 
     def summary(self):
         print()
@@ -48,8 +50,8 @@ class TestResults:
         return self.failed == 0
 
 
-def wait_for_server(port, timeout=10):
-    """Wait for server to be ready."""
+def wait_for_server(port, timeout=15):
+    """Wait for server port to be open."""
     import socket
     start = time.time()
     while time.time() - start < timeout:
@@ -64,14 +66,19 @@ def wait_for_server(port, timeout=10):
     return False
 
 
-def create_http_settings(auth_method, port):
+def create_http_settings(auth_method, port, use_for_spec_fetch=True):
     """Create temporary http-settings.yaml for specified auth method."""
+    # Only add useForSpecFetch if it's explicitly false (default is true)
+    use_for_spec_fetch_line = ""
+    if not use_for_spec_fetch:
+        use_for_spec_fetch_line = "\n    useForSpecFetch: false"
+
     settings_content = f"""
 - scope: http://127.0.0.1:{port}/*
   oauth2:
     clientId: test-client
     clientSecret: test-secret
-    tokenUrl: http://127.0.0.1:{port}/oauth2/token
+    tokenUrl: http://127.0.0.1:{port}/oauth2/token{use_for_spec_fetch_line}
     tokenEndpointAuth:
       method: {auth_method}
       nonceLength: 16
@@ -82,22 +89,24 @@ def create_http_settings(auth_method, port):
     return path
 
 
-def test_oauth_flow(port, auth_method, results):
+def test_oauth_flow(port, auth_method, results, use_for_spec_fetch=True):
     """Test complete OAuth flow with specified authentication method."""
-    print(f"\n{'='*70}")
-    print(f"Testing: {auth_method}")
-    print(f"{'='*70}")
+    spec_fetch_mode = "with OAuth2 token" if use_for_spec_fetch else "without OAuth2 token"
+    print(f"\n{'='*70}", flush=True)
+    print(f"Testing: {auth_method} (spec fetch: {spec_fetch_mode})", flush=True)
+    print(f"{'='*70}", flush=True)
 
     # Create temporary http settings file
-    settings_file = create_http_settings(auth_method, port)
+    settings_file = create_http_settings(auth_method, port, use_for_spec_fetch)
 
     try:
         # Set environment variable
         os.environ['HTTP_SETTINGS_FILE'] = settings_file
 
         # Create OAClient
+        test_suffix = f"{auth_method}, useForSpecFetch={use_for_spec_fetch}"
         results.add(
-            f"Create OAClient ({auth_method})",
+            f"Create OAClient ({test_suffix})",
             True
         )
 
@@ -106,7 +115,7 @@ def test_oauth_flow(port, auth_method, results):
         # Create zserio service client
         service = api.OAuthTestService.Client(client)
         results.add(
-            f"Create service client ({auth_method})",
+            f"Create service client ({test_suffix})",
             True
         )
 
@@ -117,19 +126,19 @@ def test_oauth_flow(port, auth_method, results):
         # Verify response
         if response.secret_value == 42 and "TestClient" in response.message:
             results.add(
-                f"Call protected endpoint ({auth_method})",
+                f"Call protected endpoint ({test_suffix})",
                 True
             )
         else:
             results.add(
-                f"Call protected endpoint ({auth_method})",
+                f"Call protected endpoint ({test_suffix})",
                 False,
                 f"Unexpected response: {response.message}"
             )
 
     except Exception as e:
         results.add(
-            f"OAuth flow ({auth_method})",
+            f"OAuth flow ({test_suffix})",
             False,
             str(e)
         )
@@ -193,19 +202,36 @@ def verify_server_logs(server_output, results):
         results.add("Server validated Bearer tokens", False, "Not found in logs")
 
 
+def _start_stream_reader(stream, storage, prefix):
+    """Continuously drain a stream to avoid blocking the subprocess pipes."""
+    if stream is None:
+        return None
+
+    def _reader():
+        for line in stream:
+            storage.append(line)
+            print(f"{prefix}{line}", end="", flush=True)
+        stream.close()
+
+    thread = threading.Thread(target=_reader, daemon=True)
+    thread.start()
+    return thread
+
+
 def main():
     """Run end-to-end tests."""
-    print("=" * 70)
-    print("OAuth2 Mock Server - End-to-End Test")
-    print("=" * 70)
-    print()
-    print("This test verifies:")
-    print("  • OAuth 1.0 HMAC-SHA256 signature authentication")
-    print("  • HTTP Basic Auth authentication")
-    print("  • OAuth2 token endpoint")
-    print("  • Zserio service with Bearer token protection")
-    print("  • Public endpoint access")
-    print()
+    print("=" * 70, flush=True)
+    print("OAuth2 Mock Server - End-to-End Test", flush=True)
+    print("=" * 70, flush=True)
+    print(flush=True)
+    print("This test verifies:", flush=True)
+    print("  • OAuth 1.0 HMAC-SHA256 signature authentication", flush=True)
+    print("  • HTTP Basic Auth authentication", flush=True)
+    print("  • OAuth2 token endpoint", flush=True)
+    print("  • OAuth2 token acquisition for OpenAPI spec fetch (useForSpecFetch)", flush=True)
+    print("  • Zserio service with Bearer token protection", flush=True)
+    print("  • Public endpoint access", flush=True)
+    print(flush=True)
 
     results = TestResults()
     server_process = None
@@ -213,10 +239,11 @@ def main():
 
     try:
         # Start server
-        print(f"Starting server on port {port}...")
-        # Ensure UTF-8 encoding for subprocess on all platforms (especially Windows)
+        print(f"Starting server on port {port}...", flush=True)
+        # Ensure UTF-8 encoding and unbuffered output for subprocess (especially Windows)
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUNBUFFERED'] = '1'  # Force unbuffered output on Windows
         server_process = subprocess.Popen(
             [sys.executable, '-m', 'zswag.test.oauth2_mock', '--port', str(port)],
             stdout=subprocess.PIPE,
@@ -227,20 +254,34 @@ def main():
             env=env
         )
 
+        stdout_lines = []
+        stderr_lines = []
+        stdout_thread = _start_stream_reader(server_process.stdout, stdout_lines, "[SERVER stdout] ")
+        stderr_thread = _start_stream_reader(server_process.stderr, stderr_lines, "[SERVER stderr] ")
+
         # Wait for server to start
-        if not wait_for_server(port, timeout=10):
+        if not wait_for_server(port, timeout=15):
             results.add("Server startup", False, "Server did not start in time")
             return 1
 
         results.add("Server startup", True)
-        time.sleep(1)  # Give server a moment to fully initialize
+        # Give Flask extra time to fully initialize all routes (especially on Windows)
+        time.sleep(10)
 
-        # Test OAuth 1.0 signature auth
-        test_oauth_flow(port, "rfc5849-oauth1-signature", results)
+        # Test OAuth 1.0 signature auth with useForSpecFetch=true (default)
+        test_oauth_flow(port, "rfc5849-oauth1-signature", results, use_for_spec_fetch=True)
         time.sleep(0.5)
 
-        # Test HTTP Basic Auth
-        test_oauth_flow(port, "rfc6749-client-secret-basic", results)
+        # Test OAuth 1.0 signature auth with useForSpecFetch=false
+        test_oauth_flow(port, "rfc5849-oauth1-signature", results, use_for_spec_fetch=False)
+        time.sleep(0.5)
+
+        # Test HTTP Basic Auth with useForSpecFetch=true (default)
+        test_oauth_flow(port, "rfc6749-client-secret-basic", results, use_for_spec_fetch=True)
+        time.sleep(0.5)
+
+        # Test HTTP Basic Auth with useForSpecFetch=false
+        test_oauth_flow(port, "rfc6749-client-secret-basic", results, use_for_spec_fetch=False)
         time.sleep(0.5)
 
         # Test public endpoint
@@ -252,8 +293,12 @@ def main():
         # Get server output
         server_process.terminate()
         server_process.wait(timeout=5)
-        server_stdout = server_process.stdout.read()
-        server_stderr = server_process.stderr.read()
+        if stdout_thread:
+            stdout_thread.join(timeout=2)
+        if stderr_thread:
+            stderr_thread.join(timeout=2)
+        server_stdout = ''.join(stdout_lines)
+        server_stderr = ''.join(stderr_lines)
         server_output = server_stdout + server_stderr
 
         # Verify server logs
@@ -268,11 +313,11 @@ def main():
                 print(f"  {line}")
 
     except KeyboardInterrupt:
-        print("\n\nTest interrupted by user")
+        print("\n\nTest interrupted by user", flush=True)
         return 1
 
     except Exception as e:
-        print(f"\n\nFATAL ERROR: {e}")
+        print(f"\n\nFATAL ERROR: {e}", flush=True)
         import traceback
         traceback.print_exc()
         return 1
