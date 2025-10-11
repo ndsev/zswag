@@ -712,6 +712,7 @@ http-settings:
       refreshUrl: https://issuer.example.com/oauth/token   # optional override; defaults to refreshUrl from OpenAPI, then tokenUrl
       audience: https://api.example.com/  # Optional (some providers require it)
       scope: ["orders.read", ...]  # Optional scope override; defaults to OpenAPI setting per operation
+      useForSpecFetch: true  # Optional: use OAuth2 token when fetching OpenAPI spec (default: true)
       tokenEndpointAuth:  # Optional: how to authenticate with token endpoint
         method: rfc6749-client-secret-basic  # Options: rfc6749-client-secret-basic (default), rfc5849-oauth1-signature
         nonceLength: 16  # For rfc5849-oauth1-signature: nonce length (8-64, default: 16)
@@ -733,6 +734,60 @@ The `tokenEndpointAuth` field controls how the client authenticates when request
 - Required by some providers that use OAuth 1.0 signature-based token authentication
 - Provides enhanced security through cryptographic request signing
 - **Note:** Only HMAC-SHA256 signature method is supported
+
+#### OAuth2-Authenticated OpenAPI Spec Fetching
+
+By default, when OAuth2 is configured, zswag will acquire an OAuth2 access token **before** fetching the OpenAPI specification. This solves the "chicken-and-egg" problem where the OpenAPI spec endpoint itself requires authentication.
+
+**How it works:**
+
+1. **With `useForSpecFetch: true` (default):**
+   - Client acquires OAuth2 token using configured authentication method
+   - Token is included as `Authorization: Bearer <token>` header when fetching OpenAPI spec
+   - OpenAPI spec fetch succeeds even if endpoint requires authentication
+   - Same token is cached and reused for subsequent API calls
+
+2. **With `useForSpecFetch: false`:**
+   - OpenAPI spec is fetched without OAuth2 token (plain HTTP GET)
+   - OAuth2 token acquisition is deferred until first API method call
+   - Use this when the OpenAPI spec endpoint is public (doesn't require authentication)
+
+**Configuration:**
+
+```yaml
+- scope: https://api.example.com/*
+  oauth2:
+    clientId: your-client-id
+    clientSecret: your-client-secret
+    tokenUrl: https://api.example.com/oauth/token
+    useForSpecFetch: true  # Default: true. Set to false if spec is public.
+```
+
+**When to use `useForSpecFetch: false`:**
+- OpenAPI spec endpoint is publicly accessible
+- Avoids unnecessary token acquisition if only the spec is needed
+- Improves performance by deferring OAuth2 flow until first API call
+
+**When to keep `useForSpecFetch: true` (default):**
+- OpenAPI spec endpoint requires authentication
+- Service returns 401/403 when fetching spec without credentials
+- Most secure option (ensures token is available from the start)
+
+**Debugging OAuth2 Issues:**
+
+To troubleshoot OAuth2 authentication problems, enable detailed logging:
+
+```bash
+export HTTP_LOG_LEVEL=debug   # Shows OAuth2 flow (token acquisition, cache hits/misses)
+export HTTP_LOG_LEVEL=trace   # Shows additional details (request/response bodies, signatures)
+```
+
+The logs will show:
+- Token endpoint authentication method being used
+- Token request/response status
+- Token cache hit/miss/expired events
+- OAuth2 configuration status for OpenAPI spec fetch
+- Whether OAuth2 token is being used for spec fetch
 
 #### Testing OAuth 1.0 Signature with Your Service
 
