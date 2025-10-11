@@ -213,6 +213,12 @@ YAML::Node configToNode(Config const& config) {
 
             oauth2Node["tokenEndpointAuth"] = authNode;
         }
+
+        // Write useForSpecFetch only if non-default (false)
+        if (!config.oauth2->useForSpecFetch) {
+            oauth2Node["useForSpecFetch"] = false;
+        }
+
         result["oauth2"] = oauth2Node;
     }
 
@@ -298,6 +304,12 @@ Config configFromNode(YAML::Node const& node)
 
             oauth2.tokenEndpointAuth = auth;
         }
+
+        // Parse useForSpecFetch (defaults to true)
+        if (auto useForSpecFetchNode = oauth2Node["useForSpecFetch"]) {
+            oauth2.useForSpecFetch = useForSpecFetchNode.as<bool>();
+        }
+
         conf.oauth2 = oauth2;
     }
 
@@ -617,6 +629,8 @@ Config& Config::operator |= (Config const& other) {
             oauth2->audience = other.oauth2->audience;
         if (!other.oauth2->scopesOverride.empty())
             oauth2->scopesOverride = other.oauth2->scopesOverride;
+        // Always merge useForSpecFetch to allow explicit override of default
+        oauth2->useForSpecFetch = other.oauth2->useForSpecFetch;
         if (other.oauth2->tokenEndpointAuth)
             oauth2->tokenEndpointAuth = other.oauth2->tokenEndpointAuth;
     }

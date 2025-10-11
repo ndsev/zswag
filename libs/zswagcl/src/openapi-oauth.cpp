@@ -54,6 +54,7 @@ bool OAuth2ClientCredentialsHandler::satisfy(
         std::shared_lock lk(m_);
         auto it = cache_.find(key);
         if (it != cache_.end() && steady_clock::now() < it->second.expiresAt) {
+            httpcl::log().debug("[OAuth2] Using cached token (still valid)");
             ctx.resultHttpConfigWithAuthorization.headers.insert({"Authorization", "Bearer " + it->second.accessToken});
             return true;
         }
@@ -71,9 +72,10 @@ bool OAuth2ClientCredentialsHandler::satisfy(
 
         // Try refresh if we had an entry, but it expired and has refresh token
         if (it != cache_.end() && !it->second.refreshToken.empty()) {
+            httpcl::log().debug("[OAuth2] Cached token expired, attempting refresh...");
             try {
                 httpcl::log().debug("Trying token refresh at {} ...", refreshUrl);
-                auto newTok = requestToken(ctx, oauthConfig, refreshUrl, 
+                auto newTok = requestToken(ctx, oauthConfig, refreshUrl,
                     GRANT_TYPE_REFRESH_TOKEN, {}, it->second.refreshToken);
                 it->second = newTok;
                 ctx.resultHttpConfigWithAuthorization.headers.insert({"Authorization", "Bearer " + newTok.accessToken});
@@ -84,11 +86,17 @@ bool OAuth2ClientCredentialsHandler::satisfy(
                 httpcl::log().debug("  ... refresh failed with error: {}", e.what());
             }
         }
+        else if (it != cache_.end()) {
+            httpcl::log().debug("[OAuth2] Cached token expired (no refresh token), minting new...");
+        }
+        else {
+            httpcl::log().debug("[OAuth2] No cached token, minting new...");
+        }
 
         // Mint fresh
         try {
             httpcl::log().debug("Trying token mint at {} ...", tokenUrl);
-            auto minted = requestToken(ctx, oauthConfig, tokenUrl, 
+            auto minted = requestToken(ctx, oauthConfig, tokenUrl,
                 GRANT_TYPE_CLIENT_CREDENTIALS, scopes);
             cache_[key] = minted;
             ctx.resultHttpConfigWithAuthorization.headers.insert({"Authorization", "Bearer " + minted.accessToken});
@@ -151,12 +159,22 @@ static void addClientAuthentication(
 
     auto authMethod = oauthConfig.getTokenEndpointAuthMethod();
 
+    httpcl::log().debug("[OAuth2] Token endpoint auth method: {}",
+        authMethod == httpcl::Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature
+        ? "rfc5849-oauth1-signature (HMAC-SHA256)"
+        : "rfc6749-client-secret-basic (HTTP Basic)");
+
     if (authMethod == httpcl::Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature) {
         // OAuth 1.0 signature-based authentication
         auto bodyParams = parseBodyParams(body);
         int nonceLength = oauthConfig.tokenEndpointAuth
             ? oauthConfig.tokenEndpointAuth->nonceLength
             : 16;
+
+        httpcl::log().debug("[OAuth2] Building OAuth 1.0 signature for token request");
+        httpcl::log().trace("[OAuth2]   URL: POST {}", tokenUrl);
+        httpcl::log().trace("[OAuth2]   Nonce length: {}", nonceLength);
+        httpcl::log().trace("[OAuth2]   Body params count: {}", bodyParams.size());
 
         std::string authHeader = httpcl::oauth1::buildAuthorizationHeader(
             "POST",
@@ -165,6 +183,8 @@ static void addClientAuthentication(
             outSecret,
             bodyParams,
             nonceLength);
+
+        httpcl::log().trace("[OAuth2]   Authorization header: OAuth ...");
 
         conf.headers.insert({"Authorization", authHeader});
     }
@@ -210,15 +230,27 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requ
         body += "&client_id=" + httplib::detail::encode_url(oauthConfig.clientId);
     }
 
+    httpcl::log().debug("[OAuth2] Requesting token: grant_type={}, url={}", grantType, resolvedTokenUrl);
+    httpcl::log().trace("[OAuth2]   client_id: {}", oauthConfig.clientId);
+    if (grantType == GRANT_TYPE_CLIENT_CREDENTIALS && !resolvedScopes.empty()) {
+        httpcl::log().trace("[OAuth2]   scopes: {}", stx::join(resolvedScopes.begin(), resolvedScopes.end(), ", "));
+    }
+
     auto res = httpCtx.httpClient.post(
         resolvedTokenUrl,
         httpcl::BodyAndContentType{body, "application/x-www-form-urlencoded"},
         tokenRequestConf);
 
+    httpcl::log().debug("[OAuth2] Token endpoint response: status={}, body_size={}", res.status, res.content.size());
+
     if (res.status < 200 || res.status >= 300) {
-        throw httpcl::IHttpClient::Error(res, 
+        httpcl::log().warn("[OAuth2] Token request failed with status {}", res.status);
+        httpcl::log().trace("[OAuth2]   Error response: {}", res.content);
+        throw httpcl::IHttpClient::Error(res,
             stx::format("OAuth2 token endpoint returned non-2xx for grant_type={}.", grantType));
     }
+
+    httpcl::log().trace("[OAuth2]   Success response: {}", res.content);
 
     // Parse response - common for both grant types
     auto jsonResult = YAML::Load(res.content);
@@ -243,6 +275,70 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requ
         out.refreshToken = refreshToken;  // Keep the old refresh token if not reissued
 
     return out;
+}
+
+std::optional<std::string> acquireOAuth2TokenForSpecFetch(
+    httpcl::IHttpClient& httpClient,
+    httpcl::Config& httpConfig,
+    const std::string& specUrl)
+{
+    // Check if OAuth2 is configured
+    if (!httpConfig.oauth2) {
+        httpcl::log().trace("[OAuth2] No OAuth2 config for spec fetch at {}", specUrl);
+        return std::nullopt;
+    }
+
+    // Check if useForSpecFetch is enabled
+    if (!httpConfig.oauth2->useForSpecFetch) {
+        httpcl::log().debug("[OAuth2] useForSpecFetch=false, skipping token acquisition for spec fetch");
+        return std::nullopt;
+    }
+
+    httpcl::log().debug("[OAuth2] Acquiring token for OpenAPI spec fetch at {}", specUrl);
+
+    // Create minimal security requirement for OAuth2 client credentials
+    auto scheme = std::make_shared<OpenAPIConfig::SecurityScheme>();
+    scheme->type = SecuritySchemeType::OAuth2ClientCredentials;
+
+    // Use tokenUrlOverride if available, otherwise we'll need a dummy (handler will fail gracefully if missing)
+    if (!httpConfig.oauth2->tokenUrlOverride.empty()) {
+        scheme->oauthTokenUrl = httpConfig.oauth2->tokenUrlOverride;
+    }
+
+    SecurityRequirement req;
+    req.scheme = scheme;
+    req.scopes = httpConfig.oauth2->scopesOverride;  // Use configured scopes
+
+    // Create auth context with a copy of httpConfig that will be modified by the handler
+    httpcl::Config resultConfig = httpConfig;
+    httpcl::Settings settings;
+    AuthContext ctx{httpClient, specUrl, settings, resultConfig};
+
+    // Try to satisfy the requirement (this will acquire the token)
+    OAuth2ClientCredentialsHandler handler;
+    std::string mismatchReason;
+    if (!handler.satisfy(req, ctx, mismatchReason)) {
+        httpcl::log().warn("[OAuth2] Failed to acquire token for spec fetch: {}", mismatchReason);
+        return std::nullopt;
+    }
+
+    // Extract the token from the Authorization header
+    auto authHeader = resultConfig.headers.find("Authorization");
+    if (authHeader == resultConfig.headers.end()) {
+        httpcl::log().warn("[OAuth2] Token acquired but Authorization header not set");
+        return std::nullopt;
+    }
+
+    // Extract token from "Bearer <token>" format
+    const std::string& headerValue = authHeader->second;
+    if (headerValue.size() > 7 && headerValue.substr(0, 7) == "Bearer ") {
+        std::string token = headerValue.substr(7);
+        httpcl::log().debug("[OAuth2] Successfully acquired token for spec fetch");
+        return token;
+    }
+
+    httpcl::log().warn("[OAuth2] Authorization header present but not in Bearer format: {}", headerValue);
+    return std::nullopt;
 }
 
 }  // namespace zswagcl

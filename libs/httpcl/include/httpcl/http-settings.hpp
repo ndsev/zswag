@@ -54,6 +54,7 @@ struct Config
         std::string refreshUrlOverride; // optional
         std::string audience; // optional
         std::vector<std::string> scopesOverride; // optional
+        bool useForSpecFetch = true;  // Use OAuth2 token when fetching OpenAPI spec (default: true)
 
         /**
          * Token endpoint authentication method.
