@@ -705,16 +705,186 @@ http-settings:
       key: value
     api-key: value  # API Key as required by OpenAPI config - see description below.
     oauth2:
-      clientId: my-client-id                               # For OAuth2 client-credentials auth
-      clientSecretKeychain: keychain-service-string        # Prefer a keychain entry over cleartext
-      clientSecret: cleartext-secret                       # discouraged, use keychain
-      tokenUrl: https://issuer.example.com/oauth/token     # optional override; defaults to tokenUrl from OpenAPI
-      refreshUrl: https://issuer.example.com/oauth/token   # optional override; defaults to refreshUrl from OpenAPI, then tokenUrl
-      audience: https://api.example.com/  # Optional (some providers require it)
-      scope: ["orders.read", ...]  # Optional scope override; defaults to OpenAPI setting per operation
+      # REQUIRED fields
+      clientId: my-client-id                               # REQUIRED: OAuth2 client identifier
+
+      # REQUIRED if useForSpecFetch=true (default), OPTIONAL otherwise
+      tokenUrl: https://issuer.example.com/oauth/token     # Token endpoint URL (see precedence rules below)
+
+      # Client secret (choose one method)
+      clientSecretKeychain: keychain-service-string        # RECOMMENDED: Load secret from OS keychain
+      clientSecret: cleartext-secret                       # DISCOURAGED: Cleartext secret (use keychain instead)
+
+      # OPTIONAL fields (with defaults/precedence)
+      refreshUrl: https://issuer.example.com/oauth/token   # Optional override; defaults to refreshUrl from OpenAPI, then tokenUrl
+      audience: https://api.example.com/                   # Optional: audience parameter (required by some providers)
+      scope: ["orders.read", ...]                          # Optional: scope override; defaults to OpenAPI spec's per-operation scopes
+      useForSpecFetch: true                                # Optional: acquire token before fetching OpenAPI spec (default: true)
+      tokenEndpointAuth:                                   # Optional: token endpoint authentication method
+        method: rfc6749-client-secret-basic                # Options: rfc6749-client-secret-basic (default), rfc5849-oauth1-signature
+        nonceLength: 16                                    # For rfc5849-oauth1-signature: nonce length (8-64, default: 16)
 ```
 
 **Note:** For `proxy` configs, the credentials are optional.
+
+#### OAuth2 Configuration: Required vs Optional Fields
+
+**Important:** Zswag only supports the **OAuth2 `clientCredentials` flow**. Other flows (`authorizationCode`, `implicit`, `password`) are not supported.
+
+**Field Requirements:**
+
+| Field | Required? | Notes |
+|-------|-----------|-------|
+| `clientId` | ✅ Always | OAuth2 client identifier |
+| `tokenUrl` | ⚠️ Conditional | **REQUIRED** when `useForSpecFetch: true` (default)<br>**OPTIONAL** when `useForSpecFetch: false` (defaults to OpenAPI spec) |
+| `clientSecret` / `clientSecretKeychain` | ⚠️ Conditional | **REQUIRED** for confidential clients<br>**OPTIONAL** for public clients (if omitted, client_id is sent in request body) |
+| `refreshUrl` | ❌ Optional | Defaults to `refreshUrl` from OpenAPI spec, then `tokenUrl` |
+| `scope` | ❌ Optional | Defaults to scopes from OpenAPI spec's per-operation `security` requirements |
+| `audience` | ❌ Optional | Only required by some OAuth2 providers |
+| `useForSpecFetch` | ❌ Optional | Default: `true` (acquire token before fetching OpenAPI spec) |
+| `tokenEndpointAuth` | ❌ Optional | Default: `rfc6749-client-secret-basic` |
+
+**Precedence Rules (http-settings.yaml vs OpenAPI spec):**
+
+When both http-settings.yaml and the OpenAPI specification provide values, the following precedence applies:
+
+1. **`tokenUrl`**: http-settings.yaml `tokenUrl` **overrides** OpenAPI spec's `flows.clientCredentials.tokenUrl`
+2. **`refreshUrl`**: http-settings.yaml `refreshUrl` **overrides** OpenAPI spec's `flows.clientCredentials.refreshUrl`
+3. **`scope`**: http-settings.yaml `scope` **overrides** OpenAPI spec's per-operation `security` scopes
+
+**Common Scenarios:**
+
+| Scenario | `useForSpecFetch` | `tokenUrl` in http-settings | `tokenUrl` in OpenAPI spec | Result |
+|----------|-------------------|----------------------------|---------------------------|--------|
+| **Protected OpenAPI spec** | `true` (default) | ✅ Required | Used as fallback | http-settings value used |
+| **Public OpenAPI spec** | `false` | ❌ Optional | ✅ Required in spec | OpenAPI spec value used |
+| **Override spec settings** | `true` or `false` | ✅ Provided | Any | http-settings value **always wins** |
+
+#### OAuth2 Token Endpoint Authentication Methods
+
+The `tokenEndpointAuth` field controls how the client authenticates when requesting OAuth2 tokens. Two methods are supported:
+
+**`rfc6749-client-secret-basic` (default):** HTTP Basic Authentication (RFC 6749 Section 2.3.1)
+- Both `clientId` and `clientSecret` are sent in the `Authorization: Basic` header
+- Works with most OAuth2 providers
+
+**`rfc5849-oauth1-signature`:** OAuth 1.0 HMAC-SHA256 request signing (RFC 5849)
+- `clientId` is sent as `oauth_consumer_key` in both header and body
+- `clientSecret` is used only for HMAC-SHA256 signature computation (never transmitted)
+- Required by some providers that use OAuth 1.0 signature-based token authentication
+- Provides enhanced security through cryptographic request signing
+- **Note:** Only HMAC-SHA256 signature method is supported
+
+#### OAuth2-Authenticated OpenAPI Spec Fetching
+
+By default, when OAuth2 is configured, zswag will acquire an OAuth2 access token **before** fetching the OpenAPI specification. This solves the "chicken-and-egg" problem where the OpenAPI spec endpoint itself requires authentication.
+
+**How it works:**
+
+1. **With `useForSpecFetch: true` (default):**
+   - Client acquires OAuth2 token using configured authentication method
+   - Token is included as `Authorization: Bearer <token>` header when fetching OpenAPI spec
+   - OpenAPI spec fetch succeeds even if endpoint requires authentication
+   - Same token is cached and reused for subsequent API calls
+
+2. **With `useForSpecFetch: false`:**
+   - OpenAPI spec is fetched without OAuth2 token (plain HTTP GET)
+   - OAuth2 token acquisition is deferred until first API method call
+   - Use this when the OpenAPI spec endpoint is public (doesn't require authentication)
+
+**Configuration:**
+
+```yaml
+- scope: https://api.example.com/*
+  oauth2:
+    clientId: your-client-id
+    clientSecret: your-client-secret
+    tokenUrl: https://api.example.com/oauth/token
+    useForSpecFetch: true  # Default: true. Set to false if spec is public.
+```
+
+**When to use `useForSpecFetch: false`:**
+- OpenAPI spec endpoint is publicly accessible
+- Avoids unnecessary token acquisition if only the spec is needed
+- Improves performance by deferring OAuth2 flow until first API call
+
+**When to keep `useForSpecFetch: true` (default):**
+- OpenAPI spec endpoint requires authentication
+- Service returns 401/403 when fetching spec without credentials
+- Most secure option (ensures token is available from the start)
+
+**Debugging OAuth2 Issues:**
+
+To troubleshoot OAuth2 authentication problems, enable detailed logging:
+
+```bash
+export HTTP_LOG_LEVEL=debug   # Shows OAuth2 flow (token acquisition, cache hits/misses)
+export HTTP_LOG_LEVEL=trace   # Shows additional details (request/response bodies, signatures)
+```
+
+The logs will show:
+- Token endpoint authentication method being used
+- Token request/response status
+- Token cache hit/miss/expired events
+- OAuth2 configuration status for OpenAPI spec fetch
+- Whether OAuth2 token is being used for spec fetch
+
+#### Testing OAuth 1.0 Signature with Your Service
+
+To verify OAuth 1.0 signature authentication with your service:
+
+**1. Install zswag:**
+
+For official releases:
+```bash
+pip install zswag
+```
+
+For custom builds or development snapshots:
+```bash
+pip install /path/to/pyzswagcl-*.whl /path/to/zswag-*.whl
+```
+
+**2. Create `http-settings.yaml`** with your service details:
+```yaml
+- scope: https://your-api.example.com/*
+  oauth2:
+    clientId: your-client-id
+    clientSecret: your-client-secret
+    tokenUrl: https://your-api.example.com/oauth/token
+    tokenEndpointAuth:
+      method: rfc5849-oauth1-signature
+      nonceLength: 16
+```
+
+**3. Create a test script** (`test_oauth1.py`):
+```python
+import os
+from zswag import OAClient
+
+# Point to your http-settings file
+os.environ['HTTP_SETTINGS_FILE'] = '/path/to/http-settings.yaml'
+
+# Create client with your OpenAPI spec
+client = OAClient("https://your-api.example.com/openapi.json")
+
+# Import your generated zserio service
+import your_service.api as api
+
+# Create service client and make a test call
+service = api.YourService.Client(client)
+request = api.YourRequest(...)
+response = service.your_method(request)
+
+print(f"Success! Response: {response}")
+```
+
+**4. Run the test:**
+```bash
+python test_oauth1.py
+```
+
+**Verification:** Check your server logs to confirm OAuth 1.0 HMAC-SHA256 signatures are being validated correctly and the token endpoint receives properly signed requests.
 
 The **`api-key`** setting will be applied under the correct
 cookie/header/query parameter, if the service
@@ -935,6 +1105,58 @@ of a service, OpenAPI allows for `securitySchemes` and `security` fields in the 
 Please refer to the relevant parts of the [OpenAPI 3 specification](https://swagger.io/docs/specification/authentication/) for some
 examples on how to integrate these fields into your spec.
 
+#### When Security Schemes Are Applied
+
+**Important:** Security schemes (including OAuth2) are **only applied when explicitly declared** in the OpenAPI specification. Zswag clients respect the security requirements defined in the spec according to the [OpenAPI 3.0 Security Requirement specification](https://spec.openapis.org/oas/v3.0.3#security-requirement-object).
+
+**Security Configuration Levels:**
+
+1. **Global Security** - Applied to all endpoints by default (root-level `security` field):
+   ```yaml
+   components:
+     securitySchemes:
+       HeaderAuth:
+         type: apiKey
+         in: header
+         name: X-Generic-Token
+
+   security:
+     - HeaderAuth: []  # Applied to all endpoints by default
+
+   paths:
+     /methodWithGlobalAuth:
+       get:
+         # Uses global HeaderAuth
+   ```
+
+2. **Per-Endpoint Security** - Override global security for specific operations:
+   ```yaml
+   paths:
+     /protected:
+       post:
+         security:
+           - oauth2: [read, write]  # Overrides global security
+     /admin:
+       post:
+         security:
+           - oauth2: [admin]  # Different scopes for admin endpoint
+   ```
+
+3. **No Authentication** - Explicitly disable security for public endpoints:
+   ```yaml
+   paths:
+     /public:
+       get:
+         security: []  # Explicitly no authentication required (overrides global)
+   ```
+
+**Precedence Rule:** Per-operation `security` settings **override** global `security` settings. If an operation specifies its own security requirements (including `security: []`), the global security configuration is ignored for that operation.
+
+**Complete Working Examples:**
+
+- **OAuth2 with per-endpoint security**: See [`libs/zswagcl/test/testdata/oauth2-openapi.yaml`](libs/zswagcl/test/testdata/oauth2-openapi.yaml) which demonstrates different OAuth2 scopes per endpoint and public endpoints without authentication.
+- **Global security with overrides**: See [`libs/zswag/test/calc/api.yaml`](libs/zswag/test/calc/api.yaml) which shows global `HeaderAuth` security with per-endpoint overrides and explicit no-auth declarations.
+
 Zswag currently understands the following authentication schemes:
 
 * **HTTP Basic Authorization:** If a called endpoint requires HTTP basic auth,
@@ -952,6 +1174,12 @@ Zswag currently understands the following authentication schemes:
 * **API-Key Header:** If a called endpoint requires an API-Key Header,
   zswag will either apply the `api-key` setting, or verify that the
   HTTP config contains a header key-value pair with the required name, *case-sensitive*.
+* **OAuth2 Client Credentials:** If a called endpoint requires OAuth2 authentication,
+  zswag will **automatically acquire, cache, and refresh** access tokens from the configured
+  OAuth2 token endpoint. The client handles the entire OAuth2 client credentials flow
+  transparently, including token expiry and refresh. **Note:** Only the `clientCredentials`
+  flow is supported. See the [OAuth2 configuration section](#persistent-http-headers-proxy-cookie-and-authentication)
+  for detailed setup instructions.
 
 **Note**: If you don't want to pass your Basic-Auth/Bearer/Query/Cookie/Header
 credential through your [persistent config](#persistent-http-headers-proxy-cookie-and-authentication),

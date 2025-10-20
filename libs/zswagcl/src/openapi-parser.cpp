@@ -1,4 +1,5 @@
 #include "private/openapi-parser.hpp"
+#include "private/openapi-oauth.hpp"
 
 #include "httpcl/http-settings.hpp"
 #include "httpcl/uri.hpp"
@@ -481,6 +482,20 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
     // Add persistent configuration
     httpcl::log().debug("{} Applying HTTP settings ...", debugContext);
     httpConfig |= httpcl::Settings()[url];
+
+    // NEW: Log OAuth2 configuration status
+    if (httpConfig.oauth2) {
+        httpcl::log().trace("{} OAuth2 config present (clientId={})",
+            debugContext, httpConfig.oauth2->clientId);
+    } else {
+        httpcl::log().trace("{} No OAuth2 config for this URL", debugContext);
+    }
+
+    // NEW: Acquire OAuth2 token for spec fetch if configured
+    if (auto token = acquireOAuth2TokenForSpecFetch(client, httpConfig, url)) {
+        httpcl::log().debug("{} Using OAuth2 Bearer token for OpenAPI spec fetch", debugContext);
+        httpConfig.headers.insert({"Authorization", "Bearer " + *token});
+    }
 
     // Load client config content.
     httpcl::log().debug("{} Parsing URL ...", debugContext);

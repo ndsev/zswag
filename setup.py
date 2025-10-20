@@ -36,12 +36,14 @@ setuptools.setup(
     long_description_content_type="text/markdown",
 
     package_dir={'': 'libs'},
-    packages=['zswag', 'zswag.test.calc'],
+    packages=['zswag', 'zswag.test.calc', 'zswag.test.oauth2_mock'],
     include_package_data=True,
     package_data={
         "zswag": [
             "test/calc/api.yaml",
-            "test/calc/calculator.zs"
+            "test/calc/calculator.zs",
+            "test/oauth2_mock/oauth_test.yaml",
+            "test/oauth2_mock/oauth_test.zs"
         ]
     },
 
