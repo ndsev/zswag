@@ -1,0 +1,125 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    container: ghcr.io/klebert-engineering/manylinux-cpp17-py3.11-x86_64:2025.1
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install coverage tools
+        run: |
+          yum install -y lcov
+          pip install gcovr
+
+      - name: Configure with coverage enabled
+        run: |
+          python3 -m venv venv && . ./venv/bin/activate
+          pip install -U setuptools wheel pip
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+                -DZSWAG_ENABLE_TESTING=ON \
+                -DZSWAG_ENABLE_COVERAGE=ON \
+                -DZSWAG_BUILD_WHEELS=OFF \
+                -DZSWAG_KEYCHAIN_SUPPORT=OFF ..
+
+      - name: Build
+        working-directory: build
+        run: |
+          . ../venv/bin/activate
+          cmake --build .
+
+      - name: Test
+        working-directory: build
+        run: |
+          . ../venv/bin/activate
+          ctest -C Debug --verbose --no-tests=error
+
+      - name: Generate Coverage Report
+        working-directory: build
+        run: |
+          # Generate coverage report with lcov
+          lcov --capture \
+            --directory . \
+            --output-file coverage.info \
+            --rc lcov_branch_coverage=1
+
+          # Extract only the library source files we want to track
+          lcov --extract coverage.info \
+            '*/libs/httpcl/src/*' '*/libs/httpcl/include/*' \
+            '*/libs/zswagcl/src/*' '*/libs/zswagcl/include/*' \
+            --output-file coverage_temp.info \
+            --rc lcov_branch_coverage=1
+
+          # Strip the workspace prefix to make paths relative
+          # GitHub Actions uses /__w/ as the actual working directory path
+          sed 's|/__w/zswag/zswag/||g' coverage_temp.info > coverage_cleaned.info
+
+          # Show coverage summary
+          lcov --list coverage_cleaned.info
+
+      - name: Generate SonarQube Coverage XML
+        run: |
+          # Generate SonarQube XML format using gcovr from project root
+          # This ensures paths match what SonarCloud expects
+          gcovr --sonarqube build/coverage.xml \
+            --filter 'libs/httpcl/src/.*' \
+            --filter 'libs/httpcl/include/.*' \
+            --filter 'libs/zswagcl/src/.*' \
+            --filter 'libs/zswagcl/include/.*'
+
+          # Debug: Show sample paths from coverage XML
+          echo "=== Sample paths from coverage.xml (first 10) ==="
+          grep '<file ' build/coverage.xml | head -10
+
+      - name: Cleanup Coverage Data
+        working-directory: build
+        run: |
+          # Remove raw coverage data to prevent codecov-cli from re-processing
+          find . -name '*.gcda' -delete
+          find . -name '*.gcno' -delete
+          echo "Cleaned up .gcda and .gcno files to prevent duplicate processing"
+
+      - name: Upload Coverage to Codecov
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          # Use Python-based codecov-cli to avoid GLIBC issues in manylinux
+          . ./venv/bin/activate
+          pip install codecov-cli
+
+          # Verify paths in coverage file are relative
+          echo "=== Coverage file paths (first 20) ==="
+          grep "^SF:" build/coverage_cleaned.info | head -20
+
+          # Upload from repo root to prevent codecov-cli from finding .gcno files
+          codecovcli upload-process \
+            --fail-on-error \
+            --file build/coverage_cleaned.info \
+            --disable-search \
+            --network-root-folder ${{ github.workspace }} \
+            --flag unittests \
+            --name codecov-cpp \
+            --git-service github
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.coverageReportPaths=build/coverage.xml
