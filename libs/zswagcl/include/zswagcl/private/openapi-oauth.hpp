@@ -57,4 +57,13 @@ private:
         const std::string& refreshToken = "");
 };
 
+/**
+ * Acquire OAuth2 token for OpenAPI spec fetching if configured.
+ * Returns the token string if successful, empty optional otherwise.
+ */
+std::optional<std::string> acquireOAuth2TokenForSpecFetch(
+    httpcl::IHttpClient& httpClient,
+    httpcl::Config& httpConfig,
+    const std::string& specUrl);
+
 }  // namespace zswagcl

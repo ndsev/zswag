@@ -1,0 +1,63 @@
+# NOTE: This file was initially generated using:
+#   python -m zswag.gen -s oauth_test.OAuthTestService -i oauth_test.zs -o oauth_test.yaml
+#
+# MANUALLY MODIFIED to add:
+#   - components.securitySchemes.oauth2 with x-bearerInfoFunc
+#   - security requirements on /getData endpoint
+#   - Improved titles and descriptions
+#
+# This demonstrates how generated OpenAPI specs can be enhanced with OAuth2 security.
+
+info:
+  contact:
+    email: support@example.com
+  description: OAuth2 Test Service for testing OAuth 1.0 signature and HTTP Basic Auth
+  license:
+    name: MIT
+  title: OAuth2 Test Service
+  version: 1.0.0
+openapi: 3.0.0
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: /oauth2/token
+          scopes:
+            read: Read access
+            write: Write access
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      x-bearerInfoFunc: zswag.test.oauth2_mock.server.validate_bearer_token
+
+paths:
+  /getData:
+    post:
+      description: Get protected data - requires OAuth2 Bearer token with 'read' scope
+      operationId: getData
+      summary: Get protected data
+      security:
+        - oauth2: [read]
+        - bearer: []
+      parameters: []
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+        description: Zserio-serialized DataRequest
+      responses:
+        '200':
+          content:
+            application/x-zserio-object:
+              schema:
+                format: binary
+                type: string
+          description: Success - returns zserio-serialized DataResponse
+        '401':
+          description: Unauthorized - invalid or missing Bearer token
+servers: []
