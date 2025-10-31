@@ -2,7 +2,10 @@ project(httpcl-test)
 
 add_executable(httpcl-test
   src/main.cpp
-  src/uri.cpp)
+  src/uri.cpp
+  src/http-client.cpp
+  src/http-settings.cpp
+  src/log.cpp)
 
 target_link_libraries(httpcl-test
   PUBLIC

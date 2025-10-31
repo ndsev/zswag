@@ -339,3 +339,369 @@ TEST_CASE("openapi query parameters", "[zswagcl::open-api-format-helper]") {
 
     }
 }
+
+TEST_CASE("openapi parameter bodyStr", "[zswagcl::open-api-format-helper]") {
+    SECTION("String value returns string") {
+        auto param = makeParameter("body", PStyle::Form, false);
+        ParameterValueHelper helper(param);
+
+        auto paramValue = helper.value("test content");
+        REQUIRE(paramValue.bodyStr() == "test content");
+    }
+
+    SECTION("Vector value throws exception") {
+        auto param = makeParameter("body", PStyle::Form, false);
+        ParameterValueHelper helper(param);
+
+        auto paramValue = helper.array(std::vector<int>{1, 2, 3});
+        REQUIRE_THROWS_AS(paramValue.bodyStr(), std::runtime_error);
+        REQUIRE_THROWS_WITH(paramValue.bodyStr(), "Expected parameter-value of type string, got vector");
+    }
+
+    SECTION("Map value throws exception") {
+        auto param = makeParameter("body", PStyle::Form, false);
+        ParameterValueHelper helper(param);
+
+        auto paramValue = helper.object(object);
+        REQUIRE_THROWS_AS(paramValue.bodyStr(), std::runtime_error);
+        REQUIRE_THROWS_WITH(paramValue.bodyStr(), "Expected parameter-value of type string, got dictionary");
+    }
+
+    SECTION("Binary value returns string") {
+        auto param = makeParameter("body", PStyle::Form, false, Format::Binary);
+        ParameterValueHelper helper(param);
+
+        auto paramValue = helper.binary(std::vector<uint8_t>{0x48, 0x65, 0x6C, 0x6C, 0x6F}); // "Hello"
+        REQUIRE(paramValue.bodyStr() == "Hello");
+    }
+}
+
+TEST_CASE("openapi parameter helper - negative integers", "[zswagcl::open-api-format-helper]") {
+    SECTION("Negative integer with Hex format") {
+        auto param = makeParameter("id", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(-42).pathStr(param);
+        REQUIRE(r == "-2a");
+    }
+
+    SECTION("Negative integer in array with Hex format") {
+        auto param = makeParameter("id", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.array(std::vector<int>{-10, -20, -30}).pathStr(param);
+        REQUIRE(r == "-a,-14,-1e");
+    }
+}
+
+TEST_CASE("openapi parameter helper - floating point", "[zswagcl::open-api-format-helper]") {
+    SECTION("Float with String format") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::String);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(3.14f).pathStr(param);
+        REQUIRE(r == "3.140000");
+    }
+
+    SECTION("Double with String format") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::String);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(2.71828).pathStr(param);
+        REQUIRE(r.substr(0, 7) == "2.71828");
+    }
+
+    SECTION("Float array with String format") {
+        auto param = makeParameter("values", PStyle::Simple, false, Format::String);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.array(std::vector<double>{1.1, 2.2, 3.3}).pathStr(param);
+        REQUIRE(r == "1.100000,2.200000,3.300000");
+    }
+
+    SECTION("Float with Binary format") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::Binary);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(1.0).pathStr(param);
+        REQUIRE(r.size() == sizeof(double));
+    }
+}
+
+TEST_CASE("openapi parameter helper - Base64 encoding", "[zswagcl::open-api-format-helper]") {
+    SECTION("Binary with Base64 format") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Base64);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.binary(std::vector<uint8_t>{0x48, 0x65, 0x6C, 0x6C, 0x6F}).pathStr(param);
+        REQUIRE(r == "SGVsbG8=");
+    }
+
+    SECTION("String with Base64 format") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Base64);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value("Test").pathStr(param);
+        REQUIRE(r == "VGVzdA==");
+    }
+
+    SECTION("Integer with Base64 format") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Base64);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(42).pathStr(param);
+        REQUIRE_FALSE(r.empty());
+    }
+}
+
+TEST_CASE("openapi parameter helper - zserio::Span binary", "[zswagcl::open-api-format-helper]") {
+    SECTION("Binary from zserio::Span") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        std::vector<uint8_t> data{0xAB, 0xCD, 0xEF};
+        zserio::Span<const uint8_t> span(data.data(), data.size());
+
+        auto r = helper.binary(span).pathStr(param);
+        REQUIRE(r == "abcdef");
+    }
+
+    SECTION("Binary from zserio::Span with Base64") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Base64);
+        ParameterValueHelper helper(param);
+
+        std::vector<uint8_t> data{0x01, 0x02, 0x03};
+        zserio::Span<const uint8_t> span(data.data(), data.size());
+
+        auto r = helper.binary(span).pathStr(param);
+        REQUIRE(r == "AQID");
+    }
+}
+
+TEST_CASE("openapi parameter helper - Any variant", "[zswagcl::open-api-format-helper]") {
+    SECTION("Any with int64_t") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::String);
+        Any anyValue = std::int64_t(12345);
+
+        auto result = impl::FormatHelper<Any>::format(Format::String, anyValue);
+        REQUIRE(result == "12345");
+    }
+
+    SECTION("Any with uint64_t") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::String);
+        Any anyValue = std::uint64_t(67890);
+
+        auto result = impl::FormatHelper<Any>::format(Format::String, anyValue);
+        REQUIRE(result == "67890");
+    }
+
+    SECTION("Any with double") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::String);
+        Any anyValue = 3.14159;
+
+        auto result = impl::FormatHelper<Any>::format(Format::String, anyValue);
+        REQUIRE(result.substr(0, 6) == "3.1415");
+    }
+
+    SECTION("Any with string") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::String);
+        Any anyValue = std::string("hello");
+
+        auto result = impl::FormatHelper<Any>::format(Format::String, anyValue);
+        REQUIRE(result == "hello");
+    }
+
+    SECTION("Any with hex format") {
+        Any anyValue = std::int64_t(255);
+
+        auto result = impl::FormatHelper<Any>::format(Format::Hex, anyValue);
+        REQUIRE(result == "ff");
+    }
+}
+
+TEST_CASE("openapi parameter helper - const char*", "[zswagcl::open-api-format-helper]") {
+    SECTION("const char* with String format") {
+        auto result = impl::FormatHelper<const char*>::format(Format::String, "test");
+        REQUIRE(result == "test");
+    }
+
+    SECTION("const char* with Binary format") {
+        auto result = impl::FormatHelper<const char*>::format(Format::Binary, "data");
+        REQUIRE(result == "data");
+    }
+
+    SECTION("const char* with Hex format") {
+        auto result = impl::FormatHelper<const char*>::format(Format::Hex, "AB");
+        REQUIRE(result == "4142");
+    }
+}
+
+TEST_CASE("openapi parameter helper - edge cases", "[zswagcl::open-api-format-helper]") {
+    SECTION("Empty string") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::String);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value("").pathStr(param);
+        REQUIRE(r == "");
+    }
+
+    SECTION("Empty binary") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.binary(std::vector<uint8_t>{}).pathStr(param);
+        REQUIRE(r == "");
+    }
+
+    SECTION("Zero value with Hex") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(0).pathStr(param);
+        REQUIRE(r == "0");
+    }
+
+    SECTION("Large unsigned value with Hex") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(std::uint64_t(0xDEADBEEFCAFEBABE)).pathStr(param);
+        REQUIRE(r == "deadbeefcafebabe");
+    }
+}
+
+TEST_CASE("openapi parameter helper - htobe and binary formats", "[zswagcl::open-api-format-helper]") {
+    SECTION("Integer with Binary format triggers htobe") {
+        auto param = makeParameter("value", PStyle::Simple, false, Format::Binary);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.value(0x12345678).pathStr(param);
+        REQUIRE(r.size() == sizeof(int));
+        // Verify it's in big-endian format
+    }
+
+    SECTION("int8 with Binary format") {
+        auto r = impl::FormatHelper<int8_t>::format(Format::Binary, int8_t(42));
+        REQUIRE(r.size() == 1);
+        REQUIRE(r[0] == 42);
+    }
+
+    SECTION("int16 with Binary format") {
+        auto r = impl::FormatHelper<int16_t>::format(Format::Binary, int16_t(0x1234));
+        REQUIRE(r.size() == 2);
+    }
+
+    SECTION("int32 with Binary format") {
+        auto r = impl::FormatHelper<int32_t>::format(Format::Binary, int32_t(0x12345678));
+        REQUIRE(r.size() == 4);
+    }
+
+    SECTION("int64 with Binary format") {
+        auto r = impl::FormatHelper<int64_t>::format(Format::Binary, int64_t(0x123456789ABCDEF0));
+        REQUIRE(r.size() == 8);
+    }
+
+    SECTION("uint8 with Binary format") {
+        auto r = impl::FormatHelper<uint8_t>::format(Format::Binary, uint8_t(255));
+        REQUIRE(r.size() == 1);
+    }
+
+    SECTION("uint16 with Binary format") {
+        auto r = impl::FormatHelper<uint16_t>::format(Format::Binary, uint16_t(0xABCD));
+        REQUIRE(r.size() == 2);
+    }
+
+    SECTION("uint32 with Binary format") {
+        auto r = impl::FormatHelper<uint32_t>::format(Format::Binary, uint32_t(0xDEADBEEF));
+        REQUIRE(r.size() == 4);
+    }
+
+    SECTION("uint64 with Binary format") {
+        auto r = impl::FormatHelper<uint64_t>::format(Format::Binary, uint64_t(0xCAFEBABEDEADBEEF));
+        REQUIRE(r.size() == 8);
+    }
+}
+
+TEST_CASE("openapi parameter helper - vector<uint8_t> formatting", "[zswagcl::open-api-format-helper]") {
+    SECTION("vector<uint8_t> with Hex format") {
+        std::vector<uint8_t> data = {0xDE, 0xAD, 0xBE, 0xEF};
+        auto r = impl::FormatHelper<std::vector<uint8_t>>::format(Format::Hex, data);
+        REQUIRE(r == "deadbeef");
+    }
+
+    SECTION("vector<uint8_t> with Base64 format") {
+        std::vector<uint8_t> data = {0x48, 0x65, 0x6C, 0x6C, 0x6F};
+        auto r = impl::FormatHelper<std::vector<uint8_t>>::format(Format::Base64, data);
+        REQUIRE(r == "SGVsbG8=");
+    }
+
+    SECTION("vector<uint8_t> with Base64url format") {
+        std::vector<uint8_t> data = {0x01, 0x02, 0x03};
+        auto r = impl::FormatHelper<std::vector<uint8_t>>::format(Format::Base64url, data);
+        REQUIRE(r == "AQID");
+    }
+
+    SECTION("vector<uint8_t> with String format") {
+        std::vector<uint8_t> data = {0x41, 0x42, 0x43}; // "ABC"
+        auto r = impl::FormatHelper<std::vector<uint8_t>>::format(Format::String, data);
+        REQUIRE(r == "ABC");
+    }
+
+    SECTION("vector<uint8_t> with Binary format") {
+        std::vector<uint8_t> data = {0xAA, 0xBB, 0xCC};
+        auto r = impl::FormatHelper<std::vector<uint8_t>>::format(Format::Binary, data);
+        REQUIRE(r.size() == 3);
+    }
+}
+
+TEST_CASE("openapi parameter helper - floating point binary format", "[zswagcl::open-api-format-helper]") {
+    SECTION("float with Binary format") {
+        auto r = impl::FormatHelper<float>::format(Format::Binary, 3.14f);
+        REQUIRE(r.size() == sizeof(float));
+    }
+
+    SECTION("double with Binary format") {
+        auto r = impl::FormatHelper<double>::format(Format::Binary, 2.71828);
+        REQUIRE(r.size() == sizeof(double));
+    }
+
+    SECTION("float with Base64 format") {
+        auto r = impl::FormatHelper<float>::format(Format::Base64, 1.0f);
+        REQUIRE_FALSE(r.empty());
+    }
+
+    SECTION("double with Base64url format") {
+        auto r = impl::FormatHelper<double>::format(Format::Base64url, 1.0);
+        REQUIRE_FALSE(r.empty());
+    }
+}
+
+TEST_CASE("openapi parameter helper - binary method overloads", "[zswagcl::open-api-format-helper]") {
+    SECTION("binary with rvalue vector") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        auto r = helper.binary(std::vector<uint8_t>{0xCA, 0xFE}).pathStr(param);
+        REQUIRE(r == "cafe");
+    }
+
+    SECTION("binary with const vector reference") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Hex);
+        ParameterValueHelper helper(param);
+
+        const std::vector<uint8_t> data = {0xBE, 0xEF};
+        auto r = helper.binary(data).pathStr(param);
+        REQUIRE(r == "beef");
+    }
+
+    SECTION("binary with zserio::Span") {
+        auto param = makeParameter("data", PStyle::Simple, false, Format::Base64url);
+        ParameterValueHelper helper(param);
+
+        std::vector<uint8_t> data = {0x01, 0x02, 0x03, 0x04};
+        zserio::Span<const uint8_t> span(data.data(), data.size());
+
+        auto r = helper.binary(span).pathStr(param);
+        REQUIRE(r == "AQIDBA==");
+    }
+}
