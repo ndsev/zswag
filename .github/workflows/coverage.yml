@@ -71,46 +71,6 @@ jobs:
           # Show coverage summary
           lcov --list coverage_cleaned.info
 
-      - name: Coverage PR Comment
-        if: github.event_name == 'pull_request'
-        uses: zgosalvez/github-actions-report-lcov@v5.0.1
-        with:
-          coverage-files: ./build/coverage_cleaned.info
-          minimum-coverage: 65
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          update-comment: true
-          working-directory: ${{ github.workspace }}
-
-      - name: Generate HTML Coverage Report
-        run: |
-          # Generate browsable HTML report from repo root where source files are
-          genhtml build/coverage_cleaned.info \
-            --output-directory build/coverage-html \
-            --title "zswag Code Coverage" \
-            --legend \
-            --show-details \
-            --branch-coverage \
-            --prefix ${{ github.workspace }}
-
-          echo "📊 HTML coverage report generated in build/coverage-html/"
-
-      - name: Upload HTML Coverage Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html-report
-          path: build/coverage-html/
-          retention-days: 30
-
-      - name: Add Coverage to Job Summary
-        run: |
-          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          lcov --summary build/coverage_cleaned.info 2>&1 | tail -n 6 >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📥 [Download full HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-
       - name: Generate SonarQube Coverage XML
         run: |
           # Generate SonarQube XML format using gcovr from project root
@@ -163,3 +123,43 @@ jobs:
         with:
           args: >
             -Dsonar.coverageReportPaths=build/coverage.xml
+
+      - name: Generate HTML Coverage Report
+        run: |
+          # Generate browsable HTML report from repo root where source files are
+          genhtml build/coverage_cleaned.info \
+            --output-directory build/coverage-html \
+            --title "zswag Code Coverage" \
+            --legend \
+            --show-details \
+            --branch-coverage \
+            --prefix ${{ github.workspace }}
+
+          echo "📊 HTML coverage report generated in build/coverage-html/"
+
+      - name: Upload HTML Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-report
+          path: build/coverage-html/
+          retention-days: 30
+
+      - name: Add Coverage to Job Summary
+        run: |
+          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          lcov --summary build/coverage_cleaned.info 2>&1 | tail -n 6 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📥 [Download full HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: Coverage PR Comment (Blocking Check)
+        if: github.event_name == 'pull_request'
+        uses: zgosalvez/github-actions-report-lcov@v5.0.1
+        with:
+          coverage-files: ./build/coverage_cleaned.info
+          minimum-coverage: 65
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          update-comment: true
+          working-directory: ${{ github.workspace }}
