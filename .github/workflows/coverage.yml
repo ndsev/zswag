@@ -73,22 +73,24 @@ jobs:
 
       - name: Coverage PR Comment
         if: github.event_name == 'pull_request'
-        uses: romeovs/lcov-reporter-action@v0.3.1
+        uses: zgosalvez/github-actions-report-lcov@v5.0.1
         with:
-          lcov-file: ./build/coverage_cleaned.info
+          coverage-files: ./build/coverage_cleaned.info
+          minimum-coverage: 70
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          delete-old-comments: true
+          update-comment: true
+          working-directory: ${{ github.workspace }}
 
       - name: Generate HTML Coverage Report
-        working-directory: build
         run: |
-          # Generate browsable HTML report
-          genhtml coverage_cleaned.info \
-            --output-directory coverage-html \
+          # Generate browsable HTML report from repo root where source files are
+          genhtml build/coverage_cleaned.info \
+            --output-directory build/coverage-html \
             --title "zswag Code Coverage" \
             --legend \
             --show-details \
-            --branch-coverage
+            --branch-coverage \
+            --prefix ${{ github.workspace }}
 
           echo "📊 HTML coverage report generated in build/coverage-html/"
 
