@@ -170,6 +170,8 @@ cmake -DZSWAG_BUILD_WHEELS=ON -DZSWAG_ENABLE_TESTING=ON ..
 
 zswag includes comprehensive C++ test coverage analysis for the `httpcl` and `zswagcl` libraries. Coverage is automatically collected in CI and reported to [Codecov](https://codecov.io/gh/ndsev/zswag).
 
+**📊 [View HTML Coverage Report](https://ndsev.github.io/zswag/coverage/)** - Browsable coverage report hosted on GitHub Pages
+
 **Local Coverage Analysis**
 
 To generate coverage reports locally, you'll need:

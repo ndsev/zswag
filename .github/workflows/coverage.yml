@@ -144,6 +144,15 @@ jobs:
           path: build/coverage-html/
           retention-days: 30
 
+      - name: Deploy Coverage Report to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/coverage-html
+          destination_dir: coverage
+          keep_files: false
+
       - name: Add Coverage to Job Summary
         run: |
           echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
@@ -152,6 +161,11 @@ jobs:
           lcov --summary build/coverage_cleaned.info 2>&1 | tail -n 6 >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/master" ]; then
+            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+            echo "🌐 [View coverage report on GitHub Pages](https://${{ github.repository_owner }}.github.io/${REPO_NAME}/coverage/)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "📥 [Download full HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
 
       - name: Coverage PR Comment (Blocking Check)
