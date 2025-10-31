@@ -65,9 +65,8 @@ jobs:
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
-          pip install -U setuptools wheel pip
-          mkdir build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
+          pip install -U setuptools wheel pip delocate
+          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
       - name: Build
         working-directory: build
         run: |
@@ -82,6 +81,12 @@ jobs:
         run: |
           . ../venv/bin/activate
           ctest -C Release --verbose --no-tests=error
+      - name: Test OAuth Authentication
+        working-directory: build
+        run: |
+          . ../venv/bin/activate
+          pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+          python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
       - name: Deploy
         uses: actions/upload-artifact@v4
         with:
@@ -133,11 +138,11 @@ jobs:
               -DZSWAG_ENABLE_TESTING=ON \
               -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
         cmake --build .
-        mv bin/wheel bin/wheel-auditme  # Same as on Linux
-        mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
-        _deps/python-cmake-wheel-src/repair-wheel-macos.bash \
-              "$(pwd)"/bin/wheel-auditme/pyzswagcl*.whl \
-              "$(pwd)"/bin/wheel pyzswagcl
+        # No wheel repair needed with python-cmake-wheel commit b1d399e
+        mv bin/wheel bin/wheel-final
+        mkdir bin/wheel
+        mv bin/wheel-final/zswag*.whl bin/wheel/
+        mv bin/wheel-final/pyzswagcl*.whl bin/wheel/
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       working-directory: build
@@ -160,6 +165,14 @@ jobs:
       working-directory: build
       run: |
         ctest -C Release --verbose --no-tests=error
+    - name: Test OAuth Authentication
+      working-directory: build
+      shell: bash  # Use bash on all platforms for consistent wildcard expansion
+      env:
+        PYTHONIOENCODING: utf-8
+      run: |
+        pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+        python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
 
   deploy:
     needs: [determine-version, build-manylinux, build]
