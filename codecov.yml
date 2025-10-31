@@ -5,18 +5,21 @@ coverage:
         target: auto
         threshold: 1%
         informational: true
+        branches: null  # Ignore branch coverage, only consider line coverage
     patch:
       default:
         target: auto
         threshold: 1%
         informational: true
+        branches: null  # Ignore branch coverage, only consider line coverage
 
 comment:
   layout: "reach,diff,flags,files,footer"
-  behavior: default
-  require_changes: false
-  require_base: false
-  require_head: true
+  behavior: default  # Options: default, once, always, new, never
+  require_changes: false  # Post comment even if coverage doesn't change
+  require_base: false  # Don't require base branch coverage
+  require_head: true  # Require head commit coverage before posting
+  after_n_builds: 1  # Post comment after this many builds upload coverage
 
 github_checks:
   annotations: true
