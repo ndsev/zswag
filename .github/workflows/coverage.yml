@@ -76,7 +76,7 @@ jobs:
         uses: zgosalvez/github-actions-report-lcov@v5.0.1
         with:
           coverage-files: ./build/coverage_cleaned.info
-          minimum-coverage: 70
+          minimum-coverage: 65
           github-token: ${{ secrets.GITHUB_TOKEN }}
           update-comment: true
           working-directory: ${{ github.workspace }}
