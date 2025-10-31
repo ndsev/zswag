@@ -53,6 +53,12 @@ target_include_directories(zswagcl
     include/zswagcl
   PUBLIC
     include)
+
+# Enable coverage for zswagcl
+if(ZSWAG_ENABLE_COVERAGE)
+  target_enable_coverage(zswagcl)
+endif()
+
 if(ZSWAG_ENABLE_TESTING)
   add_subdirectory(test)
 endif()
