@@ -71,8 +71,3 @@ if (ZSWAG_BUILD_WHEELS)
       ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
   add_dependencies(wheel zswag-server-wheel)
 endif()
-
-
-
-
-

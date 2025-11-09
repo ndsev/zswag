@@ -90,9 +90,9 @@ if(ZSWAG_ENABLE_TESTING)
 endif()
 
 # zserio-cmake-helper
-set(ZSERIO_VERSION "2.16.1")
-CPMAddPackage("gh:Klebert-Engineering/zserio-cmake-helper@1.1.4")
-# Add zserio C++ runtime target
+set(ZSERIO_VERSION "2.17.0")
+set(ZSERIO_CPP17_VERSION "0.5.0")
+CPMAddPackage(URI "gh:Klebert-Engineering/zserio-cmake-helper#zserio-cpp17-support@2.17.0")
 if(NOT TARGET ZserioCppRuntime)
     add_zserio_cpp_runtime()
 endif()

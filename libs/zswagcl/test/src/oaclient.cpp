@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include "zswagcl/oaclient.hpp"
+#include "zserio/IService.h"
 #include "zserio/SerializeUtil.h"
 #include "service_client_test/Flat.h"
 #include "service_client_test/Request.h"
@@ -113,7 +114,7 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
         )json");
 
         auto service = OAClient(config, std::move(client));
-        auto response = service.callMethod("multi", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        auto response = service.callMethod("multi", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
 
         /* Check result */
         REQUIRE(getCalled);
@@ -171,7 +172,7 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
         )json");
 
         auto service = OAClient(config, std::move(client));
-        auto response = service.callMethod("q", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        auto response = service.callMethod("q", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
 
         /* Check result */
         REQUIRE(getCalled);
@@ -226,7 +227,7 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
             }
         )json");
         auto service = OAClient(config, std::move(client));
-        auto response = service.callMethod("post", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        auto response = service.callMethod("post", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
 
         /* Check result */
         REQUIRE(postCalled);
@@ -247,7 +248,7 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
         auto request = service_client_test::Request(
             "hello", 0, std::vector<std::string>{},
             service_client_test::Flat("", ""));
-        zserio::ReflectableServiceData requestData{request.reflectable()};
+        zserio::BasicIntrospectableServiceData requestData(std::move(request));
 
         /* Make config, client, service */
         auto config = makeConfig("", TESTDATA "/config-with-auth.json");

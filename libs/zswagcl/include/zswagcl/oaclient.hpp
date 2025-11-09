@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string_view>
 #include <zserio/IService.h>
 
 #include "private/openapi-client.hpp"
@@ -17,8 +18,8 @@ public:
         httpcl::Config httpConfig = {},
         uint32_t serverIndex = 0);
 
-    std::vector<uint8_t> callMethod(
-        zserio::StringView methodName,
+    zserio::Vector<uint8_t> callMethod(
+        std::string_view methodName,
         zserio::IServiceData const& requestData,
         void* context) override;
 
