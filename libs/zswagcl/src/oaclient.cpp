@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include "stx/format.h"
+#include "zserio/IIntrospectableView.h"
 #include "zserio/ITypeInfo.h"
 
 namespace zswagcl
@@ -24,7 +25,8 @@ ParameterValue reflectableArrayToParameterValue(std::function<void(std::vector<a
     return helper.array(values);
 }
 
-ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio::IReflectableConstPtr const& ref, zserio::ITypeInfo const& refType, ParameterValueHelper& helper)
+template <class ReflectableDataPtr>
+ParameterValue reflectableToParameterValue(std::string const& fieldName, ReflectableDataPtr const& ref, zserio::ITypeInfo const& refType, ParameterValueHelper& helper)
 {
     switch (refType.getCppType())
     {
@@ -99,15 +101,11 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
         case zserio::CppType::UNION: {
             if (ref->isArray()) {
                 return reflectableArrayToParameterValue<std::string>([&](auto& arr, auto i) {
-                    zserio::BitBuffer buffer(ref->at(i)->bitSizeOf());
-                    zserio::BitStreamWriter writer(buffer);
-                    ref->at(i)->write(writer);
+                    auto buffer = ref->at(i)->serialize();
                     arr.emplace_back(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize());
                 }, ref->size(), helper);
             }
-            zserio::BitBuffer buffer(ref->bitSizeOf());
-            zserio::BitStreamWriter writer(buffer);
-            ref->write(writer);
+            auto buffer = ref->serialize();
             return helper.binary(std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
         }
 
@@ -121,26 +119,25 @@ ParameterValue reflectableToParameterValue(std::string const& fieldName, zserio:
     throw std::runtime_error(stx::format("Failed to serialize field '{}' for HTTP transport.", fieldName));
 }
 
-std::vector<uint8_t> OAClient::callMethod(
-    zserio::StringView methodName,
+zserio::Vector<uint8_t> OAClient::callMethod(
+    std::string_view methodName,
     zserio::IServiceData const& requestData,
     void* context)
 {
-    if (!requestData.getReflectable()) {
-        throw std::runtime_error(stx::format("Cannot use OAClient: Make sure that zserio generator call has -withTypeInfoCode flag!"));
-    }
-    const auto strMethodName = std::string(methodName.begin(), methodName.end());
+    if (!requestData.getIntrospectable())
+        throw std::runtime_error("Cannot use OAClient: Make sure that zserio generator call has -withTypeInfoCode flag!");
 
+    const auto strMethodName = std::string(methodName.begin(), methodName.end());
     auto response = client_.call(strMethodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper) -> ParameterValue {
         if (field == ZSERIO_REQUEST_PART_WHOLE) {
-            zserio::BitBuffer buffer(requestData.getReflectable()->bitSizeOf());
-            zserio::BitStreamWriter writer(buffer);
-            requestData.getReflectable()->write(writer);
-            return helper.binary(std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
+            auto buffer = requestData.getIntrospectable()->serialize();
+            return helper.binary(requestData.getData());
         }
-        auto reflectableField = requestData.getReflectable()->find(field);
+
+        auto reflectableField = requestData.getIntrospectable()->find(field);
         if (!reflectableField)
             throw std::runtime_error(stx::format("Could not find field/function for identifier '{}'", field));
+
         return reflectableToParameterValue(field, reflectableField, reflectableField->getTypeInfo(), helper);
     });
 
