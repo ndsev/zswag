@@ -172,8 +172,8 @@ TEST_CASE("OAuth2 Integration with OpenAPI Parser", "[oauth2][integration]") {
         // Call protected endpoint
         REQUIRE_NOTHROW(
             oaClient.callMethod("protectedEndpoint", 
-                              zserio::ReflectableServiceData(request.reflectable()), 
-                              nullptr)
+                                zserio::BasicIntrospectableServiceData(service_client_test::Request(request)),
+                                nullptr)
         );
         
         REQUIRE(tokenRequested);
@@ -185,8 +185,8 @@ TEST_CASE("OAuth2 Integration with OpenAPI Parser", "[oauth2][integration]") {
         
         REQUIRE_NOTHROW(
             oaClient.callMethod("publicEndpoint", 
-                              zserio::ReflectableServiceData(request.reflectable()), 
-                              nullptr)
+                                zserio::BasicIntrospectableServiceData(service_client_test::Request(request)),
+                                nullptr)
         );
         
         REQUIRE_FALSE(tokenRequested); // No token needed for public endpoint
@@ -251,8 +251,8 @@ TEST_CASE("OAuth2 Integration with OpenAPI Parser", "[oauth2][integration]") {
         
         REQUIRE_NOTHROW(
             oaClient1.callMethod("flexible", 
-                               zserio::ReflectableServiceData(request.reflectable()), 
-                               nullptr)
+                                 zserio::BasicIntrospectableServiceData(service_client_test::Request(request)),
+                                 nullptr)
         );
         
         // Test with OAuth2 (no API key)
@@ -283,8 +283,8 @@ TEST_CASE("OAuth2 Integration with OpenAPI Parser", "[oauth2][integration]") {
         
         REQUIRE_NOTHROW(
             oaClient2.callMethod("flexible", 
-                               zserio::ReflectableServiceData(request.reflectable()), 
-                               nullptr)
+                                 zserio::BasicIntrospectableServiceData(service_client_test::Request(request)),
+                                 nullptr)
         );
         REQUIRE(tokenEndpointCalled);
     }

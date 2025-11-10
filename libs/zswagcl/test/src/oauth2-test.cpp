@@ -298,9 +298,9 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_NOTHROW(
-            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr)
+            oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr)
         );
-        
+
         REQUIRE(mockServer.tokenRequestCount == 1);
         REQUIRE(mockServer.lastIssuedAccessToken == "access_1");
     }
@@ -321,12 +321,12 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         // First call should get token
-        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1);
         REQUIRE(apiCallCount == 1);
         
         // Second call should use cached token
-        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1); // No new token request
         REQUIRE(apiCallCount == 2);
     }
@@ -342,7 +342,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         // First call gets initial token
-        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1);
         REQUIRE(mockServer.refreshRequestCount == 0);
         
@@ -350,7 +350,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         std::this_thread::sleep_for(2s);
         
         // Next call should trigger refresh
-        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
         REQUIRE(mockServer.tokenRequestCount == 1);
         REQUIRE(mockServer.refreshRequestCount == 1);
         REQUIRE(mockServer.lastIssuedAccessToken.find("refreshed_") == 0);
@@ -364,7 +364,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
-        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
         
         // Verify scopes were sent in the request
         REQUIRE((mockServer.lastTokenRequestBody.find("scope=read%20write") != std::string::npos ||
@@ -379,7 +379,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
-        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
         
         // Verify audience was sent
         REQUIRE(mockServer.lastTokenRequestBody.find("audience=") != std::string::npos);
@@ -392,7 +392,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_THROWS_AS(
-            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
+            oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr),
             std::runtime_error
         );
     }
@@ -404,7 +404,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_THROWS_WITH(
-            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
+            oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr),
             Catch::Matchers::ContainsSubstring("OAuth2 client-credentials required but no oauth2 config present")
         );
     }
@@ -416,7 +416,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_THROWS_WITH(
-            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr),
+            oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr),
             Catch::Matchers::ContainsSubstring("access_token missing")
         );
     }
@@ -438,7 +438,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
         REQUIRE_NOTHROW(
-            oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr)
+            oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr)
         );
     }
     
@@ -460,7 +460,7 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         
         auto request = service_client_test::Request("test", 0, {}, service_client_test::Flat("", ""));
         
-        oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        oaClient->callMethod("test", zserio::BasicIntrospectableServiceData(std::move(request)), nullptr);
     }
 }
 
