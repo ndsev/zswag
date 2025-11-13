@@ -80,6 +80,7 @@ bool OAuth2ClientCredentialsHandler::satisfy(
                 it->second = newTok;
                 ctx.resultHttpConfigWithAuthorization.headers.insert({"Authorization", "Bearer " + newTok.accessToken});
                 httpcl::log().debug("  ... refresh successful.");
+                httpcl::log().debug("[OAuth2] Refreshed access token: {}", newTok.accessToken);
                 return true;
             }
             catch (std::exception const& e) {
@@ -101,6 +102,7 @@ bool OAuth2ClientCredentialsHandler::satisfy(
             cache_[key] = minted;
             ctx.resultHttpConfigWithAuthorization.headers.insert({"Authorization", "Bearer " + minted.accessToken});
             httpcl::log().debug("  ... mint successful.");
+            httpcl::log().debug("[OAuth2] Minted access token: {}", minted.accessToken);
         }
         catch (std::exception const& e) {
             mismatchReason = stx::format("OAuth token mint failed: {}", e.what());

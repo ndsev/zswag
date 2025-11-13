@@ -112,6 +112,13 @@ struct Config
      * be passed to the respective `Config(yamlConf)` constructor.
      */
     std::string toYaml() const;
+
+    /**
+     * Create a human-readable summary of this configuration for logging,
+     * with sensitive values (passwords, secrets, API keys, static bearer tokens) masked.
+     * OAuth2 fetched tokens are NOT masked as they are temporary.
+     */
+    std::string toSafeString() const;
 };
 
 /**
