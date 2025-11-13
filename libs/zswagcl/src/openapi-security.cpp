@@ -2,6 +2,7 @@
 #include "private/openapi-oauth.hpp"
 
 #include <stx/format.h>
+#include <sstream>
 
 namespace zswagcl
 {
@@ -108,14 +109,34 @@ void AuthRegistry::satisfySecurity(
 
     bool anyAlternativeMatched = false;
     std::stringstream error;
-    error << "The provided HTTP configuration does not satisfy authentication requirements:\n";
+    error << "The provided HTTP configuration does not satisfy authentication requirements.\n\n";
+
+    // Show what the user has configured
+    error << "Your HTTP configuration provides:\n";
+    error << ctx.resultHttpConfigWithAuthorization.toSafeString();
+
+    // Show what the OpenAPI spec requires
+    error << "\nOpenAPI spec requires ONE of the following:\n";
 
     int i = 0;
     for (auto const& schemeSet : alts)
     {
         bool matched = true;
 
+        error << "  Security configuration " << i << ":\n";
         for (auto const& req : schemeSet) {
+            error << "    - Scheme '" << req.scheme->id << "' (type: "
+                  << securitySchemeTypeToString(req.scheme->type) << ")";
+            if (!req.scopes.empty()) {
+                error << ", scopes: [";
+                for (size_t j = 0; j < req.scopes.size(); ++j) {
+                    if (j > 0) error << ", ";
+                    error << req.scopes[j];
+                }
+                error << "]";
+            }
+            error << "\n";
+
             std::string reasonForMismatch;
             auto handlerIt = handlers_.find(req.scheme->type);
             if (handlerIt != handlers_.end()) {
@@ -128,7 +149,7 @@ void AuthRegistry::satisfySecurity(
                     "No handler registered for required security scheme {}",
                     req.scheme->id);
             }
-            error << "  In security configuration " << i << ": " << reasonForMismatch << "\n";
+            error << "      Problem: " << reasonForMismatch << "\n";
             matched = false;
             break;
         }
