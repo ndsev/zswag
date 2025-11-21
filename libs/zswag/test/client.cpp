@@ -36,10 +36,10 @@ int main (int argc, char* argv[]) {
             spdlog::info("[cpp-test-client]   => Running request.");
             calculator::Calculator::Client calcClient(oaClient);
             auto response = fn(calcClient);
-            if (response.getValue() == expect)
+            if (response.value == expect)
                 spdlog::info("[cpp-test-client]   => Success.");
             else
-                throw std::runtime_error(stx::format("Expected {}, got {}!", expect, response.getValue()));
+                throw std::runtime_error(stx::format("Expected {}, got {}!", expect, static_cast<decltype(expect)>(response.value)));
         }
         catch(std::exception const& e) {
             ++failureCounter;
@@ -48,13 +48,13 @@ int main (int argc, char* argv[]) {
     };
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::BaseAndExponent req(calculator::I32(2), calculator::I32(3), 0, "", .0, std::vector<bool>{});
+        calculator::BaseAndExponent req(calculator::I32(2), calculator::I32(3), 0, "", .0, zserio::Vector<zserio::Bool>{});
         return calcClient.powerMethod(req);
     }, 8., "Pass fields in path and header",
     [](Config& conf){});
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Integers req(std::vector<int32_t>{100, -200, 400});
+        calculator::Integers req(zserio::Vector<zserio::Int32>{100, -200, 400});
         return calcClient.intSumMethod(req);
     }, 300., "Pass hex-encoded array in query",
     [](Config& conf){
@@ -62,7 +62,7 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Bytes req(std::vector<uint8_t>{8, 16, 32, 64});
+        calculator::Bytes req(zserio::Vector<zserio::UInt8>{8, 16, 32, 64});
         return calcClient.byteSumMethod(req);
     }, 120., "Pass base64url-encoded byte array in path",
     [](Config& conf){
@@ -72,7 +72,7 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Integers req(std::vector<int32_t>{1, 2, 3, 4});
+        calculator::Integers req(zserio::Vector<zserio::Int32>{1, 2, 3, 4});
         return calcClient.intMulMethod(req);
     }, 24., "Pass base64-encoded long array in path",
     [](Config& conf){
@@ -80,7 +80,7 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Doubles req(std::vector<double>{34.5, 2.});
+        calculator::Doubles req(zserio::Vector<zserio::Float64>{34.5, 2.});
         return calcClient.floatMulMethod(req);
     }, 69., "Pass float array in query.",
     [](Config& conf){
@@ -88,7 +88,7 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Bools req(std::vector<bool>{true, false});
+        calculator::Bools req(zserio::Vector<zserio::Bool>{true, false});
         return calcClient.bitMulMethod(req);
     }, false, "Pass bool array in query (expect false).",
     [](Config& conf){
@@ -96,7 +96,7 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Bools req(std::vector<bool>{true, true});
+        calculator::Bools req(zserio::Vector<zserio::Bool>{true, true});
         return calcClient.bitMulMethod(req);
     }, true, "Pass bool array in query (expect true).",
     [](Config& conf){
@@ -112,7 +112,7 @@ int main (int argc, char* argv[]) {
     });
 
     runTest([](calculator::Calculator::Client& calcClient){
-        calculator::Strings req(std::vector<std::string>{"foo", "bar"});
+        calculator::Strings req(zserio::Vector<zserio::String>{"foo", "bar"});
         return calcClient.concatMethod(req);
     }, std::string("foobar"), "Pass base64-encoded strings.",
     [](Config& conf){
