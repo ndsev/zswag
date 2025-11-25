@@ -658,6 +658,8 @@ int main (int argc, char* argv[])
    config from being considered at all, set `HTTP_SETTINGS_FILE` to empty,
    e.g. via `setenv`.
 
+<!-- --8<-- [start:http-settings] -->
+
 ## Client Environment Settings
 
 Both the Python and C++ Clients can be configured using the following
@@ -897,6 +899,8 @@ on each platform:
 * [Linux `secret-tool`](https://www.marian-dan.ro/blog/storing-secrets-using-secret-tool) 
 * [macOS `add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html)
 * [Windows `cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/)
+
+<!-- --8<-- [end:http-settings] -->
 
 ## Client Result Code Handling
 
