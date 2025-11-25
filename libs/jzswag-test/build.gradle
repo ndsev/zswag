@@ -1,0 +1,96 @@
+plugins {
+    id 'application'
+}
+
+description = 'zswag Java integration tests using Calculator service'
+
+application {
+    mainClass = 'com.ndsev.zswag.test.CalculatorTestClient'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+dependencies {
+    // Java client
+    implementation project(':libs:jzswag-desktop')
+
+    // zserio runtime
+    implementation "io.github.ndsev:zserio-runtime:${rootProject.ext.zserio_version}"
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    runtimeOnly 'ch.qos.logback:logback-classic:1.4.14'
+
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testImplementation 'org.assertj:assertj-core:3.24.2'
+}
+
+// Define paths
+def zserioSourceRoot = file("${projectDir}/../../libs/zswag/test/calc")
+def zserioInputFile = file("${zserioSourceRoot}/calculator.zs")
+def zserioOutputDir = file("${projectDir}/src/main/java")
+
+// Task to download zserio compiler
+task downloadZserio {
+    description = 'Download zserio compiler'
+    doLast {
+        configurations.detachedConfiguration(
+            dependencies.create("io.github.ndsev:zserio:${rootProject.ext.zserio_version}")
+        ).resolve()
+    }
+}
+
+// Task to generate Java classes from zserio
+task generateZserio(type: JavaExec) {
+    description = 'Generate Java classes from calculator.zs'
+    group = 'build'
+
+    dependsOn downloadZserio
+
+    classpath = configurations.detachedConfiguration(
+        dependencies.create("io.github.ndsev:zserio:${rootProject.ext.zserio_version}")
+    )
+
+    mainClass = 'zserio.tools.ZserioTool'
+
+    args = [
+        '-java', zserioOutputDir.absolutePath,
+        '-withoutSourcesAmalgamation',
+        '-src', zserioSourceRoot.absolutePath,
+        'calculator.zs'
+    ]
+
+    inputs.file(zserioInputFile)
+    outputs.dir(zserioOutputDir)
+
+    doFirst {
+        zserioOutputDir.mkdirs()
+        logger.lifecycle("Generating Java classes from ${zserioInputFile.name}")
+    }
+}
+
+// Generate zserio classes before compiling
+compileJava.dependsOn generateZserio
+
+// Exclude Calculator.java from compilation (has naming conflict with java.lang.String)
+// We don't need it since we're using OpenAPI client directly
+compileJava {
+    exclude '**/calculator/Calculator.java'
+}
+
+// Clean generated sources
+clean {
+    delete file("${projectDir}/src/main/java/calculator")
+}
+
+run {
+    // Pass command line args
+    args = project.hasProperty('appArgs') ? project.property('appArgs').split('\\s+') : []
+
+    // Enable console input
+    standardInput = System.in
+}

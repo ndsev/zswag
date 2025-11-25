@@ -1,0 +1,31 @@
+plugins {
+    id 'application'
+}
+
+description = 'Example CLI application demonstrating jzswag-desktop usage'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+application {
+    mainClass = 'com.ndsev.zswag.examples.cli.ExampleCli'
+}
+
+dependencies {
+    // Desktop client
+    implementation project(':libs:jzswag-desktop')
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    runtimeOnly 'ch.qos.logback:logback-classic:1.4.14'
+}
+
+run {
+    // Pass command line args
+    args = project.hasProperty('appArgs') ? project.property('appArgs').split('\\s+') : []
+
+    // Enable console input
+    standardInput = System.in
+}

@@ -27,6 +27,7 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
   * [Server Component (Python)](#server-component)
   * [Using the Python Client](#using-the-python-client)
   * [C++ Client](#c-client)
+  * [Java Client](#java-client)
   * [Client Environment Settings](#client-environment-settings)
   * [HTTP Proxies and Authentication](#persistent-http-headers-proxy-cookie-and-authentication)
   * [Swagger User Interface](#swagger-user-interface)
@@ -43,9 +44,9 @@ zswag is a set of libraries for using/hosting zserio services through OpenAPI.
 
 ## Components
 
-The zswag repository contains two main libraries which provide
-OpenAPI layers for zserio Python and C++ clients. For Python, there
-is even a generic zserio OpenAPI server layer.
+The zswag repository provides OpenAPI layers for zserio services across
+multiple platforms: Python, C++, and Java clients. For Python, there
+is also a generic zserio OpenAPI server layer.
 
 The following UML diagram provides a more in-depth overview:
 
@@ -65,6 +66,12 @@ Here are some brief descriptions of the main components:
 * `httpcl` is a wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib),
   HTTP request configuration and OS secret storage abilities based on
   the [keychain](https://github.com/hrantzsch/keychain) library.
+* `jzswag-api` is a Java library providing shared interfaces and types for
+  OpenAPI client implementations across Desktop and Android platforms.
+* `jzswag-desktop` is a pure Java library implementing the OpenAPI client
+  using Java 11's built-in HttpClient for Desktop applications.
+* `jzswag-test` contains integration tests for the Java client using the
+  Calculator test service.
   
 ## Setup
 
@@ -732,9 +739,46 @@ int main (int argc, char* argv[])
    config from being considered at all, set `HTTP_SETTINGS_FILE` to empty,
    e.g. via `setenv`.
 
+## Java Client
+
+The Java client provides type-safe OpenAPI client functionality for zserio services
+on Desktop and Android Automotive platforms.
+
+### Features
+
+- ✅ Pure Java implementation (no JNI dependencies)
+- ✅ Java 11+ support with modern HttpClient
+- ✅ Full OpenAPI 3.0 specification parsing
+- ✅ All authentication schemes (Basic, Bearer, API Key, Cookie, OAuth2)
+- ✅ All parameter encodings (hex, base64, base64url, binary)
+- ✅ Immutable configuration with builder pattern
+- ✅ Thread-safe OAuth2 token management
+- ✅ Integration tested against Python server
+
+### Modules
+
+- **jzswag-api**: Shared interfaces and types for all platforms
+- **jzswag-desktop**: Desktop implementation using Java 11 HttpClient
+- **jzswag-test**: Integration tests using Calculator service
+- **jzswag-android**: Android implementation *(coming soon)*
+
+### Quick Start
+
+See [GETTING_STARTED_JAVA.md](GETTING_STARTED_JAVA.md) for detailed usage instructions.
+
+**Building:**
+```bash
+./gradlew build
+```
+
+**Running Integration Tests:**
+```bash
+./libs/jzswag-test/test-java-client.bash
+```
+
 ## Client Environment Settings
 
-Both the Python and C++ Clients can be configured using the following
+The Python, C++, and Java Clients can be configured using the following
 environment variables:
 
 <!-- --8<-- [start:env] -->

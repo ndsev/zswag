@@ -1,0 +1,42 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+description = 'zswag Java API - Shared interfaces for Desktop and Android implementations'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+dependencies {
+    // zserio runtime for service integration
+    api "io.github.ndsev:zserio-runtime:${rootProject.ext.zserio_version}"
+
+    // Annotations
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+
+    // Kotlin standard library (optional - for Kotlin extensions if enabled)
+    // implementation "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlin_version}"
+}
+
+// Test dependencies
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testImplementation 'org.mockito:mockito-core:5.8.0'
+    testImplementation 'org.assertj:assertj-core:3.24.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            artifactId = 'jzswag-api'
+        }
+    }
+}

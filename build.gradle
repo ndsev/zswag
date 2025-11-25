@@ -1,0 +1,36 @@
+// Root build.gradle for zswag Java modules
+
+buildscript {
+    ext {
+        kotlin_version = '2.1.0'
+        zserio_version = '2.16.1'
+    }
+    repositories {
+        mavenCentral()
+        google()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'com.android.tools.build:gradle:8.2.2'
+    }
+}
+
+allprojects {
+    group = 'com.ndsev.zswag'
+    version = '1.11.0'
+
+    repositories {
+        mavenCentral()
+        google()
+    }
+}
+
+subprojects {
+    // Only apply java-library to non-example projects
+    // Individual modules will specify their own plugins
+
+    repositories {
+        mavenCentral()
+        google()
+    }
+}
