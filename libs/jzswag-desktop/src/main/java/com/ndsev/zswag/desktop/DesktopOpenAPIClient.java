@@ -190,10 +190,14 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
 
     /**
      * Adds header parameters to the request.
+     * Note: Generic headers from HttpSettings are added by DesktopHttpClient, not here.
+     * This method only processes operation-specific header parameters from the parameters map.
      */
     private void addParametersToHeaders(@NotNull OpenAPIParser.MethodInfo methodInfo,
                                          @NotNull Map<String, Object> parameters,
                                          @NotNull Map<String, String> headers) {
+        // Process operation-specific header parameters only
+        // Generic headers from HttpSettings are added by DesktopHttpClient.execute()
         for (OpenAPIParameter param : methodInfo.getParameters()) {
             if (param.getLocation() == ParameterLocation.HEADER) {
                 Object value = parameters.get(param.getName());

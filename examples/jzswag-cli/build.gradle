@@ -22,9 +22,11 @@ dependencies {
     runtimeOnly 'ch.qos.logback:logback-classic:1.4.14'
 }
 
-run {
+tasks.named('run') {
     // Pass command line args
-    args = project.hasProperty('appArgs') ? project.property('appArgs').split('\\s+') : []
+    if (project.hasProperty('appArgs')) {
+        args project.property('appArgs').split('\\s+').toList()
+    }
 
     // Enable console input
     standardInput = System.in

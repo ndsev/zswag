@@ -186,14 +186,14 @@ public class CalculatorTestClient {
             assertEquals("foobar", response.getValue(), "concat(['foo', 'bar']) should equal 'foobar'");
         });
 
-        // Test 10: name() - API Key in query, enum value
+        // Test 10: name() - Header auth (global default), enum value
         runTest("Pass enum", () -> {
             EnumWrapper request = new EnumWrapper(Enum.TEST_ENUM_0);
 
             calculator.String response = callMethod("name",
                     request,
                     HttpSettings.builder()
-                            .queryParameter("api-key", "42")
+                            .header("X-Generic-Token", "42")
                             .build());
 
             assertEquals("TEST_ENUM_0", response.getValue(), "name(TEST_ENUM_0) should equal 'TEST_ENUM_0'");

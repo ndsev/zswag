@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
+import java.util.StringJoiner;
 
 /**
  * Desktop implementation of IHttpClient using Java 11 HttpClient.
@@ -65,6 +66,16 @@ public class DesktopHttpClient implements IHttpClient {
             // Add headers from settings
             for (Map.Entry<String, String> header : settings.getHeaders().entrySet()) {
                 requestBuilder.header(header.getKey(), header.getValue());
+            }
+
+            // Add cookies from settings as Cookie header
+            Map<String, String> cookies = settings.getCookies();
+            if (!cookies.isEmpty()) {
+                StringJoiner cookieJoiner = new StringJoiner("; ");
+                for (Map.Entry<String, String> cookie : cookies.entrySet()) {
+                    cookieJoiner.add(cookie.getKey() + "=" + cookie.getValue());
+                }
+                requestBuilder.header("Cookie", cookieJoiner.toString());
             }
 
             // Add authentication headers

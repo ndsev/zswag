@@ -87,9 +87,11 @@ clean {
     delete file("${projectDir}/src/main/java/calculator")
 }
 
-run {
+tasks.named('run') {
     // Pass command line args
-    args = project.hasProperty('appArgs') ? project.property('appArgs').split('\\s+') : []
+    if (project.hasProperty('appArgs')) {
+        args project.property('appArgs').split('\\s+').toList()
+    }
 
     // Enable console input
     standardInput = System.in
