@@ -100,7 +100,8 @@ jobs:
       matrix:
         # macos-13: Intel-based runners (x86_64)
         # macos-14: Apple Silicon runners (arm64)
-        os: [macos-13, macos-14, windows-latest]
+        # windows-2022: Pinned due to DLL loading issues on windows-2025 (see #153)
+        os: [macos-13, macos-14, windows-2022]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         exclude:
           # Python 3.10 doesn't have ARM64 builds for macOS
@@ -144,7 +145,7 @@ jobs:
         mv bin/wheel-final/zswag*.whl bin/wheel/
         mv bin/wheel-final/pyzswagcl*.whl bin/wheel/
     - name: Build (Windows)
-      if: matrix.os == 'windows-latest'
+      if: startsWith(matrix.os, 'windows')
       working-directory: build
       run: |
         # Install NASM and jom using chocolatey (required for OpenSSL build)
