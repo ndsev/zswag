@@ -2,6 +2,8 @@ package com.ndsev.zswag.api;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
+
 /**
  * Exception thrown when HTTP communication fails.
  */
@@ -24,7 +26,7 @@ public class HttpException extends Exception {
     public HttpException(@Nullable String message, int statusCode, @Nullable byte[] responseBody) {
         super(message);
         this.statusCode = statusCode;
-        this.responseBody = responseBody;
+        this.responseBody = responseBody != null ? Arrays.copyOf(responseBody, responseBody.length) : null;
     }
 
     @Nullable
@@ -34,6 +36,6 @@ public class HttpException extends Exception {
 
     @Nullable
     public byte[] getResponseBody() {
-        return responseBody;
+        return responseBody != null ? Arrays.copyOf(responseBody, responseBody.length) : null;
     }
 }

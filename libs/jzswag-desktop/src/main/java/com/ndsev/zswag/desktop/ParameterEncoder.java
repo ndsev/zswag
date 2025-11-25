@@ -2,9 +2,7 @@ package com.ndsev.zswag.desktop;
 
 import com.ndsev.zswag.api.*;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;

@@ -3,6 +3,7 @@ package com.ndsev.zswag.api;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -20,7 +21,7 @@ public class HttpRequest {
         this.method = method;
         this.url = url;
         this.headers = headers != null ? Collections.unmodifiableMap(new HashMap<>(headers)) : Collections.emptyMap();
-        this.body = body;
+        this.body = body != null ? Arrays.copyOf(body, body.length) : null;
     }
 
     /**
@@ -48,11 +49,11 @@ public class HttpRequest {
     }
 
     /**
-     * @return Request body (may be null for GET/DELETE)
+     * @return Request body as defensive copy (may be null for GET/DELETE)
      */
     @Nullable
     public byte[] getBody() {
-        return body;
+        return body != null ? Arrays.copyOf(body, body.length) : null;
     }
 
     /**

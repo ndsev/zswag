@@ -24,13 +24,3 @@ allprojects {
         google()
     }
 }
-
-subprojects {
-    // Only apply java-library to non-example projects
-    // Individual modules will specify their own plugins
-
-    repositories {
-        mavenCentral()
-        google()
-    }
-}

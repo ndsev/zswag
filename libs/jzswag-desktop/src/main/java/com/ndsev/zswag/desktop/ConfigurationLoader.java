@@ -5,7 +5,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,7 +50,10 @@ public class ConfigurationLoader {
     @SuppressWarnings("unchecked")
     public static HttpSettings loadFromFile(@NotNull String filePath) throws IOException {
         try (InputStream input = Files.newInputStream(Paths.get(filePath))) {
-            Yaml yaml = new Yaml();
+            // Use SafeConstructor to prevent arbitrary code execution vulnerabilities
+            LoaderOptions options = new LoaderOptions();
+            options.setAllowDuplicateKeys(false);
+            Yaml yaml = new Yaml(new SafeConstructor(options));
             Map<String, Object> config = yaml.load(input);
 
             HttpSettings.Builder builder = HttpSettings.builder();

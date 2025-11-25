@@ -5,7 +5,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,7 +49,10 @@ public class OpenAPIParser {
         }
 
         try (input) {
-            Yaml yaml = new Yaml();
+            // Use SafeConstructor to prevent arbitrary code execution vulnerabilities
+            LoaderOptions options = new LoaderOptions();
+            options.setAllowDuplicateKeys(false);
+            Yaml yaml = new Yaml(new SafeConstructor(options));
             Map<String, Object> loaded = yaml.load(input);
             if (loaded == null) {
                 throw new IOException("Failed to load OpenAPI spec - empty or invalid YAML");

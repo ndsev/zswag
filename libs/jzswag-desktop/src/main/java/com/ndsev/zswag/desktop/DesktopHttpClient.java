@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
@@ -129,18 +130,18 @@ public class DesktopHttpClient implements IHttpClient {
 
     /**
      * Adds authentication headers based on settings.
+     * Note: Bearer token takes precedence over Basic auth if both are configured.
      */
     private void addAuthenticationHeaders(@NotNull HttpRequest.Builder requestBuilder) {
-        // Basic authentication
-        if (settings.getBasicAuthUsername() != null && settings.getBasicAuthPassword() != null) {
-            String credentials = settings.getBasicAuthUsername() + ":" + settings.getBasicAuthPassword();
-            String encodedCredentials = Base64.getEncoder().encodeToString(credentials.getBytes());
-            requestBuilder.header("Authorization", "Basic " + encodedCredentials);
-        }
-
-        // Bearer token
+        // Bearer token takes precedence over Basic auth
         if (settings.getBearerToken() != null) {
             requestBuilder.header("Authorization", "Bearer " + settings.getBearerToken());
+        } else if (settings.getBasicAuthUsername() != null && settings.getBasicAuthPassword() != null) {
+            // Basic authentication (only if no bearer token)
+            String credentials = settings.getBasicAuthUsername() + ":" + settings.getBasicAuthPassword();
+            String encodedCredentials = Base64.getEncoder().encodeToString(
+                    credentials.getBytes(StandardCharsets.UTF_8));
+            requestBuilder.header("Authorization", "Basic " + encodedCredentials);
         }
 
         // API keys are added to headers by the OpenAPIClient based on security scheme definition
