@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 
 my_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-. "$my_dir/../../../deps/python-cmake-wheel/python.bash"
 
 venv=$(mktemp -d)
 echo "→ Setting up a virtual environment in $venv ..."
-python3 -m venv "$venv"
-source "$venv/$activate_path"
+python -m venv "$venv"
+
+# Activate venv (Scripts/ on Windows, bin/ on Unix)
+if [[ -d "$venv/Scripts" ]]; then
+    source "$venv/Scripts/activate"
+else
+    source "$venv/bin/activate"
+fi
+
 python -m pip install -U pip
 
 trap 'echo "→ Removing $venv"; rm -rf "$venv"' EXIT
