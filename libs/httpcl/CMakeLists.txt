@@ -51,6 +51,11 @@ if (ZSWAG_KEYCHAIN_SUPPORT)
   target_link_libraries(httpcl PUBLIC keychain)
 endif()
 
+# Enable coverage for httpcl
+if(ZSWAG_ENABLE_COVERAGE)
+  target_enable_coverage(httpcl)
+endif()
+
 if(ZSWAG_ENABLE_TESTING)
   add_subdirectory(test)
 endif()
