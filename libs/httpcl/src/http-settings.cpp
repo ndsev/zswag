@@ -11,6 +11,7 @@
 #include <future>
 #include <fstream>
 #include <filesystem>
+#include <sstream>
 #include <spdlog/spdlog.h>
 
 using namespace httpcl;
@@ -196,6 +197,29 @@ YAML::Node configToNode(Config const& config) {
             oauth2Node["audience"] = config.oauth2->audience;
         if (!config.oauth2->scopesOverride.empty())
             oauth2Node["scopes"] = config.oauth2->scopesOverride;
+        if (config.oauth2->tokenEndpointAuth) {
+            YAML::Node authNode;
+            const auto& auth = *config.oauth2->tokenEndpointAuth;
+
+            // Write method
+            std::string methodStr = (auth.method == Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature)
+                ? "rfc5849-oauth1-signature"
+                : "rfc6749-client-secret-basic";
+            authNode["method"] = methodStr;
+
+            // Write nonceLength only if non-default
+            if (auth.nonceLength != 16) {
+                authNode["nonceLength"] = auth.nonceLength;
+            }
+
+            oauth2Node["tokenEndpointAuth"] = authNode;
+        }
+
+        // Write useForSpecFetch only if non-default (false)
+        if (!config.oauth2->useForSpecFetch) {
+            oauth2Node["useForSpecFetch"] = false;
+        }
+
         result["oauth2"] = oauth2Node;
     }
 
@@ -258,6 +282,35 @@ Config configFromNode(YAML::Node const& node)
             for (auto const& scope : v)
                 oauth2.scopesOverride.emplace_back(scope.as<std::string>());
         }
+        if (auto authNode = oauth2Node["tokenEndpointAuth"]) {
+            Config::OAuth2::TokenEndpointAuth auth;
+
+            if (auto methodNode = authNode["method"]) {
+                std::string method = methodNode.as<std::string>();
+                if (method == "rfc5849-oauth1-signature") {
+                    auth.method = Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature;
+                } else if (method == "rfc6749-client-secret-basic") {
+                    auth.method = Config::OAuth2::TokenEndpointAuthMethod::Rfc6749_ClientSecretBasic;
+                } else {
+                    throw std::runtime_error("Unknown tokenEndpointAuth method: " + method);
+                }
+            }
+
+            if (auto nonceLengthNode = authNode["nonceLength"]) {
+                auth.nonceLength = nonceLengthNode.as<int>();
+                if (auth.nonceLength < 8 || auth.nonceLength > 64) {
+                    throw std::runtime_error("tokenEndpointAuth.nonceLength must be between 8 and 64");
+                }
+            }
+
+            oauth2.tokenEndpointAuth = auth;
+        }
+
+        // Parse useForSpecFetch (defaults to true)
+        if (auto useForSpecFetchNode = oauth2Node["useForSpecFetch"]) {
+            oauth2.useForSpecFetch = useForSpecFetchNode.as<bool>();
+        }
+
         conf.oauth2 = oauth2;
     }
 
@@ -550,6 +603,114 @@ std::string Config::toYaml() const {
     return YAML::Dump(configToNode(*this));
 }
 
+std::string Config::toSafeString() const {
+    std::stringstream ss;
+
+    // Basic authentication
+    if (auth) {
+        ss << "  - Basic auth: user=" << auth->user;
+        if (!auth->password.empty())
+            ss << ", password=****";
+        if (!auth->keychain.empty())
+            ss << ", keychain=" << auth->keychain;
+        ss << "\n";
+    }
+
+    // OAuth2
+    if (oauth2) {
+        ss << "  - OAuth2 client credentials: clientId=" << oauth2->clientId;
+        if (!oauth2->clientSecret.empty())
+            ss << ", clientSecret=****";
+        if (!oauth2->clientSecretKeychain.empty())
+            ss << ", clientSecretKeychain=" << oauth2->clientSecretKeychain;
+        if (!oauth2->tokenUrlOverride.empty())
+            ss << ", tokenUrl=" << oauth2->tokenUrlOverride;
+        if (!oauth2->audience.empty())
+            ss << ", audience=" << oauth2->audience;
+        if (!oauth2->scopesOverride.empty()) {
+            ss << ", scopes=[";
+            for (size_t i = 0; i < oauth2->scopesOverride.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << oauth2->scopesOverride[i];
+            }
+            ss << "]";
+        }
+        ss << "\n";
+    }
+
+    // API key
+    if (apiKey) {
+        ss << "  - API key: ";
+        if (apiKey->length() <= 8)
+            ss << "****";
+        else
+            ss << apiKey->substr(0, 4) << "****" << apiKey->substr(apiKey->length() - 4);
+        ss << "\n";
+    }
+
+    // Headers (mask Authorization if it looks like a static bearer/basic token)
+    if (!headers.empty()) {
+        ss << "  - Headers: ";
+        bool first = true;
+        for (const auto& [key, value] : headers) {
+            if (!first) ss << ", ";
+            first = false;
+
+            if (key == "Authorization") {
+                // Mask static tokens, but indicate presence
+                if (value.find("Bearer ") == 0) {
+                    size_t tokenLen = value.length() - 7;
+                    ss << key << "=Bearer **** (" << tokenLen << " chars)";
+                } else if (value.find("Basic ") == 0) {
+                    ss << key << "=Basic ****";
+                } else {
+                    ss << key << "=****";
+                }
+            } else {
+                ss << key << "=" << value;
+            }
+        }
+        ss << "\n";
+    }
+
+    // Query parameters
+    if (!query.empty()) {
+        ss << "  - Query params: ";
+        bool first = true;
+        for (const auto& [key, value] : query) {
+            if (!first) ss << ", ";
+            first = false;
+            ss << key << "=" << value;
+        }
+        ss << "\n";
+    }
+
+    // Cookies
+    if (!cookies.empty()) {
+        ss << "  - Cookies: ";
+        bool first = true;
+        for (const auto& [key, value] : cookies) {
+            if (!first) ss << ", ";
+            first = false;
+            ss << key << "=" << value;
+        }
+        ss << "\n";
+    }
+
+    // Proxy
+    if (proxy) {
+        ss << "  - Proxy: " << proxy->host << ":" << proxy->port;
+        if (!proxy->user.empty())
+            ss << ", user=" << proxy->user << ", password=****";
+        ss << "\n";
+    }
+
+    std::string result = ss.str();
+    if (result.empty())
+        return "  (no auth configuration)\n";
+    return result;
+}
+
 Config& Config::operator |= (Config const& other) {
     cookies.insert(other.cookies.begin(), other.cookies.end());
     headers.insert(other.headers.begin(), other.headers.end());
@@ -577,6 +738,10 @@ Config& Config::operator |= (Config const& other) {
             oauth2->audience = other.oauth2->audience;
         if (!other.oauth2->scopesOverride.empty())
             oauth2->scopesOverride = other.oauth2->scopesOverride;
+        // Always merge useForSpecFetch to allow explicit override of default
+        oauth2->useForSpecFetch = other.oauth2->useForSpecFetch;
+        if (other.oauth2->tokenEndpointAuth)
+            oauth2->tokenEndpointAuth = other.oauth2->tokenEndpointAuth;
     }
     return *this;
 }

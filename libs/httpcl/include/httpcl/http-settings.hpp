@@ -54,6 +54,34 @@ struct Config
         std::string refreshUrlOverride; // optional
         std::string audience; // optional
         std::vector<std::string> scopesOverride; // optional
+        bool useForSpecFetch = true;  // Use OAuth2 token when fetching OpenAPI spec (default: true)
+
+        /**
+         * Token endpoint authentication method.
+         * Specifies how the client authenticates when requesting tokens.
+         */
+        enum class TokenEndpointAuthMethod {
+            Rfc6749_ClientSecretBasic,  // client_secret_basic (RFC 6749 Section 2.3.1)
+            Rfc5849_Oauth1Signature     // OAuth 1.0 HMAC-SHA256 signature (RFC 5849)
+        };
+
+        /**
+         * Configuration for token endpoint authentication.
+         */
+        struct TokenEndpointAuth {
+            TokenEndpointAuthMethod method = TokenEndpointAuthMethod::Rfc6749_ClientSecretBasic;
+            int nonceLength = 16;  // For Rfc5849_Oauth1Signature: nonce length (8-64)
+        };
+
+        std::optional<TokenEndpointAuth> tokenEndpointAuth;
+
+        /**
+         * Helper to get auth method with default.
+         * Returns Rfc6749_ClientSecretBasic if tokenEndpointAuth is not configured.
+         */
+        TokenEndpointAuthMethod getTokenEndpointAuthMethod() const {
+            return tokenEndpointAuth ? tokenEndpointAuth->method : TokenEndpointAuthMethod::Rfc6749_ClientSecretBasic;
+        }
     };
 
     std::optional<std::string> scope;
@@ -84,6 +112,13 @@ struct Config
      * be passed to the respective `Config(yamlConf)` constructor.
      */
     std::string toYaml() const;
+
+    /**
+     * Create a human-readable summary of this configuration for logging,
+     * with sensitive values (passwords, secrets, API keys, static bearer tokens) masked.
+     * OAuth2 fetched tokens are NOT masked as they are temporary.
+     */
+    std::string toSafeString() const;
 };
 
 /**

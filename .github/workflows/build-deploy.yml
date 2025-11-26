@@ -65,9 +65,8 @@ jobs:
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
-          pip install -U setuptools wheel pip
-          mkdir build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
+          pip install -U setuptools wheel pip delocate
+          mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
       - name: Build
         working-directory: build
         run: |
@@ -82,6 +81,12 @@ jobs:
         run: |
           . ../venv/bin/activate
           ctest -C Release --verbose --no-tests=error
+      - name: Test OAuth Authentication
+        working-directory: build
+        run: |
+          . ../venv/bin/activate
+          pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+          python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
       - name: Deploy
         uses: actions/upload-artifact@v4
         with:
@@ -95,7 +100,8 @@ jobs:
       matrix:
         # macos-13: Intel-based runners (x86_64)
         # macos-14: Apple Silicon runners (arm64)
-        os: [macos-13, macos-14, windows-latest]
+        # windows-2022: Pinned due to DLL loading issues on windows-2025 (see #153)
+        os: [macos-13, macos-14, windows-2022]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         exclude:
           # Python 3.10 doesn't have ARM64 builds for macOS
@@ -133,13 +139,13 @@ jobs:
               -DZSWAG_ENABLE_TESTING=ON \
               -DZSWAG_VERSION=${{ needs.determine-version.outputs.version }} ..
         cmake --build .
-        mv bin/wheel bin/wheel-auditme  # Same as on Linux
-        mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
-        _deps/python-cmake-wheel-src/repair-wheel-macos.bash \
-              "$(pwd)"/bin/wheel-auditme/pyzswagcl*.whl \
-              "$(pwd)"/bin/wheel pyzswagcl
+        # No wheel repair needed with python-cmake-wheel commit b1d399e
+        mv bin/wheel bin/wheel-final
+        mkdir bin/wheel
+        mv bin/wheel-final/zswag*.whl bin/wheel/
+        mv bin/wheel-final/pyzswagcl*.whl bin/wheel/
     - name: Build (Windows)
-      if: matrix.os == 'windows-latest'
+      if: startsWith(matrix.os, 'windows')
       working-directory: build
       run: |
         # Install NASM and jom using chocolatey (required for OpenSSL build)
@@ -148,9 +154,16 @@ jobs:
         $env:PATH = "$env:PATH;C:\Program Files\NASM"
         # Verify NASM installation
         nasm -v
+        # Install delvewheel for bundling DLLs into wheel
+        pip install delvewheel
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
         cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
         cmake --build . --config Release
+        # Bundle DLLs into wheel using delvewheel (like auditwheel on Linux)
+        Rename-Item -Path bin/wheel -NewName wheel-auditme
+        New-Item -ItemType Directory -Path bin/wheel
+        Move-Item -Path bin/wheel-auditme/zswag*.whl -Destination bin/wheel/
+        delvewheel repair --add-path bin/Release (Get-Item bin/wheel-auditme/pyzswagcl*.whl) -w bin/wheel
     - name: Deploy
       uses: actions/upload-artifact@v4
       with:
@@ -160,6 +173,14 @@ jobs:
       working-directory: build
       run: |
         ctest -C Release --verbose --no-tests=error
+    - name: Test OAuth Authentication
+      working-directory: build
+      shell: bash  # Use bash on all platforms for consistent wildcard expansion
+      env:
+        PYTHONIOENCODING: utf-8
+      run: |
+        pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+        python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
 
   deploy:
     needs: [determine-version, build-manylinux, build]

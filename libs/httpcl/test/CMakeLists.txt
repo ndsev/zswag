@@ -5,7 +5,9 @@ add_executable(httpcl-test
   src/uri.cpp
   src/http-client.cpp
   src/http-settings.cpp
-  src/log.cpp)
+  src/log.cpp
+  src/http-settings-test.cpp
+  src/oauth1-signature-test.cpp)
 
 target_link_libraries(httpcl-test
   PUBLIC
