@@ -95,7 +95,7 @@ struct YAMLScope {
         return node_.as<T>();
     }
 
-    void forEach(std::function<void(YAMLScope const& child)> const& fun) {
+    void forEach(std::function<void(YAMLScope const& child)> const& fun) const {
         if (!node_ || !fun || !(node_.IsMap() || node_.IsSequence()))
             return;
         size_t i = 0;
