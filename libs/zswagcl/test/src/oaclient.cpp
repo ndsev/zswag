@@ -1,11 +1,20 @@
 #include <catch2/catch_all.hpp>
 
 #include <fstream>
+#include <sstream>
 
 #include "zswagcl/oaclient.hpp"
+#include "zswagcl/private/openapi-config.hpp"
 #include "zserio/SerializeUtil.h"
 #include "service_client_test/Flat.h"
 #include "service_client_test/Request.h"
+#include "service_client_test/ArrayTestRequest.h"
+#include "service_client_test/ComplexArrayTestRequest.h"
+#include "service_client_test/ComplexValueTestRequest.h"
+#include "service_client_test/Address.h"
+#include "service_client_test/Status.h"
+#include "service_client_test/Permissions.h"
+#include "service_client_test/ExternTestRequest.h"
 
 using namespace zswagcl;
 
@@ -334,5 +343,915 @@ TEST_CASE("HTTP-Service", "[oaclient]") {
                 REQUIRE(c.query.find("api-key") != c.query.end());
             }));
         }
+    }
+}
+
+// ============================================================================
+// Array and Complex Type Tests
+// ============================================================================
+
+TEST_CASE("OAClient - Primitive Arrays", "[oaclient][arrays]") {
+    SECTION("Boolean Array Serialization") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // Booleans serialize as 0/1
+            REQUIRE(uri.find("bools=1,0,1,1") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ArrayTestRequest request;
+        request.setBoolArrayLen(4);
+        request.setBoolArray({true, false, true, true});
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testBoolArray",
+                    "parameters": [{
+                        "name": "bools",
+                        "in": "query",
+                        "style": "form",
+                        "explode": false,
+                        "x-zserio-request-part": "boolArray"
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testBoolArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Signed Integer Arrays Serialization") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            REQUIRE(uri.find("i8=-128,0,127") != std::string::npos);
+            REQUIRE(uri.find("i16=-32768,0,32767") != std::string::npos);
+            REQUIRE(uri.find("i32=-100,0,100") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ArrayTestRequest request;
+        request.setInt8ArrayLen(3);
+        request.setInt8Array({-128, 0, 127});
+        request.setInt16ArrayLen(3);
+        request.setInt16Array({-32768, 0, 32767});
+        request.setInt32ArrayLen(3);
+        request.setInt32Array({-100, 0, 100});
+        request.setInt64ArrayLen(0);
+        request.setInt64Array({});
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testSignedIntArrays",
+                    "parameters": [
+                        {"name": "i8", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "int8Array"},
+                        {"name": "i16", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "int16Array"},
+                        {"name": "i32", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "int32Array"}
+                    ]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testSignedIntArrays", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Unsigned Integer Arrays Serialization") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            REQUIRE(uri.find("u8=0,128,255") != std::string::npos);
+            REQUIRE(uri.find("u16=0,32768,65535") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ArrayTestRequest request;
+        request.setUint8ArrayLen(3);
+        request.setUint8Array({0, 128, 255});
+        request.setUint16ArrayLen(3);
+        request.setUint16Array({0, 32768, 65535});
+        request.setUint32ArrayLen(0);
+        request.setUint32Array({});
+        request.setUint64ArrayLen(0);
+        request.setUint64Array({});
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testUnsignedIntArrays",
+                    "parameters": [
+                        {"name": "u8", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "uint8Array"},
+                        {"name": "u16", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "uint16Array"}
+                    ]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testUnsignedIntArrays", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Floating Point Arrays Serialization") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // Just verify parameters exist, exact float representation varies
+            REQUIRE(uri.find("floats=") != std::string::npos);
+            REQUIRE(uri.find("doubles=") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ArrayTestRequest request;
+        request.setFloatArrayLen(3);
+        request.setFloatArray({0.0f, -1.5f, 3.14f});
+        request.setDoubleArrayLen(3);
+        request.setDoubleArray({0.0, -1.5, 3.14159});
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testFloatArrays",
+                    "parameters": [
+                        {"name": "floats", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "floatArray"},
+                        {"name": "doubles", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "doubleArray"}
+                    ]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testFloatArrays", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("String Array Serialization") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            REQUIRE(uri.find("strings=hello,world,test") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ArrayTestRequest request;
+        request.setStringArrayLen(3);
+        request.setStringArray({"hello", "world", "test"});
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testStringArray",
+                    "parameters": [{
+                        "name": "strings",
+                        "in": "query",
+                        "style": "form",
+                        "explode": false,
+                        "x-zserio-request-part": "stringArray"
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testStringArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Empty Array Handling") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // Empty array should still work
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ArrayTestRequest request;
+        request.setStringArrayLen(0);
+        request.setStringArray({});
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testEmptyArray",
+                    "parameters": [{
+                        "name": "empty",
+                        "in": "query",
+                        "style": "form",
+                        "explode": false,
+                        "x-zserio-request-part": "stringArray"
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testEmptyArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+}
+
+TEST_CASE("OAClient - Complex Type Arrays", "[oaclient][complex-arrays]") {
+    SECTION("Bytes Array Serialization") {
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ComplexArrayTestRequest request;
+        request.setBytesArrayLen(2);
+        zserio::vector<zserio::vector<uint8_t>> bytesVec;
+        bytesVec.push_back({0x01, 0x02, 0x03});
+        bytesVec.push_back({0xAA, 0xBB, 0xCC});
+        request.setBytesArray(bytesVec);
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testBytesArray",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testBytesArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(postCalled);
+    }
+
+    SECTION("Struct Array Serialization") {
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ComplexArrayTestRequest request;
+        request.setStructArrayLen(2);
+        zserio::vector<service_client_test::Address> addresses;
+        addresses.push_back(service_client_test::Address("Main St", 12345));
+        addresses.push_back(service_client_test::Address("Oak Ave", 67890));
+        request.setStructArray(addresses);
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testStructArray",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testStructArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(postCalled);
+    }
+
+    SECTION("Enum and Bitmask Arrays") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // Enums serialize as their underlying values
+            REQUIRE(uri.find("enums=0,1,2") != std::string::npos);
+            // Bitmasks also serialize as integers
+            REQUIRE(uri.find("masks=") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ComplexArrayTestRequest request;
+        request.setEnumArrayLen(3);
+        zserio::vector<service_client_test::Status> enums;
+        enums.push_back(service_client_test::Status::ACTIVE);
+        enums.push_back(service_client_test::Status::INACTIVE);
+        enums.push_back(service_client_test::Status::PENDING);
+        request.setEnumArray(enums);
+
+        request.setBitmaskArrayLen(2);
+        zserio::vector<service_client_test::Permissions> masks;
+        masks.push_back(service_client_test::Permissions::Values::PERM_READ);
+        masks.push_back(service_client_test::Permissions::Values::PERM_WRITE);
+        request.setBitmaskArray(masks);
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testEnumBitmaskArrays",
+                    "parameters": [
+                        {"name": "enums", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "enumArray"},
+                        {"name": "masks", "in": "query", "style": "form", "explode": false, "x-zserio-request-part": "bitmaskArray"}
+                    ]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testEnumBitmaskArrays", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+}
+
+TEST_CASE("OAClient - Single Complex Types", "[oaclient][complex-types]") {
+    SECTION("Single Bytes and Struct") {
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+            REQUIRE(body->body.size() > 0);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ComplexValueTestRequest request;
+        request.setSingleBytes({0x01, 0x02, 0x03, 0x04});
+        request.setSingleStruct(service_client_test::Address("Elm St", 99999));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testSingleBytesStruct",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testSingleBytesStruct", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(postCalled);
+    }
+
+    SECTION("Single Enum and Bitmask") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // Enum as uint8: 1 for INACTIVE
+            REQUIRE(uri.find("status=1") != std::string::npos);
+            // Bitmask as uint16
+            REQUIRE(uri.find("perms=") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ComplexValueTestRequest request;
+        request.setSingleEnum(service_client_test::Status::INACTIVE);
+        request.setSingleBitmask(service_client_test::Permissions::Values::PERM_READ |
+                                 service_client_test::Permissions::Values::PERM_WRITE);
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testSingleEnumBitmask",
+                    "parameters": [
+                        {"name": "status", "in": "query", "style": "form", "x-zserio-request-part": "singleEnum"},
+                        {"name": "perms", "in": "query", "style": "form", "x-zserio-request-part": "singleBitmask"}
+                    ]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testSingleEnumBitmask", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(getCalled);
+    }
+}
+
+TEST_CASE("OAClient - Error Handling", "[oaclient][error]") {
+    SECTION("Missing Reflection Data") {
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            FAIL("Should not make HTTP call without reflection");
+            return httpcl::IHttpClient::Result{500, {}};
+        };
+
+        // Create ServiceData without reflectable
+        class NonReflectableServiceData : public zserio::IServiceData {
+        public:
+            zserio::Span<const uint8_t> getData() const override {
+                return zserio::Span<const uint8_t>();
+            }
+            zserio::IReflectableConstPtr getReflectable() const override {
+                return nullptr;
+            }
+        };
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "test",
+                    "parameters": []
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        NonReflectableServiceData badData;
+
+        REQUIRE_THROWS_WITH(
+            service.callMethod("test", badData, nullptr),
+            Catch::Matchers::ContainsSubstring("Cannot use OAClient")
+        );
+    }
+
+    SECTION("Missing Field in Request") {
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            FAIL("Should not make HTTP call with missing field");
+            return httpcl::IHttpClient::Result{500, {}};
+        };
+
+        service_client_test::Request request("test", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testMissingField",
+                    "parameters": [{
+                        "name": "nonexistent",
+                        "in": "query",
+                        "x-zserio-request-part": "thisFieldDoesNotExist"
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+
+        REQUIRE_THROWS_WITH(
+            service.callMethod("testMissingField",
+                             zserio::ReflectableServiceData(request.reflectable()),
+                             nullptr),
+            Catch::Matchers::ContainsSubstring("Could not find field")
+        );
+    }
+}
+
+TEST_CASE("OAClient - Request Extraction Modes", "[oaclient][request-extraction]") {
+    SECTION("Whole Request Body Serialization") {
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        service_client_test::Request request("hello", 2, {"a", "b"},
+                                            service_client_test::Flat("admin", "Alice"));
+        auto expectedBuffer = zserio::serialize(request);
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+
+            // Verify entire request was serialized
+            REQUIRE(body->body.size() == expectedBuffer.getByteSize());
+            REQUIRE(std::equal(body->body.begin(), body->body.end(),
+                             expectedBuffer.getBuffer()));
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testWholeRequest",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testWholeRequest",
+                         zserio::ReflectableServiceData(request.reflectable()),
+                         nullptr);
+        REQUIRE(postCalled);
+    }
+
+    SECTION("Individual Field Extraction") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // Verify individual fields extracted correctly
+            REQUIRE(uri.find("str=hello") != std::string::npos);
+            REQUIRE(uri.find("len=3") != std::string::npos);
+            REQUIRE(uri.find("role=admin") != std::string::npos);
+            REQUIRE(uri.find("name=Alice") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("hello", 3, {"a", "b", "c"},
+                                            service_client_test::Flat("admin", "Alice"));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testFieldExtraction",
+                    "parameters": [
+                        {"name": "str", "in": "query", "x-zserio-request-part": "str"},
+                        {"name": "len", "in": "query", "x-zserio-request-part": "strLen"},
+                        {"name": "role", "in": "query", "x-zserio-request-part": "flat.role"},
+                        {"name": "name", "in": "query", "x-zserio-request-part": "flat.firstName"}
+                    ]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testFieldExtraction",
+                         zserio::ReflectableServiceData(request.reflectable()),
+                         nullptr);
+        REQUIRE(getCalled);
+    }
+}
+
+TEST_CASE("OAClient - Missing Reflection", "[oaclient][reflection]") {
+    SECTION("Call without reflection data throws exception") {
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testNoReflection",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+        auto service = OAClient(config, std::move(client));
+
+        // Create a reflectable service data without reflection (nullptr)
+        zserio::ReflectableServiceData noReflectionData(nullptr);
+
+        REQUIRE_THROWS_AS(
+            service.callMethod("testNoReflection", noReflectionData, nullptr),
+            std::runtime_error
+        );
+        REQUIRE_THROWS_WITH(
+            service.callMethod("testNoReflection", noReflectionData, nullptr),
+            Catch::Matchers::ContainsSubstring("withTypeInfoCode")
+        );
+    }
+}
+
+TEST_CASE("OAClient - Extern/BitBuffer Types", "[oaclient][extern][bitbuffer]") {
+    SECTION("Single Extern Field") {
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+            // Verify that extern field was serialized
+            REQUIRE_FALSE(body->body.empty());
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ExternTestRequest request;
+
+        // Create a BitBuffer for the extern field
+        std::vector<uint8_t> externData = {0xDE, 0xAD, 0xBE, 0xEF};
+        zserio::BitBuffer singleExternBuffer(externData.data(), externData.size());
+        request.setSingleExtern(singleExternBuffer);
+
+        request.setExternArrayLen(0);
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testSingleExtern",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testSingleExtern", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(postCalled);
+    }
+
+    SECTION("Extern Array") {
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            REQUIRE(body);
+            REQUIRE(body->contentType == ZSERIO_OBJECT_CONTENT_TYPE);
+            REQUIRE_FALSE(body->body.empty());
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ExternTestRequest request;
+
+        // Create empty single extern
+        std::vector<uint8_t> emptyData;
+        zserio::BitBuffer emptyBuffer(emptyData.data(), 0);
+        request.setSingleExtern(emptyBuffer);
+
+        // Create array of extern fields
+        std::vector<zserio::BitBuffer> externArray;
+
+        std::vector<uint8_t> data1 = {0x01, 0x02};
+        externArray.emplace_back(data1.data(), data1.size());
+
+        std::vector<uint8_t> data2 = {0x03, 0x04, 0x05};
+        externArray.emplace_back(data2.data(), data2.size());
+
+        request.setExternArrayLen(externArray.size());
+        request.setExternArray(externArray);
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testExternArray",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testExternArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(postCalled);
+    }
+
+    SECTION("Empty Extern Array") {
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            REQUIRE(body);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::ExternTestRequest request;
+
+        std::vector<uint8_t> data = {0xAB};
+        zserio::BitBuffer buffer(data.data(), data.size());
+        request.setSingleExtern(buffer);
+        request.setExternArrayLen(0);
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "post": {
+                    "operationId": "testEmptyExternArray",
+                    "requestBody": {
+                        "content": {
+                            "application/x-zserio-object": {
+                                "schema": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testEmptyExternArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
+        REQUIRE(postCalled);
+    }
+}
+
+// ============================================================================
+// SecuritySchemeTypeToString and SecuritySchemeMaps Tests
+// ============================================================================
+
+TEST_CASE("SecuritySchemeTypeToString", "[oaclient][security]") {
+    using SST = OpenAPIConfig::SecuritySchemeType;
+
+    SECTION("All known types have string representations") {
+        REQUIRE(std::string(securitySchemeTypeToString(SST::HttpBasic)) == "http/basic");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::HttpBearer)) == "http/bearer");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::ApiKeyQuery)) == "apiKey/query");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::ApiKeyHeader)) == "apiKey/header");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::ApiKeyCookie)) == "apiKey/cookie");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::OAuth2ClientCredentials)) == "oauth2/clientCredentials");
+    }
+}
+
+TEST_CASE("SecuritySchemeMaps", "[oaclient][security]") {
+    const auto& maps = OpenAPIConfig::SecuritySchemeMaps::instance();
+
+    SECTION("Forward lookup works for all types") {
+        REQUIRE(maps.forward.at({"http", "basic"}) == OpenAPIConfig::SecuritySchemeType::HttpBasic);
+        REQUIRE(maps.forward.at({"http", "bearer"}) == OpenAPIConfig::SecuritySchemeType::HttpBearer);
+        REQUIRE(maps.forward.at({"apiKey", "query"}) == OpenAPIConfig::SecuritySchemeType::ApiKeyQuery);
+        REQUIRE(maps.forward.at({"apiKey", "header"}) == OpenAPIConfig::SecuritySchemeType::ApiKeyHeader);
+        REQUIRE(maps.forward.at({"apiKey", "cookie"}) == OpenAPIConfig::SecuritySchemeType::ApiKeyCookie);
+        REQUIRE(maps.forward.at({"oauth2", "clientCredentials"}) == OpenAPIConfig::SecuritySchemeType::OAuth2ClientCredentials);
+    }
+
+    SECTION("Reverse lookup works for all types") {
+        using SST = OpenAPIConfig::SecuritySchemeType;
+        REQUIRE(maps.reverse.at(SST::HttpBasic) == "http/basic");
+        REQUIRE(maps.reverse.at(SST::HttpBearer) == "http/bearer");
+        REQUIRE(maps.reverse.at(SST::ApiKeyQuery) == "apiKey/query");
+        REQUIRE(maps.reverse.at(SST::ApiKeyHeader) == "apiKey/header");
+        REQUIRE(maps.reverse.at(SST::ApiKeyCookie) == "apiKey/cookie");
+        REQUIRE(maps.reverse.at(SST::OAuth2ClientCredentials) == "oauth2/clientCredentials");
+    }
+
+    SECTION("Invalid forward lookup returns end()") {
+        REQUIRE(maps.forward.find({"http", "invalid"}) == maps.forward.end());
+        REQUIRE(maps.forward.find({"invalid", "basic"}) == maps.forward.end());
+    }
+}
+
+TEST_CASE("OpenAPI Security Scheme Parsing Errors", "[oaclient][security][error]") {
+    SECTION("Invalid HTTP scheme subtype") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    InvalidHttpScheme:
+      type: http
+      scheme: digest
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("digest") &&
+            Catch::Matchers::ContainsSubstring("basic") &&
+            Catch::Matchers::ContainsSubstring("bearer")
+        );
+    }
+
+    SECTION("Invalid apiKey location") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    InvalidApiKey:
+      type: apiKey
+      in: body
+      name: X-API-Key
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("body") &&
+            Catch::Matchers::ContainsSubstring("query") &&
+            Catch::Matchers::ContainsSubstring("header") &&
+            Catch::Matchers::ContainsSubstring("cookie")
+        );
+    }
+
+    SECTION("Invalid security scheme type") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    InvalidType:
+      type: openIdConnect
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("openIdConnect") &&
+            Catch::Matchers::ContainsSubstring("http") &&
+            Catch::Matchers::ContainsSubstring("apiKey") &&
+            Catch::Matchers::ContainsSubstring("oauth2")
+        );
+    }
+
+    SECTION("OAuth2 without clientCredentials flow") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    UnsupportedOAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/authorize
+          tokenUrl: https://auth.example.com/token
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("clientCredentials")
+        );
     }
 }

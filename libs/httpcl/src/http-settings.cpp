@@ -11,6 +11,7 @@
 #include <future>
 #include <fstream>
 #include <filesystem>
+#include <sstream>
 #include <spdlog/spdlog.h>
 
 using namespace httpcl;
@@ -600,6 +601,114 @@ void Config::apply(httplib::Client &cl) const
 
 std::string Config::toYaml() const {
     return YAML::Dump(configToNode(*this));
+}
+
+std::string Config::toSafeString() const {
+    std::stringstream ss;
+
+    // Basic authentication
+    if (auth) {
+        ss << "  - Basic auth: user=" << auth->user;
+        if (!auth->password.empty())
+            ss << ", password=****";
+        if (!auth->keychain.empty())
+            ss << ", keychain=" << auth->keychain;
+        ss << "\n";
+    }
+
+    // OAuth2
+    if (oauth2) {
+        ss << "  - OAuth2 client credentials: clientId=" << oauth2->clientId;
+        if (!oauth2->clientSecret.empty())
+            ss << ", clientSecret=****";
+        if (!oauth2->clientSecretKeychain.empty())
+            ss << ", clientSecretKeychain=" << oauth2->clientSecretKeychain;
+        if (!oauth2->tokenUrlOverride.empty())
+            ss << ", tokenUrl=" << oauth2->tokenUrlOverride;
+        if (!oauth2->audience.empty())
+            ss << ", audience=" << oauth2->audience;
+        if (!oauth2->scopesOverride.empty()) {
+            ss << ", scopes=[";
+            for (size_t i = 0; i < oauth2->scopesOverride.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << oauth2->scopesOverride[i];
+            }
+            ss << "]";
+        }
+        ss << "\n";
+    }
+
+    // API key
+    if (apiKey) {
+        ss << "  - API key: ";
+        if (apiKey->length() <= 8)
+            ss << "****";
+        else
+            ss << apiKey->substr(0, 4) << "****" << apiKey->substr(apiKey->length() - 4);
+        ss << "\n";
+    }
+
+    // Headers (mask Authorization if it looks like a static bearer/basic token)
+    if (!headers.empty()) {
+        ss << "  - Headers: ";
+        bool first = true;
+        for (const auto& [key, value] : headers) {
+            if (!first) ss << ", ";
+            first = false;
+
+            if (key == "Authorization") {
+                // Mask static tokens, but indicate presence
+                if (value.find("Bearer ") == 0) {
+                    size_t tokenLen = value.length() - 7;
+                    ss << key << "=Bearer **** (" << tokenLen << " chars)";
+                } else if (value.find("Basic ") == 0) {
+                    ss << key << "=Basic ****";
+                } else {
+                    ss << key << "=****";
+                }
+            } else {
+                ss << key << "=" << value;
+            }
+        }
+        ss << "\n";
+    }
+
+    // Query parameters
+    if (!query.empty()) {
+        ss << "  - Query params: ";
+        bool first = true;
+        for (const auto& [key, value] : query) {
+            if (!first) ss << ", ";
+            first = false;
+            ss << key << "=" << value;
+        }
+        ss << "\n";
+    }
+
+    // Cookies
+    if (!cookies.empty()) {
+        ss << "  - Cookies: ";
+        bool first = true;
+        for (const auto& [key, value] : cookies) {
+            if (!first) ss << ", ";
+            first = false;
+            ss << key << "=" << value;
+        }
+        ss << "\n";
+    }
+
+    // Proxy
+    if (proxy) {
+        ss << "  - Proxy: " << proxy->host << ":" << proxy->port;
+        if (!proxy->user.empty())
+            ss << ", user=" << proxy->user << ", password=****";
+        ss << "\n";
+    }
+
+    std::string result = ss.str();
+    if (result.empty())
+        return "  (no auth configuration)\n";
+    return result;
 }
 
 Config& Config::operator |= (Config const& other) {

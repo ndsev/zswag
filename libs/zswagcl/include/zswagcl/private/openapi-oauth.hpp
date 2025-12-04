@@ -54,7 +54,7 @@ private:
         const std::string& resolvedTokenUrl,
         const std::string& grantType,
         const std::vector<std::string>& resolvedScopes = {},
-        const std::string& refreshToken = "");
+        const std::string& refreshToken = "") const;
 };
 
 /**

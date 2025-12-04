@@ -95,7 +95,7 @@ struct YAMLScope {
         return node_.as<T>();
     }
 
-    void forEach(std::function<void(YAMLScope const& child)> const& fun) {
+    void forEach(std::function<void(YAMLScope const& child)> const& fun) const {
         if (!node_ || !fun || !(node_.IsMap() || node_.IsSequence()))
             return;
         size_t i = 0;
@@ -335,7 +335,7 @@ static void parseMethod(const std::string& method,
                        path.httpMethod.begin(),
                        &toupper);
 
-        methodNode["parameters"].forEach([&](auto const& parameterNode){
+        methodNode["parameters"].forEach([&path](auto const& parameterNode){
             parseMethodParameter(parameterNode, path);
         });
 
@@ -357,39 +357,30 @@ static void parseSecurityScheme(
     auto info = std::make_shared<OpenAPIConfig::SecurityScheme>();
     info->id = name;
 
+    // Determine subtype based on scheme type and parse type-specific fields
+    std::string subtype;
+    std::optional<YAMLScope> subtypeNode;
+
     if (schemeType == "http") {
         auto schemeHttpTypeNode = schemeNode.mandatoryChild("scheme");
-        auto schemeHttpType = schemeHttpTypeNode.as<std::string>();
-
-        if (schemeHttpType == "basic")
-            info->type = OpenAPIConfig::SecuritySchemeType::HttpBasic;
-        else if (schemeHttpType == "bearer")
-            info->type = OpenAPIConfig::SecuritySchemeType::HttpBearer;
-        else
-            throw schemeHttpTypeNode.valueError(schemeHttpType, {"basic", "bearer"});
+        subtype = schemeHttpTypeNode.as<std::string>();
+        subtypeNode = schemeHttpTypeNode;
     }
     else if (schemeType == "apiKey") {
         auto keyLocationNode = schemeNode.mandatoryChild("in");
-        auto keyLocation = keyLocationNode.as<std::string>();
+        subtype = keyLocationNode.as<std::string>();
+        subtypeNode = keyLocationNode;
+
         auto parameterNameNode = schemeNode.mandatoryChild("name");
         info->apiKeyName = parameterNameNode.as<std::string>();
-
-        if (keyLocation == "query")
-            info->type = OpenAPIConfig::SecuritySchemeType::ApiKeyQuery;
-        else if (keyLocation == "header")
-            info->type = OpenAPIConfig::SecuritySchemeType::ApiKeyHeader;
-        else if (keyLocation == "cookie")
-            info->type = OpenAPIConfig::SecuritySchemeType::ApiKeyCookie;
-        else
-            throw keyLocationNode.valueError(keyLocation, {"query", "header", "cookie"});
     }
     else if (schemeType == "oauth2") {
         auto flows = schemeNode.mandatoryChild("flows");
         auto cc = flows["clientCredentials"];
         if (!cc)
             throw flows.missingFieldError("clientCredentials");  // we only support CC for now
+        subtype = "clientCredentials";
 
-        info->type = OpenAPIConfig::SecuritySchemeType::OAuth2ClientCredentials;
         info->oauthTokenUrl = cc.mandatoryChild("tokenUrl").as<std::string>();
 
         // Optional refresh URL
@@ -400,7 +391,7 @@ static void parseSecurityScheme(
         // Optional documentation of scopes (name -> description)
         if (auto scopes = cc["scopes"]) {
             scopes.forEach(
-                [&](auto const& kv)
+                [&info](auto const& kv)
                 {
                     info->oauthScopes[kv.name_] = kv.template as<std::string>();
                 });
@@ -408,6 +399,27 @@ static void parseSecurityScheme(
     }
     else {
         throw schemeTypeNode.valueError(schemeType, {"http", "apiKey", "oauth2"});
+    }
+
+    // Use mapping table to convert type+subtype to enum
+    const auto& maps = OpenAPIConfig::SecuritySchemeMaps::instance();
+    auto it = maps.forward.find({schemeType, subtype});
+
+    if (it != maps.forward.end()) {
+        info->type = it->second;
+    } else {
+        // Generate error with valid subtypes for this type
+        std::vector<std::string> validSubtypes;
+        for (const auto& [key, value] : maps.forward) {
+            if (key.first == schemeType) {
+                validSubtypes.push_back(key.second);
+            }
+        }
+
+        if (subtypeNode) {
+            throw subtypeNode->valueError(subtype, validSubtypes);
+        }
+        throw std::runtime_error(stx::format("Unsupported security scheme: {}/{}", schemeType, subtype));
     }
 
     // Store in the config map
@@ -448,7 +460,7 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& ss)
 
     auto doc = YAML::Load(config.content);
     YAMLScope docScope{"", doc};
-    docScope["servers"].forEach([&](auto const& serverNode){
+    docScope["servers"].forEach([&config](auto const& serverNode){
         try { parseServer(serverNode, config); }
         catch (const httpcl::URIError& e) {
             throw httpcl::logRuntimeError(
@@ -457,16 +469,27 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& ss)
     });
 
     if (auto components = docScope["components"]) {
-        components["securitySchemes"].forEach([&](auto const& scheme){
+        components["securitySchemes"].forEach([&config](auto const& scheme){
             parseSecurityScheme(scheme, config);
         });
+    }
+
+    // Debug log parsed security schemes
+    if (!config.securitySchemes.empty()) {
+        httpcl::log().debug("[OpenAPI] Parsed {} security scheme(s):", config.securitySchemes.size());
+        for (const auto& [name, scheme] : config.securitySchemes) {
+            httpcl::log().debug("  - '{}' (type: {})", name,
+                securitySchemeTypeToString(scheme->type));
+        }
+    } else {
+        httpcl::log().debug("[OpenAPI] No security schemes defined in spec");
     }
 
     if (auto security = docScope["security"]) {
         config.defaultSecurityScheme = parseSecurity(security, config);
     }
 
-    docScope.mandatoryChild("paths").forEach([&](auto const& path){
+    docScope.mandatoryChild("paths").forEach([&config](auto const& path){
         parsePath(path, config);
     });
 

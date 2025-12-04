@@ -10,12 +10,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # without requiring CMakeLists.txt updates between releases.
 # For official releases, this value should match the git tag.
 if(NOT DEFINED ZSWAG_VERSION)
-  set(ZSWAG_VERSION 1.11.0)
+  set(ZSWAG_VERSION 1.11.1)
 endif()
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
 option(ZSWAG_KEYCHAIN_SUPPORT "Enable zswag keychain support." ON)
 option(ZSWAG_ENABLE_TESTING "Enable testing for the project" OFF)
+option(ZSWAG_ENABLE_COVERAGE "Enable code coverage analysis (requires Debug build)" OFF)
 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   message (STATUS "Testing will be enabled as zswag is the top-level project.")
@@ -24,6 +25,11 @@ endif()
 
 if (ZSWAG_ENABLE_TESTING)
   enable_testing()
+endif()
+
+# Include coverage configuration if enabled
+if (ZSWAG_ENABLE_COVERAGE)
+  include(cmake/coverage.cmake)
 endif()
 
 if (NOT MSVC)

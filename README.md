@@ -1,7 +1,10 @@
 # Zswag
 
 [![CI](https://github.com/ndsev/zswag/actions/workflows/build-deploy.yml/badge.svg)](https://github.com/ndsev/zswag/actions/workflows/build-deploy.yml)
+[![codecov](https://codecov.io/github/ndsev/zswag/graph/badge.svg?token=5DTX2M8IDE)](https://codecov.io/github/ndsev/zswag)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ndsev_zswag&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ndsev_zswag)
 [![Release](https://img.shields.io/github/release/ndsev/zswag)](https://GitHub.com/ndsev/zswag/releases/)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ndsev_zswag&metric=coverage)](https://sonarcloud.io/summary/new_code?id=ndsev_zswag)
 [![License](https://img.shields.io/github/license/ndsev/zswag)](https://github.com/ndsev/zswag/blob/master/LICENSE)
 
 zswag is a set of libraries for using/hosting zserio services through OpenAPI.
@@ -161,6 +164,77 @@ cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON -DFETCHCONTENT_SOURCE_DIR_SPDLOG=/pat
 cmake -DZSWAG_BUILD_WHEELS=ON -DZSWAG_ENABLE_TESTING=ON ..
 ```
 
+#### Code Coverage
+
+[![codecov](https://codecov.io/gh/ndsev/zswag/branch/master/graph/badge.svg)](https://codecov.io/gh/ndsev/zswag)
+
+zswag includes comprehensive C++ test coverage analysis for the `httpcl` and `zswagcl` libraries. Coverage is automatically collected in CI and reported to [Codecov](https://codecov.io/gh/ndsev/zswag).
+
+**📊 [View HTML Coverage Report](https://ndsev.github.io/zswag/coverage/)** - Browsable coverage report hosted on GitHub Pages
+
+**Local Coverage Analysis**
+
+To generate coverage reports locally, you'll need:
+- GCC or Clang compiler
+- `lcov` and `genhtml` tools (install with `sudo apt-get install lcov` on Ubuntu/Debian)
+
+Build with coverage enabled:
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug \
+      -DZSWAG_ENABLE_COVERAGE=ON \
+      -DZSWAG_ENABLE_TESTING=ON \
+      -DZSWAG_BUILD_WHEELS=OFF \
+      -DZSWAG_KEYCHAIN_SUPPORT=OFF ..
+cmake --build .
+```
+
+**Note:** The flags `-DZSWAG_BUILD_WHEELS=OFF` and `-DZSWAG_KEYCHAIN_SUPPORT=OFF` disable features that aren't needed for coverage analysis and avoid requiring Python development headers or system keychain libraries.
+
+Generate coverage reports:
+```bash
+# Run tests to generate coverage data
+ctest --output-on-failure
+
+# Generate HTML coverage report
+cmake --build . --target coverage-report
+```
+
+The HTML coverage report will be available at `build/coverage/html/index.html`.
+
+**Available Coverage Targets:**
+- `coverage-clean` - Remove all coverage data
+- `coverage-report` - Generate coverage report from existing test runs
+- `coverage` - Clean, run tests, and generate report (all-in-one)
+
+**Coverage Configuration:**
+- **Goal:** 70%+ line coverage (initial), near 100% line and branch coverage (ultimate)
+- **Scope:** Coverage is tracked only for library source files (`libs/httpcl`, `libs/zswagcl`)
+- **Not included:** Test code, dependencies, generated code (zserio)
+
+**Troubleshooting Coverage Builds:**
+
+If you get "gcov not found" warnings:
+```bash
+# Check if versioned gcov exists
+which gcov-13 gcov-12 gcov-11
+
+# Create symlink (example for gcov-13)
+sudo ln -s /usr/bin/gcov-13 /usr/bin/gcov
+
+# Or install gcc package
+sudo apt-get install gcc
+```
+
+If you want to build coverage **with** wheel support (requires Python development headers):
+```bash
+cmake -DCMAKE_BUILD_TYPE=Debug \
+      -DZSWAG_ENABLE_COVERAGE=ON \
+      -DZSWAG_ENABLE_TESTING=ON \
+      -DZSWAG_BUILD_WHEELS=ON \
+      -DZSWAG_KEYCHAIN_SUPPORT=OFF ..
+```
+Note: This requires `python3-dev` package (Ubuntu/Debian) or equivalent on your system.
 
 ## CI/CD and Release Process
 
@@ -663,6 +737,8 @@ int main (int argc, char* argv[])
 Both the Python and C++ Clients can be configured using the following
 environment variables:
 
+<!-- --8<-- [start:env] -->
+
 | Variable Name | Details   |
 | ------------- | --------- |
 | `HTTP_SETTINGS_FILE` | Path to settings file for HTTP proxies and authentication, see [next section](#persistent-http-headers-proxy-cookie-and-authentication) |
@@ -672,11 +748,19 @@ environment variables:
 | `HTTP_TIMEOUT` | Timeout for HTTP requests (connection+transfer) in seconds. Defaults to 60s. |
 | `HTTP_SSL_STRICT` | Set to any nonempty value for strict SSL certificate validation. |
 
+<!-- --8<-- [end:env] -->
+
 ## Persistent HTTP Headers, Proxy, Cookie and Authentication
 
 Both the Python `OAClient` and C++ `HttpLibHttpClient` read a YAML file
 stored under a path which is given by the `HTTP_SETTINGS_FILE` environment
-variable. The YAML file contains a list of HTTP-related configs that are
+variable.
+
+<!-- --8<-- [start:settings] -->
+
+### HTTP Settings File Format 
+
+The YAML file contains a list of HTTP-related configs that are
 applied to HTTP requests based on a regular expression which is matched
 against the requested URL.
 
@@ -727,7 +811,7 @@ http-settings:
 
 **Note:** For `proxy` configs, the credentials are optional.
 
-#### OAuth2 Configuration: Required vs Optional Fields
+### OAuth2 Configuration: Required vs Optional Fields
 
 **Important:** Zswag only supports the **OAuth2 `clientCredentials` flow**. Other flows (`authorizationCode`, `implicit`, `password`) are not supported.
 
@@ -760,7 +844,7 @@ When both http-settings.yaml and the OpenAPI specification provide values, the f
 | **Public OpenAPI spec** | `false` | ❌ Optional | ✅ Required in spec | OpenAPI spec value used |
 | **Override spec settings** | `true` or `false` | ✅ Provided | Any | http-settings value **always wins** |
 
-#### OAuth2 Token Endpoint Authentication Methods
+### OAuth2 Token Endpoint Authentication Methods
 
 The `tokenEndpointAuth` field controls how the client authenticates when requesting OAuth2 tokens. Two methods are supported:
 
@@ -775,7 +859,7 @@ The `tokenEndpointAuth` field controls how the client authenticates when request
 - Provides enhanced security through cryptographic request signing
 - **Note:** Only HMAC-SHA256 signature method is supported
 
-#### OAuth2-Authenticated OpenAPI Spec Fetching
+### OAuth2-Authenticated OpenAPI Spec Fetching
 
 By default, when OAuth2 is configured, zswag will acquire an OAuth2 access token **before** fetching the OpenAPI specification. This solves the "chicken-and-egg" problem where the OpenAPI spec endpoint itself requires authentication.
 
@@ -829,7 +913,7 @@ The logs will show:
 - OAuth2 configuration status for OpenAPI spec fetch
 - Whether OAuth2 token is being used for spec fetch
 
-#### Testing OAuth 1.0 Signature with Your Service
+### Testing OAuth 1.0 Signature with Your Service
 
 To verify OAuth 1.0 signature authentication with your service:
 
@@ -897,6 +981,8 @@ on each platform:
 * [Linux `secret-tool`](https://www.marian-dan.ro/blog/storing-secrets-using-secret-tool) 
 * [macOS `add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html)
 * [Windows `cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/)
+
+<!-- --8<-- [end:settings] -->
 
 ## Client Result Code Handling
 
