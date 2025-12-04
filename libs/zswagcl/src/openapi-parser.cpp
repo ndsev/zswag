@@ -335,7 +335,7 @@ static void parseMethod(const std::string& method,
                        path.httpMethod.begin(),
                        &toupper);
 
-        methodNode["parameters"].forEach([&](auto const& parameterNode){
+        methodNode["parameters"].forEach([&path](auto const& parameterNode){
             parseMethodParameter(parameterNode, path);
         });
 
@@ -391,7 +391,7 @@ static void parseSecurityScheme(
         // Optional documentation of scopes (name -> description)
         if (auto scopes = cc["scopes"]) {
             scopes.forEach(
-                [&](auto const& kv)
+                [&info](auto const& kv)
                 {
                     info->oauthScopes[kv.name_] = kv.template as<std::string>();
                 });
@@ -460,7 +460,7 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& ss)
 
     auto doc = YAML::Load(config.content);
     YAMLScope docScope{"", doc};
-    docScope["servers"].forEach([&](auto const& serverNode){
+    docScope["servers"].forEach([&config](auto const& serverNode){
         try { parseServer(serverNode, config); }
         catch (const httpcl::URIError& e) {
             throw httpcl::logRuntimeError(
@@ -469,7 +469,7 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& ss)
     });
 
     if (auto components = docScope["components"]) {
-        components["securitySchemes"].forEach([&](auto const& scheme){
+        components["securitySchemes"].forEach([&config](auto const& scheme){
             parseSecurityScheme(scheme, config);
         });
     }
@@ -489,7 +489,7 @@ OpenAPIConfig parseOpenAPIConfig(std::istream& ss)
         config.defaultSecurityScheme = parseSecurity(security, config);
     }
 
-    docScope.mandatoryChild("paths").forEach([&](auto const& path){
+    docScope.mandatoryChild("paths").forEach([&config](auto const& path){
         parsePath(path, config);
     });
 
