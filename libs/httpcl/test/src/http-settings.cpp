@@ -638,3 +638,198 @@ http-settings:
     REQUIRE(config2.apiKey.has_value());
     REQUIRE(*config2.apiKey == "updated-key");
 }
+
+// =============================================================================
+// toSafeString Tests
+// =============================================================================
+
+TEST_CASE("ToSafeStringEmptyConfig", "[http-settings][to-safe-string]") {
+    httpcl::Config config;
+    auto result = config.toSafeString();
+    REQUIRE(result == "  (no auth configuration)\n");
+}
+
+TEST_CASE("ToSafeStringBasicAuth", "[http-settings][to-safe-string]") {
+    SECTION("With password") {
+        httpcl::Config config;
+        config.auth = httpcl::Config::BasicAuthentication{"testuser", "secretpass", ""};
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Basic auth: user=testuser") != std::string::npos);
+        REQUIRE(result.find("password=****") != std::string::npos);
+        REQUIRE(result.find("secretpass") == std::string::npos);
+    }
+
+    SECTION("With keychain") {
+        httpcl::Config config;
+        config.auth = httpcl::Config::BasicAuthentication{"testuser", "", "my-keychain"};
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Basic auth: user=testuser") != std::string::npos);
+        REQUIRE(result.find("keychain=my-keychain") != std::string::npos);
+    }
+
+    SECTION("Without password or keychain") {
+        httpcl::Config config;
+        config.auth = httpcl::Config::BasicAuthentication{"testuser", "", ""};
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Basic auth: user=testuser") != std::string::npos);
+        REQUIRE(result.find("password=") == std::string::npos);
+        REQUIRE(result.find("keychain=") == std::string::npos);
+    }
+}
+
+TEST_CASE("ToSafeStringOAuth2", "[http-settings][to-safe-string]") {
+    SECTION("Basic OAuth2") {
+        httpcl::Config config;
+        config.oauth2 = httpcl::Config::OAuth2{};
+        config.oauth2->clientId = "my-client";
+        config.oauth2->clientSecret = "my-secret";
+        auto result = config.toSafeString();
+        REQUIRE(result.find("OAuth2 client credentials: clientId=my-client") != std::string::npos);
+        REQUIRE(result.find("clientSecret=****") != std::string::npos);
+        REQUIRE(result.find("my-secret") == std::string::npos);
+    }
+
+    SECTION("OAuth2 with keychain") {
+        httpcl::Config config;
+        config.oauth2 = httpcl::Config::OAuth2{};
+        config.oauth2->clientId = "my-client";
+        config.oauth2->clientSecretKeychain = "oauth-keychain";
+        auto result = config.toSafeString();
+        REQUIRE(result.find("clientSecretKeychain=oauth-keychain") != std::string::npos);
+    }
+
+    SECTION("OAuth2 with tokenUrl override") {
+        httpcl::Config config;
+        config.oauth2 = httpcl::Config::OAuth2{};
+        config.oauth2->clientId = "my-client";
+        config.oauth2->tokenUrlOverride = "https://auth.example.com/token";
+        auto result = config.toSafeString();
+        REQUIRE(result.find("tokenUrl=https://auth.example.com/token") != std::string::npos);
+    }
+
+    SECTION("OAuth2 with audience") {
+        httpcl::Config config;
+        config.oauth2 = httpcl::Config::OAuth2{};
+        config.oauth2->clientId = "my-client";
+        config.oauth2->audience = "https://api.example.com";
+        auto result = config.toSafeString();
+        REQUIRE(result.find("audience=https://api.example.com") != std::string::npos);
+    }
+
+    SECTION("OAuth2 with scopes") {
+        httpcl::Config config;
+        config.oauth2 = httpcl::Config::OAuth2{};
+        config.oauth2->clientId = "my-client";
+        config.oauth2->scopesOverride = {"read", "write", "admin"};
+        auto result = config.toSafeString();
+        REQUIRE(result.find("scopes=[read, write, admin]") != std::string::npos);
+    }
+}
+
+TEST_CASE("ToSafeStringApiKey", "[http-settings][to-safe-string]") {
+    SECTION("Short API key (<=8 chars)") {
+        httpcl::Config config;
+        config.apiKey = "short";
+        auto result = config.toSafeString();
+        REQUIRE(result.find("API key: ****") != std::string::npos);
+        REQUIRE(result.find("short") == std::string::npos);
+    }
+
+    SECTION("Long API key (>8 chars)") {
+        httpcl::Config config;
+        config.apiKey = "abcd1234efgh5678";
+        auto result = config.toSafeString();
+        REQUIRE(result.find("API key: abcd****5678") != std::string::npos);
+    }
+}
+
+TEST_CASE("ToSafeStringHeaders", "[http-settings][to-safe-string]") {
+    SECTION("Regular headers") {
+        httpcl::Config config;
+        config.headers.insert({"X-Custom-Header", "some-value"});
+        config.headers.insert({"X-Another", "another-value"});
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Headers:") != std::string::npos);
+        REQUIRE(result.find("X-Custom-Header=some-value") != std::string::npos);
+    }
+
+    SECTION("Authorization Bearer header") {
+        httpcl::Config config;
+        config.headers.insert({"Authorization", "Bearer myverylongtoken12345"});
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Authorization=Bearer ****") != std::string::npos);
+        REQUIRE(result.find("myverylongtoken") == std::string::npos);
+    }
+
+    SECTION("Authorization Basic header") {
+        httpcl::Config config;
+        config.headers.insert({"Authorization", "Basic dXNlcjpwYXNz"});
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Authorization=Basic ****") != std::string::npos);
+        REQUIRE(result.find("dXNlcjpwYXNz") == std::string::npos);
+    }
+
+    SECTION("Non-Bearer/Basic Authorization header") {
+        httpcl::Config config;
+        config.headers.insert({"Authorization", "CustomScheme token123"});
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Authorization=****") != std::string::npos);
+        REQUIRE(result.find("token123") == std::string::npos);
+    }
+}
+
+TEST_CASE("ToSafeStringQueryParams", "[http-settings][to-safe-string]") {
+    httpcl::Config config;
+    config.query.insert({"api_key", "key123"});
+    config.query.insert({"version", "v2"});
+    auto result = config.toSafeString();
+    REQUIRE(result.find("Query params:") != std::string::npos);
+    REQUIRE(result.find("api_key=key123") != std::string::npos);
+    REQUIRE(result.find("version=v2") != std::string::npos);
+}
+
+TEST_CASE("ToSafeStringCookies", "[http-settings][to-safe-string]") {
+    httpcl::Config config;
+    config.cookies["session"] = "abc123";
+    config.cookies["user"] = "testuser";
+    auto result = config.toSafeString();
+    REQUIRE(result.find("Cookies:") != std::string::npos);
+    REQUIRE(result.find("session=abc123") != std::string::npos);
+    REQUIRE(result.find("user=testuser") != std::string::npos);
+}
+
+TEST_CASE("ToSafeStringProxy", "[http-settings][to-safe-string]") {
+    SECTION("Proxy without auth") {
+        httpcl::Config config;
+        config.proxy = httpcl::Config::Proxy{"proxy.example.com", 8080, "", "", ""};
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Proxy: proxy.example.com:8080") != std::string::npos);
+        REQUIRE(result.find("user=") == std::string::npos);
+    }
+
+    SECTION("Proxy with auth") {
+        httpcl::Config config;
+        config.proxy = httpcl::Config::Proxy{"proxy.example.com", 8080, "proxyuser", "proxypass", ""};
+        auto result = config.toSafeString();
+        REQUIRE(result.find("Proxy: proxy.example.com:8080") != std::string::npos);
+        REQUIRE(result.find("user=proxyuser") != std::string::npos);
+        REQUIRE(result.find("password=****") != std::string::npos);
+        REQUIRE(result.find("proxypass") == std::string::npos);
+    }
+}
+
+TEST_CASE("ToSafeStringCombined", "[http-settings][to-safe-string]") {
+    httpcl::Config config;
+    config.auth = httpcl::Config::BasicAuthentication{"user", "pass", ""};
+    config.apiKey = "longapikey1234567890";
+    config.headers.insert({"X-Custom", "value"});
+    config.query.insert({"q", "search"});
+    config.cookies["c"] = "cookie";
+
+    auto result = config.toSafeString();
+    REQUIRE(result.find("Basic auth:") != std::string::npos);
+    REQUIRE(result.find("API key:") != std::string::npos);
+    REQUIRE(result.find("Headers:") != std::string::npos);
+    REQUIRE(result.find("Query params:") != std::string::npos);
+    REQUIRE(result.find("Cookies:") != std::string::npos);
+}

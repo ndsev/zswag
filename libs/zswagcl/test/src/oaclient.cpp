@@ -1,8 +1,10 @@
 #include <catch2/catch_all.hpp>
 
 #include <fstream>
+#include <sstream>
 
 #include "zswagcl/oaclient.hpp"
+#include "zswagcl/private/openapi-config.hpp"
 #include "zserio/SerializeUtil.h"
 #include "service_client_test/Flat.h"
 #include "service_client_test/Request.h"
@@ -1094,5 +1096,162 @@ TEST_CASE("OAClient - Extern/BitBuffer Types", "[oaclient][extern][bitbuffer]") 
         service.callMethod("testEmptyExternArray", zserio::ReflectableServiceData(request.reflectable()), nullptr);
         REQUIRE(postCalled);
     }
+}
 
+// ============================================================================
+// SecuritySchemeTypeToString and SecuritySchemeMaps Tests
+// ============================================================================
+
+TEST_CASE("SecuritySchemeTypeToString", "[oaclient][security]") {
+    using SST = OpenAPIConfig::SecuritySchemeType;
+
+    SECTION("All known types have string representations") {
+        REQUIRE(std::string(securitySchemeTypeToString(SST::HttpBasic)) == "http/basic");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::HttpBearer)) == "http/bearer");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::ApiKeyQuery)) == "apiKey/query");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::ApiKeyHeader)) == "apiKey/header");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::ApiKeyCookie)) == "apiKey/cookie");
+        REQUIRE(std::string(securitySchemeTypeToString(SST::OAuth2ClientCredentials)) == "oauth2/clientCredentials");
+    }
+}
+
+TEST_CASE("SecuritySchemeMaps", "[oaclient][security]") {
+    const auto& maps = OpenAPIConfig::SecuritySchemeMaps::instance();
+
+    SECTION("Forward lookup works for all types") {
+        REQUIRE(maps.forward.at({"http", "basic"}) == OpenAPIConfig::SecuritySchemeType::HttpBasic);
+        REQUIRE(maps.forward.at({"http", "bearer"}) == OpenAPIConfig::SecuritySchemeType::HttpBearer);
+        REQUIRE(maps.forward.at({"apiKey", "query"}) == OpenAPIConfig::SecuritySchemeType::ApiKeyQuery);
+        REQUIRE(maps.forward.at({"apiKey", "header"}) == OpenAPIConfig::SecuritySchemeType::ApiKeyHeader);
+        REQUIRE(maps.forward.at({"apiKey", "cookie"}) == OpenAPIConfig::SecuritySchemeType::ApiKeyCookie);
+        REQUIRE(maps.forward.at({"oauth2", "clientCredentials"}) == OpenAPIConfig::SecuritySchemeType::OAuth2ClientCredentials);
+    }
+
+    SECTION("Reverse lookup works for all types") {
+        using SST = OpenAPIConfig::SecuritySchemeType;
+        REQUIRE(maps.reverse.at(SST::HttpBasic) == "http/basic");
+        REQUIRE(maps.reverse.at(SST::HttpBearer) == "http/bearer");
+        REQUIRE(maps.reverse.at(SST::ApiKeyQuery) == "apiKey/query");
+        REQUIRE(maps.reverse.at(SST::ApiKeyHeader) == "apiKey/header");
+        REQUIRE(maps.reverse.at(SST::ApiKeyCookie) == "apiKey/cookie");
+        REQUIRE(maps.reverse.at(SST::OAuth2ClientCredentials) == "oauth2/clientCredentials");
+    }
+
+    SECTION("Invalid forward lookup returns end()") {
+        REQUIRE(maps.forward.find({"http", "invalid"}) == maps.forward.end());
+        REQUIRE(maps.forward.find({"invalid", "basic"}) == maps.forward.end());
+    }
+}
+
+TEST_CASE("OpenAPI Security Scheme Parsing Errors", "[oaclient][security][error]") {
+    SECTION("Invalid HTTP scheme subtype") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    InvalidHttpScheme:
+      type: http
+      scheme: digest
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("digest") &&
+            Catch::Matchers::ContainsSubstring("basic") &&
+            Catch::Matchers::ContainsSubstring("bearer")
+        );
+    }
+
+    SECTION("Invalid apiKey location") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    InvalidApiKey:
+      type: apiKey
+      in: body
+      name: X-API-Key
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("body") &&
+            Catch::Matchers::ContainsSubstring("query") &&
+            Catch::Matchers::ContainsSubstring("header") &&
+            Catch::Matchers::ContainsSubstring("cookie")
+        );
+    }
+
+    SECTION("Invalid security scheme type") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    InvalidType:
+      type: openIdConnect
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("openIdConnect") &&
+            Catch::Matchers::ContainsSubstring("http") &&
+            Catch::Matchers::ContainsSubstring("apiKey") &&
+            Catch::Matchers::ContainsSubstring("oauth2")
+        );
+    }
+
+    SECTION("OAuth2 without clientCredentials flow") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    UnsupportedOAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/authorize
+          tokenUrl: https://auth.example.com/token
+paths:
+  /test:
+    get:
+      operationId: test
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("clientCredentials")
+        );
+    }
 }

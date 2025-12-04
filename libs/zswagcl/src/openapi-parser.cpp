@@ -410,9 +410,9 @@ static void parseSecurityScheme(
     } else {
         // Generate error with valid subtypes for this type
         std::vector<std::string> validSubtypes;
-        for (const auto& mapping : OpenAPIConfig::SECURITY_SCHEME_MAPPINGS) {
-            if (mapping.openapiType == schemeType) {
-                validSubtypes.push_back(mapping.openapiSubtype);
+        for (const auto& [key, value] : maps.forward) {
+            if (key.first == schemeType) {
+                validSubtypes.push_back(key.second);
             }
         }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 #include <map>
@@ -43,16 +44,17 @@ struct OpenAPIConfig
 
     /**
      * Security scheme mapping table - single source of truth.
-     * When adding new security scheme types, only update this array.
+     * When adding new security scheme types, update this array and the size.
+     * Using std::array with explicit size for reliable cross-platform constexpr behavior.
      */
-    static constexpr SecuritySchemeMapping SECURITY_SCHEME_MAPPINGS[] = {
+    static constexpr std::array<SecuritySchemeMapping, 6> SECURITY_SCHEME_MAPPINGS = {{
         {"http", "basic", SecuritySchemeType::HttpBasic, "http/basic"},
         {"http", "bearer", SecuritySchemeType::HttpBearer, "http/bearer"},
         {"apiKey", "query", SecuritySchemeType::ApiKeyQuery, "apiKey/query"},
         {"apiKey", "header", SecuritySchemeType::ApiKeyHeader, "apiKey/header"},
         {"apiKey", "cookie", SecuritySchemeType::ApiKeyCookie, "apiKey/cookie"},
         {"oauth2", "clientCredentials", SecuritySchemeType::OAuth2ClientCredentials, "oauth2/clientCredentials"},
-    };
+    }};
 
     /**
      * Bidirectional maps for security scheme lookups.
