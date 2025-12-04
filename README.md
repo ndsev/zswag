@@ -737,6 +737,8 @@ int main (int argc, char* argv[])
 Both the Python and C++ Clients can be configured using the following
 environment variables:
 
+<!-- --8<-- [start:env] -->
+
 | Variable Name | Details   |
 | ------------- | --------- |
 | `HTTP_SETTINGS_FILE` | Path to settings file for HTTP proxies and authentication, see [next section](#persistent-http-headers-proxy-cookie-and-authentication) |
@@ -746,11 +748,19 @@ environment variables:
 | `HTTP_TIMEOUT` | Timeout for HTTP requests (connection+transfer) in seconds. Defaults to 60s. |
 | `HTTP_SSL_STRICT` | Set to any nonempty value for strict SSL certificate validation. |
 
+<!-- --8<-- [end:env] -->
+
 ## Persistent HTTP Headers, Proxy, Cookie and Authentication
 
 Both the Python `OAClient` and C++ `HttpLibHttpClient` read a YAML file
 stored under a path which is given by the `HTTP_SETTINGS_FILE` environment
-variable. The YAML file contains a list of HTTP-related configs that are
+variable.
+
+<!-- --8<-- [start:settings] -->
+
+### HTTP Settings File Format 
+
+The YAML file contains a list of HTTP-related configs that are
 applied to HTTP requests based on a regular expression which is matched
 against the requested URL.
 
@@ -801,7 +811,7 @@ http-settings:
 
 **Note:** For `proxy` configs, the credentials are optional.
 
-#### OAuth2 Configuration: Required vs Optional Fields
+### OAuth2 Configuration: Required vs Optional Fields
 
 **Important:** Zswag only supports the **OAuth2 `clientCredentials` flow**. Other flows (`authorizationCode`, `implicit`, `password`) are not supported.
 
@@ -834,7 +844,7 @@ When both http-settings.yaml and the OpenAPI specification provide values, the f
 | **Public OpenAPI spec** | `false` | ❌ Optional | ✅ Required in spec | OpenAPI spec value used |
 | **Override spec settings** | `true` or `false` | ✅ Provided | Any | http-settings value **always wins** |
 
-#### OAuth2 Token Endpoint Authentication Methods
+### OAuth2 Token Endpoint Authentication Methods
 
 The `tokenEndpointAuth` field controls how the client authenticates when requesting OAuth2 tokens. Two methods are supported:
 
@@ -849,7 +859,7 @@ The `tokenEndpointAuth` field controls how the client authenticates when request
 - Provides enhanced security through cryptographic request signing
 - **Note:** Only HMAC-SHA256 signature method is supported
 
-#### OAuth2-Authenticated OpenAPI Spec Fetching
+### OAuth2-Authenticated OpenAPI Spec Fetching
 
 By default, when OAuth2 is configured, zswag will acquire an OAuth2 access token **before** fetching the OpenAPI specification. This solves the "chicken-and-egg" problem where the OpenAPI spec endpoint itself requires authentication.
 
@@ -903,7 +913,7 @@ The logs will show:
 - OAuth2 configuration status for OpenAPI spec fetch
 - Whether OAuth2 token is being used for spec fetch
 
-#### Testing OAuth 1.0 Signature with Your Service
+### Testing OAuth 1.0 Signature with Your Service
 
 To verify OAuth 1.0 signature authentication with your service:
 
@@ -971,6 +981,8 @@ on each platform:
 * [Linux `secret-tool`](https://www.marian-dan.ro/blog/storing-secrets-using-secret-tool) 
 * [macOS `add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html)
 * [Windows `cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/)
+
+<!-- --8<-- [end:settings] -->
 
 ## Client Result Code Handling
 

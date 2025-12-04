@@ -98,8 +98,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # windows-2022: Pinned due to DLL loading issues on windows-2025 (see #153)
-        os: [macos-14, windows-2022]
+        # macos-14: Apple Silicon runners (arm64)
+        os: [macos-14, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         exclude:
           # Python 3.10 doesn't have ARM64 builds for macOS
