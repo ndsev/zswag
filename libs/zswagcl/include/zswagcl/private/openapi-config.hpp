@@ -30,6 +30,53 @@ struct OpenAPIConfig
         OAuth2ClientCredentials
     };
 
+    /**
+     * Mapping between OpenAPI spec strings and SecuritySchemeType enum.
+     * Single source of truth for both parsing and reverse lookup.
+     */
+    struct SecuritySchemeMapping {
+        const char* openapiType;      // "http", "apiKey", "oauth2"
+        const char* openapiSubtype;   // "basic"/"bearer", "query"/"header"/"cookie", "clientCredentials"
+        SecuritySchemeType enumValue;
+        const char* displayString;    // "http/basic", "apiKey/query", etc.
+    };
+
+    /**
+     * Security scheme mapping table - single source of truth.
+     * When adding new security scheme types, only update this array.
+     */
+    static constexpr SecuritySchemeMapping SECURITY_SCHEME_MAPPINGS[] = {
+        {"http", "basic", SecuritySchemeType::HttpBasic, "http/basic"},
+        {"http", "bearer", SecuritySchemeType::HttpBearer, "http/bearer"},
+        {"apiKey", "query", SecuritySchemeType::ApiKeyQuery, "apiKey/query"},
+        {"apiKey", "header", SecuritySchemeType::ApiKeyHeader, "apiKey/header"},
+        {"apiKey", "cookie", SecuritySchemeType::ApiKeyCookie, "apiKey/cookie"},
+        {"oauth2", "clientCredentials", SecuritySchemeType::OAuth2ClientCredentials, "oauth2/clientCredentials"},
+    };
+
+    /**
+     * Bidirectional maps for security scheme lookups.
+     * Auto-generated from SECURITY_SCHEME_MAPPINGS at static initialization.
+     */
+    struct SecuritySchemeMaps {
+        // Forward: (type, subtype) -> enum
+        std::map<std::pair<std::string, std::string>, SecuritySchemeType> forward;
+        // Reverse: enum -> display string
+        std::map<SecuritySchemeType, std::string> reverse;
+
+        SecuritySchemeMaps() {
+            for (const auto& m : SECURITY_SCHEME_MAPPINGS) {
+                forward[{m.openapiType, m.openapiSubtype}] = m.enumValue;
+                reverse[m.enumValue] = m.displayString;
+            }
+        }
+
+        static const SecuritySchemeMaps& instance() {
+            static SecuritySchemeMaps maps;
+            return maps;
+        }
+    };
+
     struct SecurityScheme
     {
         SecuritySchemeType type;
@@ -205,6 +252,19 @@ struct OpenAPIConfig
      */
     std::string content;
 };
+
+/**
+ * Convert SecuritySchemeType enum to display string.
+ * Returns "unknown" if type is not found.
+ */
+inline const char* securitySchemeTypeToString(OpenAPIConfig::SecuritySchemeType type) {
+    const auto& maps = OpenAPIConfig::SecuritySchemeMaps::instance();
+    auto it = maps.reverse.find(type);
+    if (it != maps.reverse.end()) {
+        return it->second.c_str();
+    }
+    return "unknown";
+}
 
 ZSWAGCL_EXPORT extern const std::string ZSERIO_OBJECT_CONTENT_TYPE;
 ZSWAGCL_EXPORT extern const std::string ZSERIO_REQUEST_PART;

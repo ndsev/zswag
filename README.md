@@ -1,7 +1,10 @@
 # Zswag
 
 [![CI](https://github.com/ndsev/zswag/actions/workflows/build-deploy.yml/badge.svg)](https://github.com/ndsev/zswag/actions/workflows/build-deploy.yml)
+[![codecov](https://codecov.io/github/ndsev/zswag/graph/badge.svg?token=5DTX2M8IDE)](https://codecov.io/github/ndsev/zswag)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ndsev_zswag&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ndsev_zswag)
 [![Release](https://img.shields.io/github/release/ndsev/zswag)](https://GitHub.com/ndsev/zswag/releases/)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ndsev_zswag&metric=coverage)](https://sonarcloud.io/summary/new_code?id=ndsev_zswag)
 [![License](https://img.shields.io/github/license/ndsev/zswag)](https://github.com/ndsev/zswag/blob/master/LICENSE)
 
 zswag is a set of libraries for using/hosting zserio services through OpenAPI.
@@ -161,6 +164,77 @@ cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON -DFETCHCONTENT_SOURCE_DIR_SPDLOG=/pat
 cmake -DZSWAG_BUILD_WHEELS=ON -DZSWAG_ENABLE_TESTING=ON ..
 ```
 
+#### Code Coverage
+
+[![codecov](https://codecov.io/gh/ndsev/zswag/branch/master/graph/badge.svg)](https://codecov.io/gh/ndsev/zswag)
+
+zswag includes comprehensive C++ test coverage analysis for the `httpcl` and `zswagcl` libraries. Coverage is automatically collected in CI and reported to [Codecov](https://codecov.io/gh/ndsev/zswag).
+
+**📊 [View HTML Coverage Report](https://ndsev.github.io/zswag/coverage/)** - Browsable coverage report hosted on GitHub Pages
+
+**Local Coverage Analysis**
+
+To generate coverage reports locally, you'll need:
+- GCC or Clang compiler
+- `lcov` and `genhtml` tools (install with `sudo apt-get install lcov` on Ubuntu/Debian)
+
+Build with coverage enabled:
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug \
+      -DZSWAG_ENABLE_COVERAGE=ON \
+      -DZSWAG_ENABLE_TESTING=ON \
+      -DZSWAG_BUILD_WHEELS=OFF \
+      -DZSWAG_KEYCHAIN_SUPPORT=OFF ..
+cmake --build .
+```
+
+**Note:** The flags `-DZSWAG_BUILD_WHEELS=OFF` and `-DZSWAG_KEYCHAIN_SUPPORT=OFF` disable features that aren't needed for coverage analysis and avoid requiring Python development headers or system keychain libraries.
+
+Generate coverage reports:
+```bash
+# Run tests to generate coverage data
+ctest --output-on-failure
+
+# Generate HTML coverage report
+cmake --build . --target coverage-report
+```
+
+The HTML coverage report will be available at `build/coverage/html/index.html`.
+
+**Available Coverage Targets:**
+- `coverage-clean` - Remove all coverage data
+- `coverage-report` - Generate coverage report from existing test runs
+- `coverage` - Clean, run tests, and generate report (all-in-one)
+
+**Coverage Configuration:**
+- **Goal:** 70%+ line coverage (initial), near 100% line and branch coverage (ultimate)
+- **Scope:** Coverage is tracked only for library source files (`libs/httpcl`, `libs/zswagcl`)
+- **Not included:** Test code, dependencies, generated code (zserio)
+
+**Troubleshooting Coverage Builds:**
+
+If you get "gcov not found" warnings:
+```bash
+# Check if versioned gcov exists
+which gcov-13 gcov-12 gcov-11
+
+# Create symlink (example for gcov-13)
+sudo ln -s /usr/bin/gcov-13 /usr/bin/gcov
+
+# Or install gcc package
+sudo apt-get install gcc
+```
+
+If you want to build coverage **with** wheel support (requires Python development headers):
+```bash
+cmake -DCMAKE_BUILD_TYPE=Debug \
+      -DZSWAG_ENABLE_COVERAGE=ON \
+      -DZSWAG_ENABLE_TESTING=ON \
+      -DZSWAG_BUILD_WHEELS=ON \
+      -DZSWAG_KEYCHAIN_SUPPORT=OFF ..
+```
+Note: This requires `python3-dev` package (Ubuntu/Debian) or equivalent on your system.
 
 ## CI/CD and Release Process
 

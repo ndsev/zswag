@@ -137,7 +137,7 @@ jobs:
         mv bin/wheel-final/zswag*.whl bin/wheel/
         mv bin/wheel-final/pyzswagcl*.whl bin/wheel/
     - name: Build (Windows)
-      if: matrix.os == 'windows-latest'
+      if: startsWith(matrix.os, 'windows')
       working-directory: build
       run: |
         # Install NASM and jom using chocolatey (required for OpenSSL build)
@@ -146,9 +146,16 @@ jobs:
         $env:PATH = "$env:PATH;C:\Program Files\NASM"
         # Verify NASM installation
         nasm -v
+        # Install delvewheel for bundling DLLs into wheel
+        pip install delvewheel
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
         cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
         cmake --build . --config Release
+        # Bundle DLLs into wheel using delvewheel (like auditwheel on Linux)
+        Rename-Item -Path bin/wheel -NewName wheel-auditme
+        New-Item -ItemType Directory -Path bin/wheel
+        Move-Item -Path bin/wheel-auditme/zswag*.whl -Destination bin/wheel/
+        delvewheel repair --add-path bin/Release (Get-Item bin/wheel-auditme/pyzswagcl*.whl) -w bin/wheel
     - name: Deploy
       uses: actions/upload-artifact@v4
       with:
