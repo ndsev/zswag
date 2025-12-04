@@ -27,7 +27,7 @@ endif()
 
 # fmt
 CPMAddPackage(
-    URI "gh:fmtlib/fmt#11.1.3"
+    URI "gh:fmtlib/fmt#11.1.4"
     OPTIONS "FMT_HEADER_ONLY OFF"
 )
 
@@ -42,12 +42,13 @@ CPMAddPackage(
 
 # yaml-cpp
 CPMAddPackage(
-    URI "gh:jbeder/yaml-cpp#aa8d4e4750ec9fe9f8cc680eb90f1b15955c817e"
+    URI "gh:jbeder/yaml-cpp#aa8d4e@0.8.0" # Use > 0.8.0 once available.
+    GIT_SHALLOW OFF
     OPTIONS
         "YAML_CPP_BUILD_TESTS OFF"
         "YAML_CPP_BUILD_TOOLS OFF"
-        "YAML_CPP_BUILD_CONTRIB OFF"
-)
+        "YAML_CPP_BUILD_CONTRIB OFF")
+
 
 # stx
 CPMAddPackage("gh:Klebert-Engineering/stx@1.0.0")
