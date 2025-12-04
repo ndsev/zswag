@@ -359,17 +359,17 @@ static void parseSecurityScheme(
 
     // Determine subtype based on scheme type and parse type-specific fields
     std::string subtype;
-    const YAMLScope* subtypeNode = nullptr;
+    std::optional<YAMLScope> subtypeNode;
 
     if (schemeType == "http") {
         auto schemeHttpTypeNode = schemeNode.mandatoryChild("scheme");
         subtype = schemeHttpTypeNode.as<std::string>();
-        subtypeNode = &schemeHttpTypeNode;
+        subtypeNode = schemeHttpTypeNode;
     }
     else if (schemeType == "apiKey") {
         auto keyLocationNode = schemeNode.mandatoryChild("in");
         subtype = keyLocationNode.as<std::string>();
-        subtypeNode = &keyLocationNode;
+        subtypeNode = keyLocationNode;
 
         auto parameterNameNode = schemeNode.mandatoryChild("name");
         info->apiKeyName = parameterNameNode.as<std::string>();
