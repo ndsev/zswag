@@ -1255,3 +1255,606 @@ paths:
         );
     }
 }
+
+// ============================================================================
+// parseParameterSchema Tests - Coverage for openapi-parser.cpp:134-161
+// ============================================================================
+
+TEST_CASE("OpenAPI Parameter Schema Format Parsing", "[oaclient][parser][schema]") {
+
+    SECTION("Default format (no schema.format) returns String") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // No encoding transformation for String format
+            REQUIRE(uri.find("param=hello") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("hello", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testDefaultFormat",
+                    "parameters": [{
+                        "name": "param",
+                        "in": "query",
+                        "x-zserio-request-part": "str"
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testDefaultFormat",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Format 'string' returns String") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            REQUIRE(uri.find("param=hello") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("hello", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testStringFormat",
+                    "parameters": [{
+                        "name": "param",
+                        "in": "query",
+                        "x-zserio-request-part": "str",
+                        "schema": {
+                            "type": "string",
+                            "format": "string"
+                        }
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testStringFormat",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Format 'byte' returns Base64") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // "hello" in base64 is "aGVsbG8="
+            REQUIRE(uri.find("param=aGVsbG8") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("hello", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testByteFormat",
+                    "parameters": [{
+                        "name": "param",
+                        "in": "query",
+                        "x-zserio-request-part": "str",
+                        "schema": {
+                            "type": "string",
+                            "format": "byte"
+                        }
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testByteFormat",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Format 'base64' returns Base64") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // "hello" in base64 is "aGVsbG8="
+            REQUIRE(uri.find("param=aGVsbG8") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("hello", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testBase64Format",
+                    "parameters": [{
+                        "name": "param",
+                        "in": "query",
+                        "x-zserio-request-part": "str",
+                        "schema": {
+                            "type": "string",
+                            "format": "base64"
+                        }
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testBase64Format",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Format 'base64url' returns Base64url") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // base64url uses URL-safe alphabet (- instead of +, _ instead of /)
+            // "hello" in base64url is "aGVsbG8" (no padding by default)
+            REQUIRE(uri.find("param=aGVsbG8") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("hello", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testBase64urlFormat",
+                    "parameters": [{
+                        "name": "param",
+                        "in": "query",
+                        "x-zserio-request-part": "str",
+                        "schema": {
+                            "type": "string",
+                            "format": "base64url"
+                        }
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testBase64urlFormat",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Format 'hex' returns Hex") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // "hello" in hex is "68656c6c6f"
+            REQUIRE(uri.find("param=68656c6c6f") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("hello", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testHexFormat",
+                    "parameters": [{
+                        "name": "param",
+                        "in": "query",
+                        "x-zserio-request-part": "str",
+                        "schema": {
+                            "type": "string",
+                            "format": "hex"
+                        }
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testHexFormat",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("Invalid format throws error with allowed values") {
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+paths:
+  /test:
+    get:
+      operationId: testInvalidFormat
+      parameters:
+        - name: param
+          in: query
+          x-zserio-request-part: str
+          schema:
+            type: string
+            format: invalid_format
+)";
+        std::istringstream ss(yaml);
+        REQUIRE_THROWS_WITH(
+            parseOpenAPIConfig(ss),
+            Catch::Matchers::ContainsSubstring("invalid_format") &&
+            Catch::Matchers::ContainsSubstring("string") &&
+            Catch::Matchers::ContainsSubstring("byte") &&
+            Catch::Matchers::ContainsSubstring("base64") &&
+            Catch::Matchers::ContainsSubstring("hex") &&
+            Catch::Matchers::ContainsSubstring("binary")
+        );
+    }
+
+    SECTION("Header parameter location parsing") {
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        service_client_test::Request request("header-value", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        auto config = makeConfig(R"json(
+            "/test": {
+                "get": {
+                    "operationId": "testHeaderParam",
+                    "parameters": [{
+                        "name": "X-Custom-Header",
+                        "in": "header",
+                        "x-zserio-request-part": "str"
+                    }]
+                }
+            }
+        )json");
+
+        auto service = OAClient(config, std::move(client));
+        service.callMethod("testHeaderParam",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+}
+
+// ============================================================================
+// Security Handler Error Branch Tests - Coverage for openapi-security.cpp
+// ============================================================================
+
+TEST_CASE("Security Handler Error Branches", "[oaclient][security][error-branches]") {
+
+    SECTION("HttpBasicHandler accepts Authorization header without auth config") {
+        // This tests lines 27-36 of openapi-security.cpp
+        // When ctx.auth is not set but Authorization: Basic header is present
+
+        auto postCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->postFun = [&](std::string_view uri,
+                              httpcl::OptionalBodyAndContentType const& body,
+                              httpcl::Config const& conf) {
+            postCalled = true;
+            // Verify the Authorization header is present
+            auto authIt = conf.headers.find("Authorization");
+            REQUIRE(authIt != conf.headers.end());
+            REQUIRE(authIt->second.find("Basic ") == 0);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+security:
+  - basicAuth: []
+paths:
+  /test:
+    post:
+      operationId: testBasicAuthHeader
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+)";
+        std::istringstream ss(yaml);
+        auto config = parseOpenAPIConfig(ss);
+
+        service_client_test::Request request("test", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        // Provide Authorization header directly instead of auth config
+        httpcl::Config httpConfig;
+        httpConfig.headers.insert({"Authorization", "Basic dXNlcjpwYXNz"}); // user:pass
+
+        auto service = OAClient(config, std::move(client), httpConfig);
+        service.callMethod("testBasicAuthHeader",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(postCalled);
+    }
+
+    SECTION("HttpBearerHandler error message when Authorization header missing") {
+        // This tests lines 55-56 of openapi-security.cpp
+
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+paths:
+  /test:
+    post:
+      operationId: testBearerMissing
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+)";
+        std::istringstream ss(yaml);
+        auto config = parseOpenAPIConfig(ss);
+
+        service_client_test::Request request("test", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        // No Authorization header provided
+        httpcl::Config httpConfig;
+
+        auto service = OAClient(config, std::move(client), httpConfig);
+
+        REQUIRE_THROWS_WITH(
+            service.callMethod("testBearerMissing",
+                              zserio::ReflectableServiceData(request.reflectable()),
+                              nullptr),
+            Catch::Matchers::ContainsSubstring("Authorization: Bearer")
+        );
+    }
+
+    SECTION("ApiKeyHandler uses global apiKey fallback for query") {
+        // This tests lines 70-72 of openapi-security.cpp
+
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            // Verify the API key was added to query
+            REQUIRE(uri.find("api_key=my-global-api-key") != std::string::npos);
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: query
+      name: api_key
+paths:
+  /test:
+    get:
+      operationId: testApiKeyFallback
+      security:
+        - apiKeyAuth: []
+)";
+        std::istringstream ss(yaml);
+        auto config = parseOpenAPIConfig(ss);
+
+        service_client_test::Request request("test", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        // Provide apiKey via global config instead of directly in query
+        httpcl::Config httpConfig;
+        httpConfig.apiKey = "my-global-api-key";
+
+        auto service = OAClient(config, std::move(client), httpConfig);
+        service.callMethod("testApiKeyFallback",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("ApiKeyHandler uses global apiKey fallback for header") {
+        // This tests lines 70-72 of openapi-security.cpp for header location
+
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+paths:
+  /test:
+    get:
+      operationId: testApiKeyHeaderFallback
+      security:
+        - apiKeyAuth: []
+)";
+        std::istringstream ss(yaml);
+        auto config = parseOpenAPIConfig(ss);
+
+        service_client_test::Request request("test", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        // Provide apiKey via global config instead of directly in headers
+        httpcl::Config httpConfig;
+        httpConfig.apiKey = "my-header-api-key";
+
+        auto service = OAClient(config, std::move(client), httpConfig);
+        service.callMethod("testApiKeyHeaderFallback",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("ApiKeyHandler uses global apiKey fallback for cookie") {
+        // This tests lines 70-72 of openapi-security.cpp for cookie location
+
+        auto getCalled = false;
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        client->getFun = [&](std::string_view uri) {
+            getCalled = true;
+            return httpcl::IHttpClient::Result{200, {}};
+        };
+
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: cookie
+      name: session_token
+paths:
+  /test:
+    get:
+      operationId: testApiKeyCookieFallback
+      security:
+        - apiKeyAuth: []
+)";
+        std::istringstream ss(yaml);
+        auto config = parseOpenAPIConfig(ss);
+
+        service_client_test::Request request("test", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        // Provide apiKey via global config instead of directly in cookies
+        httpcl::Config httpConfig;
+        httpConfig.apiKey = "my-cookie-api-key";
+
+        auto service = OAClient(config, std::move(client), httpConfig);
+        service.callMethod("testApiKeyCookieFallback",
+                          zserio::ReflectableServiceData(request.reflectable()),
+                          nullptr);
+        REQUIRE(getCalled);
+    }
+
+    SECTION("HttpBasicHandler error message when credentials missing") {
+        // This tests line 35-36 of openapi-security.cpp
+
+        auto client = std::make_unique<httpcl::MockHttpClient>();
+
+        std::string yaml = R"(
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+paths:
+  /test:
+    post:
+      operationId: testBasicAuthMissing
+      security:
+        - basicAuth: []
+      requestBody:
+        content:
+          application/x-zserio-object:
+            schema:
+              type: string
+)";
+        std::istringstream ss(yaml);
+        auto config = parseOpenAPIConfig(ss);
+
+        service_client_test::Request request("test", 0, {},
+                                             service_client_test::Flat("", ""));
+
+        // No auth credentials provided
+        httpcl::Config httpConfig;
+
+        auto service = OAClient(config, std::move(client), httpConfig);
+
+        REQUIRE_THROWS_WITH(
+            service.callMethod("testBasicAuthMissing",
+                              zserio::ReflectableServiceData(request.reflectable()),
+                              nullptr),
+            Catch::Matchers::ContainsSubstring("basic-auth credentials are missing")
+        );
+    }
+}
