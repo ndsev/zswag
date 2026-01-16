@@ -742,7 +742,7 @@ environment variables:
 | Variable Name | Details   |
 | ------------- | --------- |
 | `HTTP_SETTINGS_FILE` | Path to settings file for HTTP proxies and authentication, see [next section](#persistent-http-headers-proxy-cookie-and-authentication) |
-| `HTTP_LOG_LEVEL` | Verbosity level for console/log output. Set to `debug` for detailed output. |
+| `HTTP_LOG_LEVEL` | Verbosity level for console/log output. Set to `debug` for detailed output, `trace` for full HTTP redirect chains and request/response bodies. |
 | `HTTP_LOG_FILE` | Logfile-path (including filename) to redirect console output. The log will rotate with three files (`HTTP_LOG_FILE`, `HTTP_LOG_FILE-1`, `HTTP_LOG_FILE-2`). |
 | `HTTP_LOG_FILE_MAXSIZE` | Maximum size of the logfile, in bytes. Defaults to 1GB. |
 | `HTTP_TIMEOUT` | Timeout for HTTP requests (connection+transfer) in seconds. Defaults to 60s. |
@@ -903,7 +903,7 @@ To troubleshoot OAuth2 authentication problems, enable detailed logging:
 
 ```bash
 export HTTP_LOG_LEVEL=debug   # Shows OAuth2 flow (token acquisition, cache hits/misses)
-export HTTP_LOG_LEVEL=trace   # Shows additional details (request/response bodies, signatures)
+export HTTP_LOG_LEVEL=trace   # Shows additional details (request/response bodies, signatures, HTTP redirect chains)
 ```
 
 The logs will show:
@@ -912,6 +912,7 @@ The logs will show:
 - Token cache hit/miss/expired events
 - OAuth2 configuration status for OpenAPI spec fetch
 - Whether OAuth2 token is being used for spec fetch
+- **At trace level**: Full HTTP redirect chain with intermediate requests/responses (e.g., 303 → CDN redirect → 403)
 
 ### Testing OAuth 1.0 Signature with Your Service
 

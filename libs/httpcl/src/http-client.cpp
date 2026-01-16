@@ -29,6 +29,23 @@ auto makeClientAndApplyQuery(
     client->set_connection_timeout(timeoutSecs);
     client->set_read_timeout(timeoutSecs);
     client->set_follow_location(true);
+
+    // Set logger to trace all HTTP requests/responses including redirects
+    client->set_logger([](const httplib::Request& req, const httplib::Response& res) {
+        if (httpcl::log().should_log(spdlog::level::trace)) {
+            auto isRedirect = (res.status >= 300 && res.status < 400);
+            auto location = res.get_header_value("Location");
+
+            if (isRedirect && !location.empty()) {
+                httpcl::log().trace("  HTTP {} {} -> {} (redirect to: {})",
+                    req.method, req.path, res.status, location);
+            } else {
+                httpcl::log().trace("  HTTP {} {} -> {} ({} bytes)",
+                    req.method, req.path, res.status, res.body.size());
+            }
+        }
+    });
+
     config.apply(*client);
 
     applyQuery(uri, config);
