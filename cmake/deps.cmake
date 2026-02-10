@@ -91,7 +91,7 @@ endif()
 
 # zserio-cmake-helper
 set(ZSERIO_VERSION "2.17.0")
-set(ZSERIO_CPP17_VERSION "runtime-link-external-sqlite")
+set(ZSERIO_CPP17_VERSION "master")
 set(ZSERIO_CPP17_RUNTIME_SQLITE_ENABLE ON)
 set(ZSERIO_CPP17_RUNTIME_SQLITE_USE_EXTERNAL ON)
 CPMAddPackage(URI "gh:Klebert-Engineering/zserio-cmake-helper#zserio-cpp17-support@2.17.0")
