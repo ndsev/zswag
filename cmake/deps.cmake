@@ -74,7 +74,7 @@ endif()
 
 # python-cmake-wheel (only needed when building wheels)
 if(ZSWAG_BUILD_WHEELS)
-    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel@1.1.0")
+    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel@1.2.8")
 endif()
 
 # keychain

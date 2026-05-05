@@ -60,8 +60,9 @@ Here are some brief descriptions of the main components:
   (`OAClient`) as well as a zserio-OpenAPI server layer based on Flask/Connexion
   (`OAServer`). It also contains the command-line tool `zswag.gen`, which can be
   used to generate an OpenAPI specification from a zserio Python service class.
-* `pyzswagcl` is a binding library which exposes the C++-based OpenApi
-  parsing/request functionality to Python. **Please consider it "internal".**
+* `pyzswagcl` is the internal Python extension module bundled inside the `zswag`
+  wheel. It exposes the C++-based OpenApi parsing/request functionality to
+  Python and is not meant to be installed separately.
 * `httpcl` is a wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib),
   HTTP request configuration and OS secret storage abilities based on
   the [keychain](https://github.com/hrantzsch/keychain) library.
@@ -926,7 +927,7 @@ pip install zswag
 
 For custom builds or development snapshots:
 ```bash
-pip install /path/to/pyzswagcl-*.whl /path/to/zswag-*.whl
+pip install /path/to/zswag-*.whl
 ```
 
 **2. Create `http-settings.yaml`** with your service details:

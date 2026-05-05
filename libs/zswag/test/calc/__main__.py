@@ -1,9 +1,9 @@
 import zswag
 import sys
 
-from zswag.test.calc import working_dir
-import zswag.test.calc.client as client
-import zswag.test.calc.server as server
+from . import working_dir
+from . import client
+from . import server
 import calculator.api as calculator
 
 mode = sys.argv[1] if len(sys.argv) > 1 else ""

@@ -4,7 +4,7 @@ my_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 venv=$(mktemp -d)
 echo "→ Setting up a virtual environment in $venv ..."
-python -m venv "$venv"
+python3 -m venv "$venv"
 
 # Activate venv (Scripts/ on Windows, bin/ on Unix)
 if [[ -d "$venv/Scripts" ]]; then
@@ -39,9 +39,24 @@ python -m zswag.gen \
 diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_1.yaml"
 
 echo "→ [Test 2/4] Generate with Python source ..."
+calc_path="$(
+  python - "$my_dir/calc" <<'PY'
+import sys
+import zserio
+
+working_dir = sys.argv[1]
+zserio.generate(
+    zs_dir=working_dir,
+    main_zs_file="calculator.zs",
+    gen_dir=working_dir,
+    extra_args=["-withTypeInfoCode"],
+)
+print(working_dir)
+PY
+)"
 python -m zswag.gen \
   --service calculator.Calculator \
-  --input "$(python -m zswag.test.calc path)" \
+  --input "$calc_path" \
   --config put "*?name=data&in=query&format=base64" \
   --output "$my_dir/.test.yaml"
 diff -w "$my_dir/.test.yaml" "$my_dir/test_openapi_generator_2.yaml"

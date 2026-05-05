@@ -32,7 +32,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      x-bearerInfoFunc: zswag.test.oauth2_mock.server.validate_bearer_token
+      x-bearerInfoFunc: oauth2_mock.server.validate_bearer_token
 
 paths:
   /getData:

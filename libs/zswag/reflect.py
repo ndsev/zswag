@@ -5,7 +5,7 @@ import struct
 import functools
 from enum import Enum
 from typing import Type, Tuple, Any, Dict, Union, Optional, List, get_type_hints, Iterator
-from pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOLE
+from .pyzswagcl import OAMethod, OAParam, OAParamFormat, ZSERIO_REQUEST_PART_WHOLE
 from re import compile as re
 from zserio.typeinfo import TypeInfo, MemberInfo, TypeAttribute, MemberAttribute
 
