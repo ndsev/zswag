@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # without requiring CMakeLists.txt updates between releases.
 # For official releases, this value should match the git tag.
 if(NOT DEFINED ZSWAG_VERSION)
-  set(ZSWAG_VERSION 1.11.1)
+  set(ZSWAG_VERSION 1.11.2)
 endif()
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
@@ -77,7 +77,6 @@ if (ZSWAG_BUILD_WHEELS)
       ${Python3_EXECUTABLE} setup.py ${ZSWAG_VERSION} bdist_wheel -d "${WHEEL_DEPLOY_DIRECTORY}")
   add_dependencies(wheel zswag-server-wheel)
 endif()
-
 
 
 
