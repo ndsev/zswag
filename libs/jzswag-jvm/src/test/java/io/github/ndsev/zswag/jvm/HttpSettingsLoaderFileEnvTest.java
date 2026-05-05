@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.HttpSettings;
 import org.junit.jupiter.api.Test;

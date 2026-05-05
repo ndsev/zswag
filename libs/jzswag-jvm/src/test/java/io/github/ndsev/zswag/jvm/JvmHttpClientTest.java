@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpException;
@@ -19,7 +19,7 @@ import java.util.Collections;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class DesktopHttpClientTest {
+class JvmHttpClientTest {
 
     private MockWebServer server;
 
@@ -34,8 +34,8 @@ class DesktopHttpClientTest {
         server.shutdown();
     }
 
-    private DesktopHttpClient newClient() {
-        return new DesktopHttpClient(HttpSettings.empty(), Duration.ofSeconds(5));
+    private JvmHttpClient newClient() {
+        return new JvmHttpClient(HttpSettings.empty(), Duration.ofSeconds(5));
     }
 
     @Test
@@ -235,7 +235,7 @@ class DesktopHttpClientTest {
                 .header("X-Default", "global")
                 .build();
         HttpSettings persistent = new HttpSettings(Collections.singletonList(wildcard));
-        DesktopHttpClient client = new DesktopHttpClient(persistent, Duration.ofSeconds(5));
+        JvmHttpClient client = new JvmHttpClient(persistent, Duration.ofSeconds(5));
         assertThat(client.getPersistentSettings()).isSameAs(persistent);
     }
 
@@ -247,7 +247,7 @@ class DesktopHttpClientTest {
                 .scope("*", HttpSettings.compileScope("*"))
                 .header("X-Default", "yes")
                 .build();
-        DesktopHttpClient client = new DesktopHttpClient(
+        JvmHttpClient client = new JvmHttpClient(
                 new HttpSettings(Collections.singletonList(wildcard)), Duration.ofSeconds(5));
         HttpRequest req = HttpRequest.builder().method("GET").url(url).build();
         client.execute(req, HttpConfig.empty());
@@ -265,7 +265,7 @@ class DesktopHttpClientTest {
     @Test
     void defaultConstructorReadsEnvButYieldsValidClient() {
         // Stripped-down construction: just ensure the no-arg constructor doesn't throw.
-        DesktopHttpClient c = new DesktopHttpClient();
+        JvmHttpClient c = new JvmHttpClient();
         assertThat(c.getPersistentSettings()).isNotNull();
     }
 

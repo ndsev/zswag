@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.*;
 import org.jetbrains.annotations.NotNull;
@@ -31,8 +31,8 @@ import java.util.function.Function;
  *       endpoints or for testing.</li>
  * </ul>
  */
-public class DesktopOpenAPIClient implements IOpenAPIClient {
-    private static final Logger logger = LoggerFactory.getLogger(DesktopOpenAPIClient.class);
+public class JvmOpenAPIClient implements IOpenAPIClient {
+    private static final Logger logger = LoggerFactory.getLogger(JvmOpenAPIClient.class);
 
     /** zswag MIME type for both request bodies and response Accept header. */
     public static final String ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
@@ -43,11 +43,11 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
     private final OpenAPIParser parser;
     private final String baseUrl;
 
-    public DesktopOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient) throws IOException {
+    public JvmOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient) throws IOException {
         this(specLocation, httpClient, HttpConfig.empty());
     }
 
-    public DesktopOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+    public JvmOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
                                 @NotNull HttpConfig adhoc) throws IOException {
         this.specLocation = specLocation;
         this.httpClient = httpClient;
@@ -253,13 +253,13 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
 
     /**
      * Computes the effective {@link HttpConfig} for a given URL: the persistent
-     * settings from the underlying {@link DesktopHttpClient} (scope-matched
+     * settings from the underlying {@link JvmHttpClient} (scope-matched
      * against the URL) merged with this client's adhoc config.
      */
     @NotNull
     private HttpConfig mergedConfigFor(@NotNull String url) {
-        if (httpClient instanceof DesktopHttpClient) {
-            HttpSettings persistent = ((DesktopHttpClient) httpClient).getPersistentSettings();
+        if (httpClient instanceof JvmHttpClient) {
+            HttpSettings persistent = ((JvmHttpClient) httpClient).getPersistentSettings();
             return persistent.forUrl(url).mergedWith(adhoc);
         }
         return adhoc;
@@ -268,7 +268,7 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
     /**
      * Walks the operation's security alternatives and applies each scheme:
      * <ul>
-     *   <li>HTTP basic / bearer: validated by {@link DesktopHttpClient} from
+     *   <li>HTTP basic / bearer: validated by {@link JvmHttpClient} from
      *       the merged config; throws here if neither is configured.</li>
      *   <li>API-key: routes the merged config's {@link HttpConfig#getApiKey()}
      *       to header / query / cookie based on the scheme's {@code in}.</li>

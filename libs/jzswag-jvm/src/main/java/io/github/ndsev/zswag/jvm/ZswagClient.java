@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpException;
@@ -27,13 +27,13 @@ import java.io.IOException;
  * Double result = calc.powerMethod(new BaseAndExponent(...));
  * }</pre>
  *
- * <p>Internally delegates to {@link DesktopOpenAPIClient}, which performs
+ * <p>Internally delegates to {@link JvmOpenAPIClient}, which performs
  * {@code x-zserio-request-part} request decomposition via {@link ZserioReflection}.
  */
 public final class ZswagClient implements ServiceClientInterface {
     private static final Logger logger = LoggerFactory.getLogger(ZswagClient.class);
 
-    private final DesktopOpenAPIClient delegate;
+    private final JvmOpenAPIClient delegate;
 
     /**
      * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}
@@ -58,18 +58,18 @@ public final class ZswagClient implements ServiceClientInterface {
      */
     public ZswagClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc)
             throws IOException {
-        DesktopHttpClient http = new DesktopHttpClient(persistent);
-        this.delegate = new DesktopOpenAPIClient(openApiSpecUrl, http, adhoc);
+        JvmHttpClient http = new JvmHttpClient(persistent);
+        this.delegate = new JvmOpenAPIClient(openApiSpecUrl, http, adhoc);
     }
 
     /** Lower-level constructor — for tests / advanced use. */
-    public ZswagClient(@NotNull DesktopOpenAPIClient delegate) {
+    public ZswagClient(@NotNull JvmOpenAPIClient delegate) {
         this.delegate = delegate;
     }
 
     /** Exposes the underlying OpenAPI client (read-only) for introspection. */
     @NotNull
-    public DesktopOpenAPIClient getOpenAPIClient() {
+    public JvmOpenAPIClient getOpenAPIClient() {
         return delegate;
     }
 

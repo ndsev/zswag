@@ -15,9 +15,9 @@ import calculator.Strings;
 // NOTE: calculator.String shadows java.lang.String — qualify java strings as java.lang.String.
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpSettings;
-import io.github.ndsev.zswag.desktop.DesktopHttpClient;
-import io.github.ndsev.zswag.desktop.DesktopOpenAPIClient;
-import io.github.ndsev.zswag.desktop.ZswagClient;
+import io.github.ndsev.zswag.jvm.JvmHttpClient;
+import io.github.ndsev.zswag.jvm.JvmOpenAPIClient;
+import io.github.ndsev.zswag.jvm.ZswagClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

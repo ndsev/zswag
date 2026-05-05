@@ -1,7 +1,7 @@
 package io.github.ndsev.zswag.examples.cli;
 
 import io.github.ndsev.zswag.api.*;
-import io.github.ndsev.zswag.desktop.*;
+import io.github.ndsev.zswag.jvm.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +40,7 @@ public class ExampleCli {
         String methodPath = args[1];
 
         try {
-            // Persistent HTTP settings come from HTTP_SETTINGS_FILE (loaded inside DesktopHttpClient).
+            // Persistent HTTP settings come from HTTP_SETTINGS_FILE (loaded inside JvmHttpClient).
             HttpSettings persistent = HttpSettingsLoader.loadFromEnvironment();
             logger.info("Loaded {} scoped HTTP setting entries", persistent.getEntries().size());
 
@@ -55,11 +55,11 @@ public class ExampleCli {
             }
 
             logger.info("Creating HTTP client...");
-            IHttpClient httpClient = new DesktopHttpClient(persistent);
+            IHttpClient httpClient = new JvmHttpClient(persistent);
 
             // Create OpenAPI client
             logger.info("Loading OpenAPI spec from: {}", specLocation);
-            IOpenAPIClient client = new DesktopOpenAPIClient(specLocation, httpClient);
+            IOpenAPIClient client = new JvmOpenAPIClient(specLocation, httpClient);
 
             // Call the method
             logger.info("Calling method: {}", methodPath);

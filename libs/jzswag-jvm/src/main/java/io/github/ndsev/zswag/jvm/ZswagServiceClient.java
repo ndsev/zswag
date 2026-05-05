@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.*;
 import org.jetbrains.annotations.NotNull;
@@ -43,8 +43,8 @@ public class ZswagServiceClient implements IZswagServiceClient {
     @NotNull
     public static ZswagServiceClient create(@NotNull String serviceIdentifier, @NotNull String specLocation,
                                             @NotNull HttpSettings settings) throws IOException {
-        IHttpClient httpClient = new DesktopHttpClient(settings);
-        IOpenAPIClient openAPIClient = new DesktopOpenAPIClient(specLocation, httpClient);
+        IHttpClient httpClient = new JvmHttpClient(settings);
+        IOpenAPIClient openAPIClient = new JvmOpenAPIClient(specLocation, httpClient);
         return new ZswagServiceClient(serviceIdentifier, openAPIClient);
     }
 

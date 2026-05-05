@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;

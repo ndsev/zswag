@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.*;
 import org.jetbrains.annotations.NotNull;
@@ -36,8 +36,8 @@ import java.util.TreeSet;
  * parameters, basic-auth and proxy from the merged config are applied to the
  * underlying request.
  */
-public class DesktopHttpClient implements IHttpClient {
-    private static final Logger logger = LoggerFactory.getLogger(DesktopHttpClient.class);
+public class JvmHttpClient implements IHttpClient {
+    private static final Logger logger = LoggerFactory.getLogger(JvmHttpClient.class);
 
     private static final int DEFAULT_TIMEOUT_SECONDS = 60;
 
@@ -49,11 +49,11 @@ public class DesktopHttpClient implements IHttpClient {
      * Creates a client that loads persistent settings from {@code HTTP_SETTINGS_FILE}
      * and applies {@code HTTP_TIMEOUT} / {@code HTTP_SSL_STRICT} env vars.
      */
-    public DesktopHttpClient() {
+    public JvmHttpClient() {
         this(HttpSettingsLoader.loadFromEnvironment());
     }
 
-    public DesktopHttpClient(@NotNull HttpSettings persistentSettings) {
+    public JvmHttpClient(@NotNull HttpSettings persistentSettings) {
         JzswagLogging.init();
         this.persistentSettings = persistentSettings;
         Duration timeout = readTimeoutFromEnv();
@@ -62,7 +62,7 @@ public class DesktopHttpClient implements IHttpClient {
     }
 
     /** For tests: explicit timeout override. */
-    DesktopHttpClient(@NotNull HttpSettings persistentSettings, @NotNull Duration timeout) {
+    JvmHttpClient(@NotNull HttpSettings persistentSettings, @NotNull Duration timeout) {
         this.persistentSettings = persistentSettings;
         this.strictClient = buildJdkClient(timeout, true);
         this.permissiveClient = buildJdkClient(timeout, false);

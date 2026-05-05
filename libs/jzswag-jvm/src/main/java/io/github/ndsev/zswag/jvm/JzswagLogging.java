@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.desktop;
+package io.github.ndsev.zswag.jvm;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
