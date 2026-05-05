@@ -1,162 +1,277 @@
 package com.ndsev.zswag.desktop;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.ndsev.zswag.api.HttpConfig;
 import com.ndsev.zswag.api.HttpException;
 import com.ndsev.zswag.api.HttpRequest;
 import com.ndsev.zswag.api.HttpResponse;
 import com.ndsev.zswag.api.IHttpClient;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * OAuth2 client credentials flow handler with token caching.
- * Thread-safe implementation with automatic token refresh.
+ * OAuth 2.0 client-credentials flow handler with full zswag parity:
+ * <ul>
+ *   <li>Multi-instance token cache keyed by {@code (tokenUrl, clientId, audience, scopeKey)}
+ *       so multiple OAuth2 schemes don't collide.</li>
+ *   <li>Refresh-token reuse on expiry; falls back to fresh mint if the refresh fails.</li>
+ *   <li>{@code rfc6749-client-secret-basic} (default, HTTP Basic) and
+ *       {@code rfc5849-oauth1-signature} (HMAC-SHA256) token-endpoint
+ *       authentication methods.</li>
+ *   <li>Optional {@code audience} parameter on the token request.</li>
+ *   <li>Public client support: when no client secret is configured, the client_id
+ *       is sent in the token request body instead.</li>
+ *   <li>Override precedence: settings.tokenUrl/refreshUrl/scopes win over spec values.</li>
+ * </ul>
+ *
+ * <p>Mirrors C++ {@code OAuth2ClientCredentialsHandler::satisfy} +
+ * {@code requestToken} in {@code openapi-oauth.cpp}.
  */
-public class OAuth2Handler {
+public final class OAuth2Handler {
     private static final Logger logger = LoggerFactory.getLogger(OAuth2Handler.class);
 
-    private final String tokenEndpoint;
-    private final String clientId;
-    private final String clientSecret;
-    private final String scope;
+    private static final String GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials";
+    private static final String GRANT_TYPE_REFRESH_TOKEN = "refresh_token";
+
+    /** Process-wide token cache. Per-handler caches were tested and rejected: in the C++ reference
+     * the handler is shared across calls to the same OAClient, and tokens are keyed by
+     * (tokenUrl, clientId, audience, scope) so multiple schemes don't collide. */
+    private static final ConcurrentHashMap<TokenKey, MintedToken> CACHE = new ConcurrentHashMap<>();
+    /** Per-key lock to serialise mint/refresh attempts for the same key. */
+    private static final ConcurrentHashMap<TokenKey, ReentrantLock> KEY_LOCKS = new ConcurrentHashMap<>();
+
     private final IHttpClient httpClient;
     private final Gson gson = new Gson();
 
-    // Token cache
-    private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private String accessToken;
-    private Instant tokenExpiry;
-
-    public OAuth2Handler(@NotNull String tokenEndpoint, @NotNull String clientId,
-                         @NotNull String clientSecret, @Nullable String scope,
-                         @NotNull IHttpClient httpClient) {
-        this.tokenEndpoint = tokenEndpoint;
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
-        this.scope = scope;
+    public OAuth2Handler(@NotNull IHttpClient httpClient) {
         this.httpClient = httpClient;
     }
 
     /**
-     * Gets a valid access token, refreshing if necessary.
+     * Returns a valid bearer token for the given OAuth2 config + resolved
+     * tokenUrl/refreshUrl/scopes (already merged from settings vs spec by the
+     * caller). Uses the process-wide cache; mints or refreshes as needed.
+     *
+     * @throws HttpException if the token endpoint returns non-2xx or the
+     *                       response is malformed.
      */
     @NotNull
-    public String getAccessToken() throws HttpException {
-        // Check if we have a valid cached token
-        lock.readLock().lock();
-        try {
-            if (accessToken != null && tokenExpiry != null && Instant.now().isBefore(tokenExpiry)) {
-                return accessToken;
-            }
-        } finally {
-            lock.readLock().unlock();
+    public String getAccessToken(@NotNull HttpConfig.OAuth2 oauth, @NotNull String tokenUrl,
+                                  @NotNull String refreshUrl, @NotNull List<String> scopes) throws HttpException {
+        String scopeKey = String.join(":", scopes);
+        TokenKey key = new TokenKey(tokenUrl, oauth.clientId, oauth.audience, scopeKey);
+
+        // Fast path: cached and valid.
+        MintedToken cached = CACHE.get(key);
+        if (cached != null && Instant.now().isBefore(cached.expiresAt)) {
+            logger.debug("[OAuth2] Using cached token (still valid)");
+            return cached.accessToken;
         }
 
-        // Token expired or not present, acquire new one
-        lock.writeLock().lock();
+        ReentrantLock lock = KEY_LOCKS.computeIfAbsent(key, k -> new ReentrantLock());
+        lock.lock();
         try {
-            // Double-check after acquiring write lock
-            if (accessToken != null && tokenExpiry != null && Instant.now().isBefore(tokenExpiry)) {
-                return accessToken;
+            // Recheck after acquiring lock.
+            cached = CACHE.get(key);
+            if (cached != null && Instant.now().isBefore(cached.expiresAt)) {
+                return cached.accessToken;
             }
 
-            logger.info("Acquiring new OAuth2 access token from {}", tokenEndpoint);
-            acquireToken();
-            return accessToken;
+            // Try refresh first if we have a refresh token.
+            if (cached != null && !cached.refreshToken.isEmpty()) {
+                logger.debug("[OAuth2] Cached token expired, attempting refresh at {}...", refreshUrl);
+                try {
+                    MintedToken refreshed = requestToken(oauth, refreshUrl, GRANT_TYPE_REFRESH_TOKEN,
+                            scopes, cached.refreshToken);
+                    CACHE.put(key, refreshed);
+                    logger.debug("[OAuth2] Refresh successful");
+                    return refreshed.accessToken;
+                } catch (HttpException e) {
+                    logger.debug("[OAuth2] Refresh failed: {}; falling back to mint", e.getMessage());
+                }
+            }
 
+            // Mint fresh.
+            logger.debug("[OAuth2] Minting new token at {}", tokenUrl);
+            MintedToken minted = requestToken(oauth, tokenUrl, GRANT_TYPE_CLIENT_CREDENTIALS, scopes, "");
+            CACHE.put(key, minted);
+            return minted.accessToken;
         } finally {
-            lock.writeLock().unlock();
+            lock.unlock();
         }
     }
 
     /**
-     * Acquires a new access token using client credentials flow.
+     * Performs a single token mint or refresh. {@code refreshToken} is empty
+     * for client_credentials grant; non-empty for refresh_token grant.
      */
-    private void acquireToken() throws HttpException {
-        // Build token request
-        Map<String, String> formData = new HashMap<>();
-        formData.put("grant_type", "client_credentials");
-        if (scope != null) {
-            formData.put("scope", scope);
+    @NotNull
+    private MintedToken requestToken(@NotNull HttpConfig.OAuth2 oauth, @NotNull String url,
+                                     @NotNull String grantType, @NotNull List<String> scopes,
+                                     @NotNull String refreshToken) throws HttpException {
+        // Build form body.
+        StringBuilder body = new StringBuilder("grant_type=").append(grantType);
+        if (GRANT_TYPE_CLIENT_CREDENTIALS.equals(grantType)) {
+            if (!scopes.isEmpty()) {
+                body.append("&scope=").append(ParameterEncoder.urlEncode(String.join(" ", scopes)));
+            }
+            if (!oauth.audience.isEmpty()) {
+                body.append("&audience=").append(ParameterEncoder.urlEncode(oauth.audience));
+            }
+        } else if (GRANT_TYPE_REFRESH_TOKEN.equals(grantType)) {
+            body.append("&refresh_token=").append(ParameterEncoder.urlEncode(refreshToken));
         }
 
-        String formBody = buildFormBody(formData);
+        // Resolve client secret (cleartext or keychain).
+        String secret = oauth.clientSecret;
+        if (secret.isEmpty() && !oauth.clientSecretKeychain.isEmpty()) {
+            secret = Keychain.load(oauth.clientSecretKeychain, oauth.clientId);
+        }
 
-        // Create Basic Auth header
-        String credentials = clientId + ":" + clientSecret;
-        String encodedCredentials = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+        // Public client (no secret): send client_id in the body.
+        if (secret.isEmpty()) {
+            body.append("&client_id=").append(ParameterEncoder.urlEncode(oauth.clientId));
+        }
 
-        HttpRequest request = HttpRequest.builder()
+        // Build the HTTP request with the appropriate Authorization scheme.
+        HttpRequest.Builder rb = HttpRequest.builder()
                 .method("POST")
-                .url(tokenEndpoint)
-                .header("Authorization", "Basic " + encodedCredentials)
+                .url(url)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .body(formBody.getBytes(StandardCharsets.UTF_8))
-                .build();
+                .body(body.toString().getBytes(StandardCharsets.UTF_8));
 
-        HttpResponse response = httpClient.execute(request);
-
-        if (!response.isSuccessful()) {
-            String error = response.getBody() != null ?
-                    new String(response.getBody(), StandardCharsets.UTF_8) : "Unknown error";
-            throw new HttpException("OAuth2 token request failed: " + error, response.getStatusCode(), response.getBody());
-        }
-
-        // Parse token response
-        String responseBody = new String(response.getBody(), StandardCharsets.UTF_8);
-        JsonObject tokenResponse = gson.fromJson(responseBody, JsonObject.class);
-
-        accessToken = tokenResponse.get("access_token").getAsString();
-        int expiresIn = tokenResponse.has("expires_in") ?
-                tokenResponse.get("expires_in").getAsInt() : 3600;
-
-        // Set expiry with 60 second buffer
-        tokenExpiry = Instant.now().plusSeconds(expiresIn - 60);
-
-        logger.info("Successfully acquired OAuth2 token (expires in {}s)", expiresIn);
-    }
-
-    /**
-     * Builds a URL-encoded form body from parameters.
-     */
-    @NotNull
-    private String buildFormBody(@NotNull Map<String, String> formData) {
-        StringBuilder body = new StringBuilder();
-        boolean first = true;
-        for (Map.Entry<String, String> entry : formData.entrySet()) {
-            if (!first) {
-                body.append("&");
+        if (!secret.isEmpty()) {
+            switch (oauth.tokenEndpointAuthMethod) {
+                case RFC5849_OAUTH1_SIGNATURE: {
+                    Map<String, String> bodyParams = parseBodyParams(body.toString());
+                    String authHeader = OAuth1Signature.buildAuthorizationHeader(
+                            "POST", url, oauth.clientId, secret, bodyParams, oauth.nonceLength);
+                    rb.header("Authorization", authHeader);
+                    logger.debug("[OAuth2] Token endpoint auth method: rfc5849-oauth1-signature (HMAC-SHA256)");
+                    break;
+                }
+                case RFC6749_CLIENT_SECRET_BASIC:
+                default: {
+                    String creds = oauth.clientId + ":" + secret;
+                    String b64 = java.util.Base64.getEncoder().encodeToString(creds.getBytes(StandardCharsets.UTF_8));
+                    rb.header("Authorization", "Basic " + b64);
+                    logger.debug("[OAuth2] Token endpoint auth method: rfc6749-client-secret-basic (HTTP Basic)");
+                    break;
+                }
             }
-            body.append(ParameterEncoder.urlEncode(entry.getKey()));
-            body.append("=");
-            body.append(ParameterEncoder.urlEncode(entry.getValue()));
-            first = false;
         }
-        return body.toString();
+
+        logger.debug("[OAuth2] Requesting token: grant_type={}, url={}", grantType, url);
+
+        HttpResponse response = httpClient.execute(rb.build(), HttpConfig.empty());
+        if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+            String err = response.getBody() != null
+                    ? new String(response.getBody(), StandardCharsets.UTF_8)
+                    : "(empty)";
+            throw new HttpException("OAuth2 token endpoint returned non-2xx (" + response.getStatusCode()
+                    + ") for grant_type=" + grantType + ": " + err,
+                    response.getStatusCode(), response.getBody());
+        }
+
+        String responseBody = new String(response.getBody(), StandardCharsets.UTF_8);
+        JsonObject json = gson.fromJson(responseBody, JsonObject.class);
+
+        if (json == null || !json.has("access_token")) {
+            throw new HttpException("OAuth2: access_token missing in response for grant_type=" + grantType);
+        }
+
+        MintedToken minted = new MintedToken();
+        minted.accessToken = json.get("access_token").getAsString();
+        int expiresIn = json.has("expires_in") ? json.get("expires_in").getAsInt() : 3600;
+        // 30-second jiggle to match C++.
+        minted.expiresAt = Instant.now().plusSeconds(expiresIn - 30);
+        if (json.has("refresh_token")) {
+            minted.refreshToken = json.get("refresh_token").getAsString();
+        } else if (GRANT_TYPE_REFRESH_TOKEN.equals(grantType) && !refreshToken.isEmpty()) {
+            // Server didn't reissue; keep the old refresh token.
+            minted.refreshToken = refreshToken;
+        }
+        logger.debug("[OAuth2] Token minted (expires in {}s)", expiresIn);
+        return minted;
+    }
+
+    @NotNull
+    static Map<String, String> parseBodyParams(@NotNull String body) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (body.isEmpty()) return out;
+        for (String pair : body.split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq < 0) continue;
+            String k = pair.substring(0, eq);
+            String v;
+            try {
+                v = URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException e) {
+                v = pair.substring(eq + 1);
+            }
+            out.put(k, v);
+        }
+        return out;
     }
 
     /**
-     * Clears the cached token, forcing a refresh on next access.
+     * Clears the cached token for the given key — call when a 401 is received
+     * to force a re-mint on the next request.
      */
-    public void clearToken() {
-        lock.writeLock().lock();
-        try {
-            accessToken = null;
-            tokenExpiry = null;
-            logger.debug("OAuth2 token cache cleared");
-        } finally {
-            lock.writeLock().unlock();
+    public static void clearToken(@NotNull String tokenUrl, @NotNull String clientId,
+                                  @NotNull String audience, @NotNull List<String> scopes) {
+        CACHE.remove(new TokenKey(tokenUrl, clientId, audience, String.join(":", scopes)));
+    }
+
+    /** Test hook: clears the entire process-wide cache. */
+    static void clearAllCachedTokens() {
+        CACHE.clear();
+        KEY_LOCKS.clear();
+    }
+
+    private static final class TokenKey {
+        final String tokenUrl;
+        final String clientId;
+        final String audience;
+        final String scopeKey;
+
+        TokenKey(String tokenUrl, String clientId, String audience, String scopeKey) {
+            this.tokenUrl = tokenUrl;
+            this.clientId = clientId;
+            this.audience = audience;
+            this.scopeKey = scopeKey;
         }
+
+        @Override public boolean equals(Object o) {
+            if (!(o instanceof TokenKey)) return false;
+            TokenKey k = (TokenKey) o;
+            return Objects.equals(tokenUrl, k.tokenUrl)
+                    && Objects.equals(clientId, k.clientId)
+                    && Objects.equals(audience, k.audience)
+                    && Objects.equals(scopeKey, k.scopeKey);
+        }
+
+        @Override public int hashCode() {
+            return Objects.hash(tokenUrl, clientId, audience, scopeKey);
+        }
+    }
+
+    private static final class MintedToken {
+        String accessToken = "";
+        String refreshToken = "";
+        Instant expiresAt = Instant.EPOCH;
     }
 }

@@ -71,16 +71,34 @@ task generateZserio(type: JavaExec) {
         zserioOutputDir.mkdirs()
         logger.lifecycle("Generating Java classes from ${zserioInputFile.name}")
     }
+
+    // Workaround: zserio-Java codegen emits unqualified `String` for service
+    // method-name constants and method dispatch. Inside a package that also
+    // declares a zserio struct named `String` (calculator.String), the bare
+    // `String` resolves to the package-local type and breaks compilation.
+    // Patch Calculator.java to qualify those occurrences as java.lang.String.
+    doLast {
+        def calc = file("${zserioOutputDir}/calculator/Calculator.java")
+        if (calc.exists()) {
+            def text = calc.text
+            text = text.replaceAll('public static final String ([a-zA-Z0-9_]+_METHOD_NAME)',
+                                    'public static final java.lang.String $1')
+            text = text.replaceAll('public final String callMethod\\(',
+                                    'public final java.lang.String callMethod(')
+            // Method() inner-class signature uses String for methodName too.
+            text = text.replaceAll('public zserio\\.runtime\\.service\\.ServiceData<\\? extends zserio\\.runtime\\.io\\.Writer> invoke\\(\\s*byte\\[\\] requestData, java\\.lang\\.Object context\\)',
+                                    '$0')
+            calc.text = text
+        }
+    }
 }
 
 // Generate zserio classes before compiling
 compileJava.dependsOn generateZserio
 
-// Exclude Calculator.java from compilation (has naming conflict with java.lang.String)
-// We don't need it since we're using OpenAPI client directly
-compileJava {
-    exclude '**/calculator/Calculator.java'
-}
+// Calculator.java is now compiled — the test uses zserio-generated CalculatorClient
+// (it implements the same shape as Python's services.MyService.Client) through
+// ZswagClient, our ServiceClientInterface adapter.
 
 // Clean generated sources
 clean {

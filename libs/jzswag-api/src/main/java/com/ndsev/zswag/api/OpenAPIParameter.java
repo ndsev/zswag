@@ -3,16 +3,24 @@ package com.ndsev.zswag.api;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Optional;
+
 /**
- * Represents an OpenAPI parameter definition.
+ * One OpenAPI operation parameter, enriched with the zswag-specific
+ * {@code x-zserio-request-part} extension that maps the parameter to a
+ * field path in the zserio request object.
  */
 public class OpenAPIParameter {
+    /** Sentinel: when {@code requestPart == "*"}, the whole serialized request object goes here. */
+    public static final String REQUEST_PART_WHOLE = "*";
+
     private final String name;
     private final ParameterLocation location;
     private final ParameterStyle style;
     private final ParameterFormat format;
     private final boolean required;
     private final boolean explode;
+    private final String requestPart;  // null if no x-zserio-request-part on this parameter
 
     private OpenAPIParameter(Builder builder) {
         this.name = builder.name;
@@ -21,34 +29,28 @@ public class OpenAPIParameter {
         this.format = builder.format != null ? builder.format : ParameterFormat.STRING;
         this.required = builder.required;
         this.explode = builder.explode;
+        this.requestPart = builder.requestPart;
     }
 
+    @NotNull public String getName() { return name; }
+    @NotNull public ParameterLocation getLocation() { return location; }
+    @NotNull public ParameterStyle getStyle() { return style; }
+    @NotNull public ParameterFormat getFormat() { return format; }
+    public boolean isRequired() { return required; }
+    public boolean isExplode() { return explode; }
+
+    /**
+     * The {@code x-zserio-request-part} value: a dotted path into the zserio
+     * request struct (e.g. {@code "base.value"}), or {@code "*"} for the whole
+     * object as a binary blob, or empty if the parameter is not zswag-bound.
+     */
     @NotNull
-    public String getName() {
-        return name;
+    public Optional<String> getRequestPart() {
+        return Optional.ofNullable(requestPart);
     }
 
-    @NotNull
-    public ParameterLocation getLocation() {
-        return location;
-    }
-
-    @NotNull
-    public ParameterStyle getStyle() {
-        return style;
-    }
-
-    @NotNull
-    public ParameterFormat getFormat() {
-        return format;
-    }
-
-    public boolean isRequired() {
-        return required;
-    }
-
-    public boolean isExplode() {
-        return explode;
+    public boolean isWholeRequest() {
+        return REQUEST_PART_WHOLE.equals(requestPart);
     }
 
     @NotNull
@@ -63,13 +65,13 @@ public class OpenAPIParameter {
         private ParameterFormat format;
         private boolean required;
         private boolean explode;
+        private String requestPart;
 
         private Builder(String name, ParameterLocation location) {
             this.name = name;
             this.location = location;
-            // Set default style based on location
             this.style = getDefaultStyle(location);
-            this.explode = false;
+            this.explode = (location == ParameterLocation.QUERY || location == ParameterLocation.COOKIE);
         }
 
         private static ParameterStyle getDefaultStyle(ParameterLocation location) {
@@ -85,33 +87,12 @@ public class OpenAPIParameter {
             }
         }
 
-        @NotNull
-        public Builder style(@NotNull ParameterStyle style) {
-            this.style = style;
-            return this;
-        }
+        @NotNull public Builder style(@NotNull ParameterStyle style) { this.style = style; return this; }
+        @NotNull public Builder format(@NotNull ParameterFormat format) { this.format = format; return this; }
+        @NotNull public Builder required(boolean required) { this.required = required; return this; }
+        @NotNull public Builder explode(boolean explode) { this.explode = explode; return this; }
+        @NotNull public Builder requestPart(@Nullable String requestPart) { this.requestPart = requestPart; return this; }
 
-        @NotNull
-        public Builder format(@NotNull ParameterFormat format) {
-            this.format = format;
-            return this;
-        }
-
-        @NotNull
-        public Builder required(boolean required) {
-            this.required = required;
-            return this;
-        }
-
-        @NotNull
-        public Builder explode(boolean explode) {
-            this.explode = explode;
-            return this;
-        }
-
-        @NotNull
-        public OpenAPIParameter build() {
-            return new OpenAPIParameter(this);
-        }
+        @NotNull public OpenAPIParameter build() { return new OpenAPIParameter(this); }
     }
 }

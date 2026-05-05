@@ -34,15 +34,6 @@ public interface IOpenAPIClient {
     IHttpClient getHttpClient();
 
     /**
-     * Creates a new OpenAPI client with updated HTTP settings.
-     *
-     * @param settings The new HTTP settings
-     * @return A new OpenAPI client instance
-     */
-    @NotNull
-    IOpenAPIClient withSettings(@NotNull HttpSettings settings);
-
-    /**
      * Gets the OpenAPI specification URL or file path.
      *
      * @return The OpenAPI spec location

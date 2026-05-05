@@ -1,71 +1,23 @@
 # jzswag-api
 
-Shared Java/Kotlin API interfaces for zswag OpenAPI clients.
+Platform-agnostic types and interfaces shared by all zswag Java client implementations (`jzswag-desktop` today, `jzswag-android` planned).
 
-## Overview
+## Contents
 
-This module defines the common API contract that both Desktop and Android implementations of the zswag client adhere to. It provides:
+- **`HttpConfig`** — per-request adhoc HTTP configuration (headers, query, cookies, basic-auth, proxy, OAuth2, API key). Mirrors C++ `httpcl::Config` and Python `HTTPConfig`. Immutable; build via `HttpConfig.builder()`.
+- **`HttpSettings`** — multi-scope persistent settings registry (URL pattern → `HttpConfig`). Mirrors C++ `httpcl::Settings`. Loaded from `HTTP_SETTINGS_FILE` by `HttpSettingsLoader` in `jzswag-desktop`.
+- **`OpenAPIParameter`**, **`ParameterLocation`**, **`ParameterStyle`**, **`ParameterFormat`** — model types for OpenAPI 3.0 parameter encoding, including the zswag-specific `x-zserio-request-part` extension.
+- **`SecurityScheme`**, **`SecuritySchemeType`**, **`SecurityRequirement`** — model types for the OpenAPI security flow, preserving OR-of-AND alternatives.
+- **`IHttpClient`** — platform-agnostic HTTP transport interface; the impl applies persistent + adhoc config per request.
+- **`HttpRequest`**, **`HttpResponse`**, **`HttpException`** — request/response value types and the standard exception type for non-200 responses, connection failures, and timeouts.
 
-- **Interfaces**: `IHttpClient`, `IOpenAPIClient`, `IZswagServiceClient`
-- **Configuration**: `HttpSettings`, `OpenAPIParameter`, `SecurityScheme`
-- **Types**: Parameter locations, styles, formats, and security scheme types
-- **Kotlin DSL**: Extension functions for idiomatic Kotlin usage
+## Dependencies
+
+- Java 11+
+- zserio-runtime 2.16.1+
+
+No third-party dependencies (the YAML loader for `HttpSettings` lives in `jzswag-desktop` to keep this module dep-free).
 
 ## Usage
 
-### Java
-
-```java
-// Build HTTP settings
-HttpSettings settings = HttpSettings.builder()
-    .header("X-API-Key", "your-key")
-    .timeout(Duration.ofSeconds(60))
-    .bearerToken("your-token")
-    .build();
-
-// Make HTTP request
-HttpRequest request = HttpRequest.builder()
-    .method("GET")
-    .url("https://api.example.com/users")
-    .headers(settings.getHeaders())
-    .build();
-```
-
-### Kotlin
-
-```kotlin
-// Build HTTP settings with DSL
-val settings = httpSettings {
-    header("X-API-Key", "your-key")
-    timeout = Duration.ofSeconds(60)
-    bearerToken = "your-token"
-}
-
-// Make HTTP request with DSL
-val request = httpRequest {
-    method = "GET"
-    url = "https://api.example.com/users"
-    headers(settings.headers)
-}
-
-// Call OpenAPI method with DSL
-val response = client.call("/users/{id}") {
-    param("id", userId)
-    param("include", listOf("profile", "settings"))
-}
-```
-
-## Implementations
-
-- **jzswag-desktop**: Desktop implementation using Java 11 HttpClient
-- **jzswag-android**: Android implementation using OkHttp and Android-specific APIs
-
-## Requirements
-
-- Java 11+
-- zserio Java runtime 2.16.1+
-- Kotlin 1.9.22+ (for Kotlin extensions)
-
-## License
-
-Same as the parent zswag project.
+This module is a peer dependency of the platform implementations; you don't depend on it directly. See [`docs/java.md`](../../docs/java.md) for client usage examples.

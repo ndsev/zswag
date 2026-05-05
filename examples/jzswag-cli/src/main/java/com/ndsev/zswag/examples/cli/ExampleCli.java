@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,7 +33,6 @@ public class ExampleCli {
             System.err.println("  HTTP_SETTINGS_FILE  - Path to HTTP settings YAML file");
             System.err.println("  HTTP_TIMEOUT        - Request timeout in seconds");
             System.err.println("  HTTP_SSL_STRICT     - Enable strict SSL verification (0/1)");
-            System.err.println("  HTTP_BEARER_TOKEN   - Bearer token for authentication");
             System.exit(1);
         }
 
@@ -42,17 +40,9 @@ public class ExampleCli {
         String methodPath = args[1];
 
         try {
-            // Load HTTP settings from environment or defaults
-            HttpSettings settings;
-            try {
-                settings = ConfigurationLoader.loadSettings();
-                logger.info("Loaded HTTP settings from configuration");
-            } catch (Exception e) {
-                logger.info("Using default HTTP settings");
-                settings = HttpSettings.builder()
-                        .timeout(Duration.ofSeconds(30))
-                        .build();
-            }
+            // Persistent HTTP settings come from HTTP_SETTINGS_FILE (loaded inside DesktopHttpClient).
+            HttpSettings persistent = HttpSettingsLoader.loadFromEnvironment();
+            logger.info("Loaded {} scoped HTTP setting entries", persistent.getEntries().size());
 
             // Parse parameters from command line
             Map<String, Object> parameters = new HashMap<>();
@@ -64,9 +54,8 @@ public class ExampleCli {
                 }
             }
 
-            // Create HTTP client
             logger.info("Creating HTTP client...");
-            IHttpClient httpClient = new DesktopHttpClient(settings);
+            IHttpClient httpClient = new DesktopHttpClient(persistent);
 
             // Create OpenAPI client
             logger.info("Loading OpenAPI spec from: {}", specLocation);

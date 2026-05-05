@@ -1,214 +1,91 @@
 package com.ndsev.zswag.api;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
- * HTTP client configuration settings.
- * This class is immutable and uses the builder pattern for construction.
+ * Multi-scope HTTP settings registry. Mirrors C++ {@code httpcl::Settings}: an
+ * ordered list of {@link HttpConfig} entries, each with an optional URL scope
+ * (glob-like pattern compiled to regex). For a given request URL, all matching
+ * entries are merged into a single effective {@link HttpConfig}.
+ *
+ * <p>Loading from {@code HTTP_SETTINGS_FILE} is performed by
+ * {@code HttpSettingsLoader} in jzswag-desktop (which keeps this module free of
+ * a YAML dependency).
  */
-public class HttpSettings {
-    private final Map<String, String> headers;
-    private final Map<String, String> queryParameters;
-    private final Map<String, String> cookies;
-    private final Duration timeout;
-    private final boolean sslStrict;
-    private final String proxyUrl;
-    private final String basicAuthUsername;
-    private final String basicAuthPassword;
-    private final String bearerToken;
-    private final Map<String, String> apiKeys;
+public final class HttpSettings {
+    private final List<HttpConfig> entries;
 
-    private HttpSettings(Builder builder) {
-        this.headers = Collections.unmodifiableMap(new HashMap<>(builder.headers));
-        this.queryParameters = Collections.unmodifiableMap(new HashMap<>(builder.queryParameters));
-        this.cookies = Collections.unmodifiableMap(new HashMap<>(builder.cookies));
-        this.timeout = builder.timeout;
-        this.sslStrict = builder.sslStrict;
-        this.proxyUrl = builder.proxyUrl;
-        this.basicAuthUsername = builder.basicAuthUsername;
-        this.basicAuthPassword = builder.basicAuthPassword;
-        this.bearerToken = builder.bearerToken;
-        this.apiKeys = Collections.unmodifiableMap(new HashMap<>(builder.apiKeys));
+    public HttpSettings(@NotNull List<HttpConfig> entries) {
+        this.entries = Collections.unmodifiableList(new ArrayList<>(entries));
+    }
+
+    /** Empty settings — useful as a default when {@code HTTP_SETTINGS_FILE} is unset. */
+    @NotNull
+    public static HttpSettings empty() {
+        return new HttpSettings(Collections.emptyList());
     }
 
     @NotNull
-    public Map<String, String> getHeaders() {
-        return headers;
-    }
-
-    @NotNull
-    public Map<String, String> getQueryParameters() {
-        return queryParameters;
-    }
-
-    @NotNull
-    public Map<String, String> getCookies() {
-        return cookies;
-    }
-
-    @NotNull
-    public Duration getTimeout() {
-        return timeout;
-    }
-
-    public boolean isSslStrict() {
-        return sslStrict;
-    }
-
-    @Nullable
-    public String getProxyUrl() {
-        return proxyUrl;
-    }
-
-    @Nullable
-    public String getBasicAuthUsername() {
-        return basicAuthUsername;
-    }
-
-    @Nullable
-    public String getBasicAuthPassword() {
-        return basicAuthPassword;
-    }
-
-    @Nullable
-    public String getBearerToken() {
-        return bearerToken;
-    }
-
-    @NotNull
-    public Map<String, String> getApiKeys() {
-        return apiKeys;
-    }
-
-    @NotNull
-    public static Builder builder() {
-        return new Builder();
+    public List<HttpConfig> getEntries() {
+        return entries;
     }
 
     /**
-     * Creates a new builder initialized with this settings' values.
+     * Returns the merged {@link HttpConfig} for all entries whose
+     * {@code urlPattern} matches the given URL. Iterates in declaration order;
+     * each match is merged onto the accumulated result via
+     * {@link HttpConfig#mergedWith(HttpConfig)}.
+     *
+     * <p>Mirrors C++ {@code Settings::operator[](url)}.
      */
     @NotNull
-    public Builder toBuilder() {
-        return new Builder(this);
+    public HttpConfig forUrl(@NotNull String url) {
+        HttpConfig result = HttpConfig.empty();
+        for (HttpConfig entry : entries) {
+            Optional<Pattern> pattern = entry.getUrlPattern();
+            if (!pattern.isPresent() || pattern.get().matcher(url).matches()) {
+                result = result.mergedWith(entry);
+            }
+        }
+        return result;
     }
 
-    public static class Builder {
-        private Map<String, String> headers = new HashMap<>();
-        private Map<String, String> queryParameters = new HashMap<>();
-        private Map<String, String> cookies = new HashMap<>();
-        private Duration timeout = Duration.ofSeconds(30);
-        private boolean sslStrict = true;
-        private String proxyUrl;
-        private String basicAuthUsername;
-        private String basicAuthPassword;
-        private String bearerToken;
-        private Map<String, String> apiKeys = new HashMap<>();
-
-        private Builder() {
+    /**
+     * Converts a glob-like scope pattern (with {@code *} as wildcard) into a
+     * compiled regex, escaping all other regex metacharacters. Mirrors C++
+     * {@code convertToRegex} in {@code http-settings.cpp}.
+     */
+    @NotNull
+    public static Pattern compileScope(@NotNull String scope) {
+        StringBuilder sb = new StringBuilder("^");
+        for (int i = 0; i < scope.length(); i++) {
+            char c = scope.charAt(i);
+            switch (c) {
+                case '*':
+                    sb.append(".*");
+                    break;
+                case '.':
+                    sb.append("\\.");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '^': case '$': case '|': case '(': case ')':
+                case '[': case ']': case '{': case '}': case '?':
+                case '+': case '-': case '!':
+                    sb.append('\\').append(c);
+                    break;
+                default:
+                    sb.append(c);
+            }
         }
-
-        private Builder(HttpSettings settings) {
-            this.headers = new HashMap<>(settings.headers);
-            this.queryParameters = new HashMap<>(settings.queryParameters);
-            this.cookies = new HashMap<>(settings.cookies);
-            this.timeout = settings.timeout;
-            this.sslStrict = settings.sslStrict;
-            this.proxyUrl = settings.proxyUrl;
-            this.basicAuthUsername = settings.basicAuthUsername;
-            this.basicAuthPassword = settings.basicAuthPassword;
-            this.bearerToken = settings.bearerToken;
-            this.apiKeys = new HashMap<>(settings.apiKeys);
-        }
-
-        @NotNull
-        public Builder header(@NotNull String name, @NotNull String value) {
-            this.headers.put(name, value);
-            return this;
-        }
-
-        @NotNull
-        public Builder headers(@NotNull Map<String, String> headers) {
-            this.headers.putAll(headers);
-            return this;
-        }
-
-        @NotNull
-        public Builder queryParameter(@NotNull String name, @NotNull String value) {
-            this.queryParameters.put(name, value);
-            return this;
-        }
-
-        @NotNull
-        public Builder queryParameters(@NotNull Map<String, String> queryParameters) {
-            this.queryParameters.putAll(queryParameters);
-            return this;
-        }
-
-        @NotNull
-        public Builder cookie(@NotNull String name, @NotNull String value) {
-            this.cookies.put(name, value);
-            return this;
-        }
-
-        @NotNull
-        public Builder cookies(@NotNull Map<String, String> cookies) {
-            this.cookies.putAll(cookies);
-            return this;
-        }
-
-        @NotNull
-        public Builder timeout(@NotNull Duration timeout) {
-            this.timeout = timeout;
-            return this;
-        }
-
-        @NotNull
-        public Builder sslStrict(boolean sslStrict) {
-            this.sslStrict = sslStrict;
-            return this;
-        }
-
-        @NotNull
-        public Builder proxyUrl(@Nullable String proxyUrl) {
-            this.proxyUrl = proxyUrl;
-            return this;
-        }
-
-        @NotNull
-        public Builder basicAuth(@NotNull String username, @NotNull String password) {
-            this.basicAuthUsername = username;
-            this.basicAuthPassword = password;
-            return this;
-        }
-
-        @NotNull
-        public Builder bearerToken(@NotNull String token) {
-            this.bearerToken = token;
-            return this;
-        }
-
-        @NotNull
-        public Builder apiKey(@NotNull String name, @NotNull String value) {
-            this.apiKeys.put(name, value);
-            return this;
-        }
-
-        @NotNull
-        public Builder apiKeys(@NotNull Map<String, String> apiKeys) {
-            this.apiKeys.putAll(apiKeys);
-            return this;
-        }
-
-        @NotNull
-        public HttpSettings build() {
-            return new HttpSettings(this);
-        }
+        sb.append(".*$");
+        return Pattern.compile(sb.toString());
     }
 }

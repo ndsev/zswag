@@ -5,129 +5,202 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 
 /**
- * Desktop implementation of IHttpClient using Java 11 HttpClient.
+ * Desktop {@link IHttpClient} on top of the JDK 11 {@link HttpClient}.
+ *
+ * <p>On every request the client merges its persistent {@link HttpSettings}
+ * (URL-scope-matched) with the adhoc {@link HttpConfig} passed by the caller,
+ * matching the C++ {@code HttpLibHttpClient} flow. Headers, cookies, query
+ * parameters, basic-auth and proxy from the merged config are applied to the
+ * underlying request.
  */
 public class DesktopHttpClient implements IHttpClient {
     private static final Logger logger = LoggerFactory.getLogger(DesktopHttpClient.class);
 
-    private final HttpClient httpClient;
-    private final HttpSettings settings;
+    private static final int DEFAULT_TIMEOUT_SECONDS = 60;
 
-    public DesktopHttpClient(@NotNull HttpSettings settings) {
-        this.settings = settings;
-        this.httpClient = createHttpClient(settings);
-    }
+    private final HttpSettings persistentSettings;
+    private final HttpClient strictClient;
+    private final HttpClient permissiveClient;
 
     /**
-     * Creates a Java 11 HttpClient configured with the given settings.
+     * Creates a client that loads persistent settings from {@code HTTP_SETTINGS_FILE}
+     * and applies {@code HTTP_TIMEOUT} / {@code HTTP_SSL_STRICT} env vars.
      */
+    public DesktopHttpClient() {
+        this(HttpSettingsLoader.loadFromEnvironment());
+    }
+
+    public DesktopHttpClient(@NotNull HttpSettings persistentSettings) {
+        JzswagLogging.init();
+        this.persistentSettings = persistentSettings;
+        Duration timeout = readTimeoutFromEnv();
+        this.strictClient = buildJdkClient(timeout, true);
+        this.permissiveClient = buildJdkClient(timeout, false);
+    }
+
+    /** For tests: explicit timeout override. */
+    DesktopHttpClient(@NotNull HttpSettings persistentSettings, @NotNull Duration timeout) {
+        this.persistentSettings = persistentSettings;
+        this.strictClient = buildJdkClient(timeout, true);
+        this.permissiveClient = buildJdkClient(timeout, false);
+    }
+
     @NotNull
-    private static HttpClient createHttpClient(@NotNull HttpSettings settings) {
-        HttpClient.Builder builder = HttpClient.newBuilder()
+    public HttpSettings getPersistentSettings() {
+        return persistentSettings;
+    }
+
+    @NotNull
+    private static Duration readTimeoutFromEnv() {
+        String envTimeout = System.getenv("HTTP_TIMEOUT");
+        if (envTimeout != null && !envTimeout.isEmpty()) {
+            try {
+                int seconds = Integer.parseInt(envTimeout);
+                return Duration.ofSeconds(seconds);
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid HTTP_TIMEOUT value '{}', using default {}s", envTimeout, DEFAULT_TIMEOUT_SECONDS);
+            }
+        }
+        return Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS);
+    }
+
+    private static boolean envSslStrict() {
+        String env = System.getenv("HTTP_SSL_STRICT");
+        if (env == null || env.isEmpty()) return true;
+        return "1".equals(env) || "true".equalsIgnoreCase(env);
+    }
+
+    private static HttpClient buildJdkClient(@NotNull Duration connectTimeout, boolean sslStrict) {
+        HttpClient.Builder b = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(settings.getTimeout());
-
-        // TODO: Add proxy support
-        // TODO: Add SSL configuration
-
-        return builder.build();
+                .connectTimeout(connectTimeout);
+        if (!sslStrict) {
+            try {
+                SSLContext ctx = SSLContext.getInstance("TLS");
+                ctx.init(null, new TrustManager[]{new TrustEverythingManager()}, new java.security.SecureRandom());
+                b.sslContext(ctx);
+            } catch (NoSuchAlgorithmException | KeyManagementException e) {
+                logger.warn("Failed to install permissive SSLContext: {}", e.getMessage());
+            }
+        }
+        return b.build();
     }
 
     @Override
     @NotNull
-    public com.ndsev.zswag.api.HttpResponse execute(@NotNull com.ndsev.zswag.api.HttpRequest request)
-            throws HttpException {
+    public com.ndsev.zswag.api.HttpResponse execute(@NotNull com.ndsev.zswag.api.HttpRequest request,
+                                                    @NotNull HttpConfig adhoc) throws HttpException {
+        // Merge: persistent (scope-matched) | adhoc — matches C++ Settings[uri] |= httpConfig_
+        HttpConfig effective = persistentSettings.forUrl(request.getUrl()).mergedWith(adhoc);
+
+        // Effective SSL strictness: request.adhoc has the final say if it ever sets sslStrict=false,
+        // otherwise honor env. (Persistent settings file does not carry sslStrict in C++ either.)
+        boolean sslStrict = envSslStrict() && effective.isSslStrict();
+        HttpClient jdk = sslStrict ? strictClient : permissiveClient;
+
+        // Resolve proxy if configured. JDK HttpClient takes proxy on the client builder, so for
+        // configs that vary per-URL we'd need a per-request client; since proxy is rare, build
+        // a one-shot client when proxy is set.
+        if (effective.getProxy().isPresent()) {
+            jdk = buildClientWithProxy(jdk.connectTimeout().orElse(Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS)),
+                    sslStrict, effective.getProxy().get());
+        }
+
         try {
-            logger.debug("Executing {} request to {}", request.getMethod(), request.getUrl());
+            String url = applyQueryParams(request.getUrl(), effective.getQuery());
+            logger.debug("Executing {} request to {}", request.getMethod(), url);
 
-            // Build the Java HttpRequest
-            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(request.getUrl()))
-                    .timeout(settings.getTimeout());
+            HttpRequest.Builder rb = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(effective.getTimeout());
 
-            // Add headers from request
-            for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
-                requestBuilder.header(header.getKey(), header.getValue());
+            // Per-request headers from the OpenAPI dispatch layer
+            for (Map.Entry<String, String> h : request.getHeaders().entrySet()) {
+                rb.header(h.getKey(), h.getValue());
             }
-
-            // Add headers from settings
-            for (Map.Entry<String, String> header : settings.getHeaders().entrySet()) {
-                requestBuilder.header(header.getKey(), header.getValue());
-            }
-
-            // Add cookies from settings as Cookie header
-            Map<String, String> cookies = settings.getCookies();
-            if (!cookies.isEmpty()) {
-                StringJoiner cookieJoiner = new StringJoiner("; ");
-                for (Map.Entry<String, String> cookie : cookies.entrySet()) {
-                    cookieJoiner.add(cookie.getKey() + "=" + cookie.getValue());
+            // Persistent + adhoc headers (multi-valued)
+            for (Map.Entry<String, List<String>> h : effective.getHeaders().entrySet()) {
+                for (String v : h.getValue()) {
+                    rb.header(h.getKey(), v);
                 }
-                requestBuilder.header("Cookie", cookieJoiner.toString());
             }
 
-            // Add authentication headers
-            addAuthenticationHeaders(requestBuilder);
+            // Cookies → single Cookie header
+            if (!effective.getCookies().isEmpty()) {
+                StringJoiner cookieJoiner = new StringJoiner("; ");
+                for (Map.Entry<String, String> e : effective.getCookies().entrySet()) {
+                    cookieJoiner.add(e.getKey() + "=" + e.getValue());
+                }
+                rb.header("Cookie", cookieJoiner.toString());
+            }
 
-            // Set HTTP method and body
+            // Basic auth — only set if Authorization isn't already provided (e.g., bearer)
+            if (effective.getAuth().isPresent() && !effective.getHeaders().containsKey("Authorization")) {
+                HttpConfig.BasicAuthentication auth = effective.getAuth().get();
+                String password = !auth.password.isEmpty()
+                        ? auth.password
+                        : Keychain.load(auth.keychain, auth.user);
+                String credentials = auth.user + ":" + password;
+                String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+                rb.header("Authorization", "Basic " + encoded);
+            }
+
+            // HTTP method + body
             switch (request.getMethod().toUpperCase()) {
                 case "GET":
-                    requestBuilder.GET();
+                    rb.GET();
                     break;
                 case "POST":
-                    if (request.getBody() != null) {
-                        requestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(request.getBody()));
-                    } else {
-                        requestBuilder.POST(HttpRequest.BodyPublishers.noBody());
-                    }
+                    rb.POST(request.getBody() != null
+                            ? HttpRequest.BodyPublishers.ofByteArray(request.getBody())
+                            : HttpRequest.BodyPublishers.noBody());
                     break;
                 case "PUT":
-                    if (request.getBody() != null) {
-                        requestBuilder.PUT(HttpRequest.BodyPublishers.ofByteArray(request.getBody()));
-                    } else {
-                        requestBuilder.PUT(HttpRequest.BodyPublishers.noBody());
-                    }
+                    rb.PUT(request.getBody() != null
+                            ? HttpRequest.BodyPublishers.ofByteArray(request.getBody())
+                            : HttpRequest.BodyPublishers.noBody());
                     break;
                 case "DELETE":
-                    requestBuilder.DELETE();
-                    break;
-                case "PATCH":
                     if (request.getBody() != null) {
-                        requestBuilder.method("PATCH", HttpRequest.BodyPublishers.ofByteArray(request.getBody()));
+                        rb.method("DELETE", HttpRequest.BodyPublishers.ofByteArray(request.getBody()));
                     } else {
-                        requestBuilder.method("PATCH", HttpRequest.BodyPublishers.noBody());
+                        rb.DELETE();
                     }
                     break;
                 default:
                     throw new HttpException("Unsupported HTTP method: " + request.getMethod());
             }
 
-            HttpRequest httpRequest = requestBuilder.build();
-
-            // Execute the request
-            HttpResponse<byte[]> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
-
+            HttpResponse<byte[]> response = jdk.send(rb.build(), HttpResponse.BodyHandlers.ofByteArray());
             logger.debug("Received response with status code: {}", response.statusCode());
 
-            // Convert to our HttpResponse
             return new com.ndsev.zswag.api.HttpResponse(
                     response.statusCode(),
-                    null, // Java HttpClient doesn't expose status message
+                    null,
                     convertHeaders(response.headers().map()),
-                    response.body()
-            );
+                    response.body());
 
         } catch (IOException e) {
             logger.error("HTTP request failed: {}", e.getMessage(), e);
@@ -139,49 +212,64 @@ public class DesktopHttpClient implements IHttpClient {
         }
     }
 
-    /**
-     * Adds authentication headers based on settings.
-     * Note: Bearer token takes precedence over Basic auth if both are configured.
-     */
-    private void addAuthenticationHeaders(@NotNull HttpRequest.Builder requestBuilder) {
-        // Bearer token takes precedence over Basic auth
-        if (settings.getBearerToken() != null) {
-            requestBuilder.header("Authorization", "Bearer " + settings.getBearerToken());
-        } else if (settings.getBasicAuthUsername() != null && settings.getBasicAuthPassword() != null) {
-            // Basic authentication (only if no bearer token)
-            String credentials = settings.getBasicAuthUsername() + ":" + settings.getBasicAuthPassword();
-            String encodedCredentials = Base64.getEncoder().encodeToString(
-                    credentials.getBytes(StandardCharsets.UTF_8));
-            requestBuilder.header("Authorization", "Basic " + encodedCredentials);
+    private static HttpClient buildClientWithProxy(@NotNull Duration timeout, boolean sslStrict, @NotNull HttpConfig.Proxy proxy) {
+        HttpClient.Builder b = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(timeout)
+                .proxy(ProxySelector.of(new InetSocketAddress(proxy.host, proxy.port)));
+        if (!sslStrict) {
+            try {
+                SSLContext ctx = SSLContext.getInstance("TLS");
+                ctx.init(null, new TrustManager[]{new TrustEverythingManager()}, new java.security.SecureRandom());
+                b.sslContext(ctx);
+            } catch (NoSuchAlgorithmException | KeyManagementException e) {
+                logger.warn("Failed to install permissive SSLContext: {}", e.getMessage());
+            }
         }
-
-        // API keys are added to headers by the OpenAPIClient based on security scheme definition
+        if (!proxy.user.isEmpty()) {
+            String password = !proxy.password.isEmpty() ? proxy.password : Keychain.load(proxy.keychain, proxy.user);
+            b.authenticator(new java.net.Authenticator() {
+                @Override
+                protected java.net.PasswordAuthentication getPasswordAuthentication() {
+                    return new java.net.PasswordAuthentication(proxy.user, password.toCharArray());
+                }
+            });
+        }
+        return b.build();
     }
 
-    /**
-     * Converts Java HttpHeaders map to a simple String map.
-     */
     @NotNull
-    private Map<String, String> convertHeaders(@NotNull Map<String, java.util.List<String>> headersMap) {
-        Map<String, String> result = new java.util.HashMap<>();
-        for (Map.Entry<String, java.util.List<String>> entry : headersMap.entrySet()) {
-            if (!entry.getValue().isEmpty()) {
-                // Take the first value if multiple exist
-                result.put(entry.getKey(), entry.getValue().get(0));
+    private static String applyQueryParams(@NotNull String baseUrl, @NotNull Map<String, List<String>> query) {
+        if (query.isEmpty()) return baseUrl;
+        StringBuilder sb = new StringBuilder(baseUrl);
+        boolean hasQuery = baseUrl.indexOf('?') >= 0;
+        for (Map.Entry<String, List<String>> e : query.entrySet()) {
+            for (String v : e.getValue()) {
+                sb.append(hasQuery ? '&' : '?');
+                hasQuery = true;
+                sb.append(java.net.URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8));
+                sb.append('=');
+                sb.append(java.net.URLEncoder.encode(v, StandardCharsets.UTF_8));
+            }
+        }
+        return sb.toString();
+    }
+
+    @NotNull
+    private static Map<String, String> convertHeaders(@NotNull Map<String, List<String>> headersMap) {
+        Map<String, String> result = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> e : headersMap.entrySet()) {
+            if (!e.getValue().isEmpty()) {
+                result.put(e.getKey(), e.getValue().get(0));
             }
         }
         return result;
     }
 
-    @Override
-    @NotNull
-    public HttpSettings getSettings() {
-        return settings;
-    }
-
-    @Override
-    @NotNull
-    public IHttpClient withSettings(@NotNull HttpSettings settings) {
-        return new DesktopHttpClient(settings);
+    private static final class TrustEverythingManager implements X509TrustManager {
+        @Override public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+        @Override public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+        @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
     }
 }
