@@ -1,8 +1,73 @@
 # Next Steps for Java Client Implementation
 
-**Status**: Desktop implementation ✅ Complete | Android implementation ⏳ Pending
+**Status**: Desktop implementation ✅ Complete (incl. unit tests) | Integration tests ⏳ Re-verify | Android ⏳ Pending
 
 This document outlines the remaining work to complete the Java client implementation for zswag.
+
+---
+
+## 🔁 Session Handoff (2026-05-05)
+
+Use this section to resume work on a different machine/session.
+
+### Branch state
+- Branch: `jzswag`, pushed to `origin/jzswag`
+- Rebased cleanly onto `origin/main` (currently `994a94a`); 4 commits ahead:
+  1. `7a7e7a2` First pure JAVA zswag impl (wip)
+  2. `fb3ab06` Fixes after code review
+  3. `3f3d7e8` More fixes
+  4. `bff53a0` test: Add unit tests for jzswag-desktop client
+  5. `706fbad` build: Add placeholder build.gradle for jzswag-android and jzswag-aaos
+- No PR opened yet.
+
+### What just landed
+- **Unit tests (~1.8k LOC, 28 test classes/nested groups, all passing)** for `ParameterEncoder`, `OAuth2Handler`, `OpenAPIParser`, `DesktopHttpClient` (JUnit 5 + Mockito + AssertJ + MockWebServer).
+- **`build.gradle` stubs** for `libs/jzswag-android` and `examples/jzswag-aaos`. Without them, `./gradlew clean` (or a fresh checkout) failed with "Configuring project … without an existing directory is not allowed" because git does not track empty dirs.
+
+### Verified build commands (Java 25.0.1, Gradle 9.2.1, macOS arm64)
+```bash
+./gradlew clean build                    # full multi-module build, green
+./gradlew :libs:jzswag-desktop:test      # 28 test groups, all PASSED
+```
+
+### Immediate next actions (pick up here)
+
+#### 1. Re-run the Calculator integration test loop  ← start here
+NEXT_STEPS.md previously flagged 3 known bugs (X-Ponent header param, string-array `concat()` encoding, cookie auth 401s). The unit tests we just landed cover the encoder thoroughly and pass — so it's worth re-running the integration test to see whether those bugs are actually still present or whether the "More fixes" / "Fixes after code review" commits silently fixed them.
+
+```bash
+# 1. Build the Python wheel (needed by the test harness)
+mkdir -p build && cd build
+cmake -DZSWAG_BUILD_WHEELS=ON -DZSWAG_ENABLE_TESTING=OFF -DZSWAG_KEYCHAIN_SUPPORT=OFF ..
+cmake --build .
+cd ..
+
+# 2. Install it
+pip install -r requirements.txt
+pip install build/bin/wheel/*.whl
+
+# 3. Run the integration test
+./libs/jzswag-test/test-java-client.bash
+```
+Look for failures in: `power` (X-Ponent header), `concat` (string array → expected "foobar", was "foo,bar"), `floatMul`/`identity` (cookie auth 401). Expected outcome is one of:
+- All 10 tests pass → mark Phase 1 done, open the PR.
+- Some still fail → fix in `DesktopOpenAPIClient.java` / `ParameterEncoder.java` / `DesktopHttpClient.java` per the diagnostic notes in `libs/jzswag-test/README.md`.
+
+#### 2. Open a draft PR
+Once integration tests are reproducibly run (passing or with a known set of remaining failures):
+```bash
+gh pr create --base main --head jzswag --draft \
+  --title "Pure Java (jzswag-desktop) client" \
+  --body-file <(...)   # summary of components, test status, link to NEXT_STEPS.md
+```
+
+#### 3. Then Phase 2 (Android module)
+See section below. ~3-4 weeks of work. Do not start before #1 + #2.
+
+### Open watch-items
+- `./gradlew clean` will delete the empty `src/main/java/...` chains under the new placeholder modules but the build still succeeds because the stub `build.gradle` is tracked. If you ever add real source, commit a `.gitkeep` or actual file in the source dir.
+- Gradle 9.2.1 emits "incompatible with Gradle 10" deprecation warnings. Run `./gradlew build --warning-mode all` once before bumping Gradle to see what needs fixing.
+- `libs/jzswag-api/src/main/kotlin-disabled/` exists because Kotlin doesn't yet support Java 25 (per the README). Re-enable when Kotlin catches up — see "Kotlin DSL Re-enablement" below.
 
 ---
 
@@ -286,11 +351,13 @@ libs/jzswag-api/src/main/kotlin-disabled/
 - [x] OAuth2 client credentials flow (with caching)
 - [x] Integration test script
 - [x] Documentation (README files)
+- [x] **Unit test coverage for jzswag-desktop** (ParameterEncoder, OAuth2Handler, OpenAPIParser, DesktopHttpClient — JUnit 5/Mockito/AssertJ/MockWebServer, all green)
+- [x] **Rebase onto `origin/main`** (1.11.1 release, codecov/sonar, security fixes — clean, no conflicts)
+- [x] **Placeholder build.gradle for jzswag-android and jzswag-aaos** (so `./gradlew clean` and fresh checkouts no longer break)
 
 ### In Progress 🔧
-- [ ] Parameter encoding refinements (header params, cookies)
-- [ ] Unit test coverage
-- [ ] Integration test full pass (10/10 tests)
+- [ ] Re-run integration tests to confirm whether the 3 known parameter-encoding/auth bugs are still present
+- [ ] Open draft PR against `main`
 
 ### Pending ⏳
 - [ ] Android module implementation
@@ -356,6 +423,6 @@ For the user to get the Java client to production-ready state:
 
 ---
 
-**Last Updated**: 2025-11-25
-**Java Client Version**: 1.11.0
-**Status**: Desktop Complete ✅ | Android Pending ⏳
+**Last Updated**: 2026-05-05
+**Java Client Version**: 1.11.0 (rebased on top of 1.11.1 main)
+**Status**: Desktop Complete + Unit-tested ✅ | Integration tests pending re-run 🔧 | Android Pending ⏳
