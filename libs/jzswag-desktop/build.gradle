@@ -1,6 +1,11 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
+    id 'jacoco'
+}
+
+jacoco {
+    toolVersion = '0.8.11'
 }
 
 description = 'zswag Java Desktop Client - Pure Java implementation using Java 11 HttpClient'
@@ -15,6 +20,15 @@ test {
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
+    }
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
     }
 }
 

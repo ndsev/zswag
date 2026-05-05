@@ -1,0 +1,110 @@
+name: jzswag (Java)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Build & test
+        run: ./gradlew :libs:jzswag-api:build :libs:jzswag-desktop:test :libs:jzswag-test:assemble --console=plain --stacktrace
+
+      - name: Upload JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.os }}
+          path: libs/jzswag-*/build/test-results/test/*.xml
+          retention-days: 14
+
+      - name: Upload JaCoCo HTML report
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-html
+          path: libs/jzswag-desktop/build/reports/jacoco/test/html/
+          retention-days: 14
+
+  coverage:
+    # Single-OS coverage upload. Matches the C++ coverage.yml pattern (Codecov flag
+    # per language, separate name) so Java coverage is tracked independently of C++.
+    name: coverage
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Run tests with coverage
+        run: ./gradlew :libs:jzswag-desktop:test :libs:jzswag-desktop:jacocoTestReport --console=plain
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: libs/jzswag-desktop/build/reports/jacoco/test/jacocoTestReport.xml
+          flags: unittests-java
+          name: codecov-java
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Coverage PR comment (informational)
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.7.1
+        with:
+          paths: libs/jzswag-desktop/build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: Java Coverage (jzswag-desktop)
+          # Starting threshold — current baseline is ~29% line coverage from unit tests
+          # alone (dispatch core is exercised by integration tests that need the Python
+          # server, not yet wired into CI). Ratchet up as more unit tests land.
+          min-coverage-overall: 25
+          min-coverage-changed-files: 50
+          update-comment: true

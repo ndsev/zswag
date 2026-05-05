@@ -1,6 +1,11 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
+    id 'jacoco'
+}
+
+jacoco {
+    toolVersion = '0.8.11'
 }
 
 description = 'zswag Java API - Shared interfaces for Desktop and Android implementations'
@@ -30,6 +35,15 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
 publishing {
