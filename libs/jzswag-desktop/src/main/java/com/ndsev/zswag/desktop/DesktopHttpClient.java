@@ -52,6 +52,7 @@ public class DesktopHttpClient implements IHttpClient {
     }
 
     public DesktopHttpClient(@NotNull HttpSettings persistentSettings) {
+        JzswagLogging.init();
         this.persistentSettings = persistentSettings;
         Duration timeout = readTimeoutFromEnv();
         this.strictClient = buildJdkClient(timeout, true);

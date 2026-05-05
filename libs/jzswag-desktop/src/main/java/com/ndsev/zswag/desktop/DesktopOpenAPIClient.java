@@ -216,10 +216,26 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
             opHeaders.put("Content-Type", ZSERIO_OBJECT_CONTENT_TYPE);
         }
 
+        // Apply security: route api-key to the right location and mint OAuth2 tokens.
+        // The merged config is needed to know which auth credentials are configured.
+        HttpConfig effective = mergedConfigFor(fullUrl.toString());
+        applySecurity(info, effective, opHeaders, queryPairs);
+
+        // Re-append the (possibly-extended) query string when applySecurity added api-key/query entries.
+        // Reset URL building since query may have grown.
+        StringBuilder finalUrl = new StringBuilder(baseUrl);
+        if (!baseUrl.isEmpty() && !baseUrl.endsWith("/") && !path.startsWith("/")) {
+            finalUrl.append("/");
+        }
+        finalUrl.append(path);
+        if (!queryPairs.isEmpty()) {
+            finalUrl.append("?").append(ParameterEncoder.buildQueryString(queryPairs));
+        }
+
         // Build the HTTP request.
         com.ndsev.zswag.api.HttpRequest.Builder rb = com.ndsev.zswag.api.HttpRequest.builder()
                 .method(info.getHttpMethod())
-                .url(fullUrl.toString())
+                .url(finalUrl.toString())
                 .headers(opHeaders);
         if (body != null) rb.body(body);
 
@@ -233,6 +249,170 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
         }
         byte[] respBody = response.getBody();
         return respBody != null ? respBody : new byte[0];
+    }
+
+    /**
+     * Computes the effective {@link HttpConfig} for a given URL: the persistent
+     * settings from the underlying {@link DesktopHttpClient} (scope-matched
+     * against the URL) merged with this client's adhoc config.
+     */
+    @NotNull
+    private HttpConfig mergedConfigFor(@NotNull String url) {
+        if (httpClient instanceof DesktopHttpClient) {
+            HttpSettings persistent = ((DesktopHttpClient) httpClient).getPersistentSettings();
+            return persistent.forUrl(url).mergedWith(adhoc);
+        }
+        return adhoc;
+    }
+
+    /**
+     * Walks the operation's security alternatives and applies each scheme:
+     * <ul>
+     *   <li>HTTP basic / bearer: validated by {@link DesktopHttpClient} from
+     *       the merged config; throws here if neither is configured.</li>
+     *   <li>API-key: routes the merged config's {@link HttpConfig#getApiKey()}
+     *       to header / query / cookie based on the scheme's {@code in}.</li>
+     *   <li>OAuth2: mints (or pulls cached) bearer token via
+     *       {@link OAuth2Handler}, applying spec/settings precedence rules,
+     *       then injects {@code Authorization: Bearer ...} into the request
+     *       headers.</li>
+     * </ul>
+     *
+     * <p>Picks the first alternative whose schemes are all present in the
+     * merged config. Throws if no alternative can be satisfied.
+     */
+    private void applySecurity(@NotNull OpenAPIParser.MethodInfo info,
+                               @NotNull HttpConfig effective,
+                               @NotNull Map<String, String> opHeaders,
+                               @NotNull List<Map.Entry<String, String>> queryPairs) throws HttpException {
+        List<SecurityRequirement> alternatives = info.getSecurity()
+                .orElse(parser.getDefaultSecurity().orElse(Collections.emptyList()));
+        if (alternatives.isEmpty()) return;
+
+        // Pick the first alternative whose schemes can be satisfied.
+        Map<String, SecurityScheme> schemes = parser.getSecuritySchemes();
+        List<String> failures = new ArrayList<>();
+        for (SecurityRequirement alt : alternatives) {
+            try {
+                for (Map.Entry<String, List<String>> req : alt.getSchemes().entrySet()) {
+                    SecurityScheme scheme = schemes.get(req.getKey());
+                    if (scheme == null) {
+                        throw new HttpException("Security scheme '" + req.getKey() + "' referenced by operation but not defined in components.securitySchemes");
+                    }
+                    applySingleScheme(scheme, req.getValue(), effective, opHeaders, queryPairs);
+                }
+                return; // all schemes in this alternative satisfied
+            } catch (HttpException e) {
+                failures.add(e.getMessage());
+            }
+        }
+        throw new HttpException("Operation " + info.getOperationId() + " requires security but none of the "
+                + alternatives.size() + " alternatives could be satisfied: " + failures);
+    }
+
+    private void applySingleScheme(@NotNull SecurityScheme scheme, @NotNull List<String> requiredScopes,
+                                   @NotNull HttpConfig effective, @NotNull Map<String, String> opHeaders,
+                                   @NotNull List<Map.Entry<String, String>> queryPairs) throws HttpException {
+        switch (scheme.getType()) {
+            case HTTP: {
+                String s = scheme.getScheme() == null ? "" : scheme.getScheme().toLowerCase();
+                if ("basic".equals(s)) {
+                    if (!effective.getAuth().isPresent()) {
+                        throw new HttpException("HTTP Basic auth required but no basic-auth configured");
+                    }
+                } else if ("bearer".equals(s)) {
+                    boolean hasBearer = effective.getHeader("Authorization")
+                            .map(v -> v.startsWith("Bearer "))
+                            .orElse(false);
+                    if (!hasBearer) {
+                        throw new HttpException("HTTP Bearer auth required but no Authorization: Bearer header configured");
+                    }
+                }
+                break;
+            }
+            case API_KEY: {
+                String keyValue = effective.getApiKey().orElse(null);
+                if (keyValue == null) {
+                    // The user might have set the key directly via the matching channel.
+                    // Probe for it before declaring failure.
+                    keyValue = lookupConfiguredApiKey(scheme, effective);
+                }
+                if (keyValue == null) {
+                    throw new HttpException("API-key auth required by scheme '" + scheme.getName()
+                            + "' but no api-key configured (set via http-settings api-key, or directly via "
+                            + scheme.getApiKeyLocation() + " '" + scheme.getApiKeyName() + "')");
+                }
+                if (effective.getApiKey().isPresent()) {
+                    // Route the configured api-key to the appropriate location.
+                    switch (scheme.getApiKeyLocation()) {
+                        case HEADER:
+                            opHeaders.put(scheme.getApiKeyName(), keyValue);
+                            break;
+                        case QUERY:
+                            queryPairs.add(new java.util.AbstractMap.SimpleImmutableEntry<>(scheme.getApiKeyName(), keyValue));
+                            break;
+                        case COOKIE: {
+                            String cookieValue = scheme.getApiKeyName() + "=" + keyValue;
+                            opHeaders.merge("Cookie", cookieValue,
+                                    (existing, incoming) -> existing + "; " + incoming);
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+                break;
+            }
+            case OAUTH2: {
+                // Resolve OAuth2 config from settings (effective.oauth2) — the spec scopes/tokenUrl
+                // are fallbacks when settings don't override.
+                HttpConfig.OAuth2 oauth = effective.getOAuth2().orElse(null);
+                if (oauth == null) {
+                    throw new HttpException("OAuth2 required by scheme '" + scheme.getName()
+                            + "' but no oauth2 config in HTTP settings");
+                }
+                String tokenUrl = !oauth.tokenUrlOverride.isEmpty()
+                        ? oauth.tokenUrlOverride
+                        : scheme.getTokenUrl().orElse("");
+                String refreshUrl = !oauth.refreshUrlOverride.isEmpty()
+                        ? oauth.refreshUrlOverride
+                        : scheme.getRefreshUrl().orElse(tokenUrl);
+                if (tokenUrl.isEmpty()) {
+                    throw new HttpException("OAuth2 client-credentials: tokenUrl is missing in spec and http-settings");
+                }
+                List<String> scopes = !oauth.scopesOverride.isEmpty() ? oauth.scopesOverride : requiredScopes;
+
+                OAuth2Handler handler = new OAuth2Handler(httpClient);
+                String token = handler.getAccessToken(oauth, tokenUrl, refreshUrl, scopes);
+                opHeaders.put("Authorization", "Bearer " + token);
+                break;
+            }
+            case OPEN_ID_CONNECT:
+                throw new HttpException("OpenID Connect security scheme '" + scheme.getName()
+                        + "' is not supported by zswag clients");
+        }
+    }
+
+    /**
+     * Probes the merged config for an API-key value already supplied directly
+     * via header/query/cookie (matching the scheme's location). Returns the
+     * value found, or null if none.
+     */
+    @Nullable
+    private String lookupConfiguredApiKey(@NotNull SecurityScheme scheme, @NotNull HttpConfig effective) {
+        String name = scheme.getApiKeyName();
+        if (name == null || scheme.getApiKeyLocation() == null) return null;
+        switch (scheme.getApiKeyLocation()) {
+            case HEADER:
+                return effective.getHeader(name).orElse(null);
+            case QUERY:
+                List<String> queryVals = effective.getQuery().get(name);
+                return (queryVals != null && !queryVals.isEmpty()) ? queryVals.get(0) : null;
+            case COOKIE:
+                return effective.getCookies().get(name);
+            default:
+                return null;
+        }
     }
 
     @Override
