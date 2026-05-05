@@ -15,7 +15,7 @@ java {
 
 dependencies {
     // Java client
-    implementation project(':libs:jzswag-desktop')
+    implementation project(':libs:jzswag-jvm')
 
     // zserio runtime
     implementation "io.github.ndsev:zserio-runtime:${rootProject.ext.zserio_version}"

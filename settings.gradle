@@ -2,7 +2,7 @@ rootProject.name = 'zswag'
 
 // Java modules
 include 'libs:jzswag-api'
-include 'libs:jzswag-desktop'
+include 'libs:jzswag-jvm'
 include 'libs:jzswag-android'
 include 'libs:jzswag-test'
 

@@ -37,7 +37,7 @@ jobs:
           restore-keys: ${{ runner.os }}-gradle-
 
       - name: Build & test
-        run: ./gradlew :libs:jzswag-api:build :libs:jzswag-desktop:test :libs:jzswag-test:assemble --console=plain --stacktrace
+        run: ./gradlew :libs:jzswag-api:build :libs:jzswag-jvm:test :libs:jzswag-test:assemble --console=plain --stacktrace
 
       - name: Upload JUnit reports
         if: always()
@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-html
-          path: libs/jzswag-desktop/build/reports/jacoco/test/html/
+          path: libs/jzswag-jvm/build/reports/jacoco/test/html/
           retention-days: 14
 
   coverage:
@@ -83,12 +83,12 @@ jobs:
           restore-keys: ${{ runner.os }}-gradle-
 
       - name: Run tests with coverage
-        run: ./gradlew :libs:jzswag-desktop:test :libs:jzswag-desktop:jacocoTestReport --console=plain
+        run: ./gradlew :libs:jzswag-jvm:test :libs:jzswag-jvm:jacocoTestReport --console=plain
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: libs/jzswag-desktop/build/reports/jacoco/test/jacocoTestReport.xml
+          files: libs/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml
           flags: unittests-java
           name: codecov-java
           fail_ci_if_error: false
@@ -99,9 +99,9 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: madrapps/jacoco-report@v1.7.1
         with:
-          paths: libs/jzswag-desktop/build/reports/jacoco/test/jacocoTestReport.xml
+          paths: libs/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
-          title: Java Coverage (jzswag-desktop)
+          title: Java Coverage (jzswag-jvm)
           # Starting threshold — current baseline is ~29% line coverage from unit tests
           # alone (dispatch core is exercised by integration tests that need the Python
           # server, not yet wired into CI). Ratchet up as more unit tests land.

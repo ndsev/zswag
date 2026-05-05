@@ -2,7 +2,7 @@ plugins {
     id 'application'
 }
 
-description = 'Example CLI application demonstrating jzswag-desktop usage'
+description = 'Example CLI application demonstrating jzswag-jvm usage'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -14,8 +14,8 @@ application {
 }
 
 dependencies {
-    // Desktop client
-    implementation project(':libs:jzswag-desktop')
+    // JVM client
+    implementation project(':libs:jzswag-jvm')
 
     // Logging
     implementation 'org.slf4j:slf4j-api:2.0.9'

@@ -8,7 +8,7 @@ jacoco {
     toolVersion = '0.8.11'
 }
 
-description = 'zswag Java Desktop Client - Pure Java implementation using Java 11 HttpClient'
+description = 'zswag Java JVM Client - Pure Java implementation using Java 11 HttpClient'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -67,7 +67,7 @@ publishing {
     publications {
         maven(MavenPublication) {
             from components.java
-            artifactId = 'jzswag-desktop'
+            artifactId = 'jzswag-jvm'
         }
     }
 }
