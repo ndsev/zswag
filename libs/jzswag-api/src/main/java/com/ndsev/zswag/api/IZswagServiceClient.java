@@ -27,13 +27,4 @@ public interface IZswagServiceClient {
      */
     @NotNull
     IOpenAPIClient getOpenAPIClient();
-
-    /**
-     * Creates a new service client with updated HTTP settings.
-     *
-     * @param settings The new HTTP settings
-     * @return A new service client instance
-     */
-    @NotNull
-    IZswagServiceClient withSettings(@NotNull HttpSettings settings);
 }

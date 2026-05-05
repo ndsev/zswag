@@ -1,5 +1,6 @@
 package com.ndsev.zswag.desktop;
 
+import com.ndsev.zswag.api.HttpConfig;
 import com.ndsev.zswag.api.HttpException;
 import com.ndsev.zswag.api.HttpRequest;
 import com.ndsev.zswag.api.HttpResponse;
@@ -105,7 +106,7 @@ public class OAuth2Handler {
                 .body(formBody.getBytes(StandardCharsets.UTF_8))
                 .build();
 
-        HttpResponse response = httpClient.execute(request);
+        HttpResponse response = httpClient.execute(request, HttpConfig.empty());
 
         if (!response.isSuccessful()) {
             String error = response.getBody() != null ?

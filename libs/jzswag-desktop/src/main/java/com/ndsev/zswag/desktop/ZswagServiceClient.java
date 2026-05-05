@@ -29,7 +29,16 @@ public class ZswagServiceClient implements IZswagServiceClient {
     }
 
     /**
-     * Creates a ZswagServiceClient from an OpenAPI spec location.
+     * Creates a ZswagServiceClient that uses the persistent {@link HttpSettings}
+     * from the {@code HTTP_SETTINGS_FILE} environment variable.
+     */
+    @NotNull
+    public static ZswagServiceClient create(@NotNull String serviceIdentifier, @NotNull String specLocation) throws IOException {
+        return create(serviceIdentifier, specLocation, HttpSettingsLoader.loadFromEnvironment());
+    }
+
+    /**
+     * Creates a ZswagServiceClient with explicit persistent settings.
      */
     @NotNull
     public static ZswagServiceClient create(@NotNull String serviceIdentifier, @NotNull String specLocation,
@@ -106,12 +115,6 @@ public class ZswagServiceClient implements IZswagServiceClient {
     @NotNull
     public IOpenAPIClient getOpenAPIClient() {
         return openAPIClient;
-    }
-
-    @Override
-    @NotNull
-    public IZswagServiceClient withSettings(@NotNull HttpSettings settings) {
-        return new ZswagServiceClient(serviceIdentifier, openAPIClient.withSettings(settings));
     }
 
     @NotNull

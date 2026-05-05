@@ -5,34 +5,61 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import zserio.runtime.io.Writer;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 
 /**
- * Desktop implementation of OpenAPI client.
- * Handles OpenAPI method calls, parameter encoding, and security.
+ * The Java port of the C++ {@code zswagcl::OpenApiClient} / Python
+ * {@code zswag.OAClient}: dispatches OpenAPI calls described by a spec, with
+ * full {@code x-zserio-request-part} request-decomposition logic.
+ *
+ * <p>Two entry points:
+ * <ul>
+ *   <li>{@link #callMethod(String, Object)} — the recommended typed API.
+ *       Takes a zserio request object; uses POJO reflection (via
+ *       {@link ZserioReflection}) to resolve {@code x-zserio-request-part}
+ *       paths and encode each parameter into the request URL, headers,
+ *       cookies, or query. The whole serialized request is sent as the body
+ *       when the operation declares an {@code application/x-zserio-object}
+ *       request body.</li>
+ *   <li>{@link #callMethod(String, Map, byte[])} — low-level entry point
+ *       where the caller has already decomposed the request into a parameter
+ *       map and/or pre-serialized body bytes. Useful for non-zserio OpenAPI
+ *       endpoints or for testing.</li>
+ * </ul>
  */
 public class DesktopOpenAPIClient implements IOpenAPIClient {
     private static final Logger logger = LoggerFactory.getLogger(DesktopOpenAPIClient.class);
 
+    /** zswag MIME type for both request bodies and response Accept header. */
+    public static final String ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
+
     private final String specLocation;
     private final IHttpClient httpClient;
+    private final HttpConfig adhoc;
     private final OpenAPIParser parser;
     private final String baseUrl;
 
     public DesktopOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient) throws IOException {
+        this(specLocation, httpClient, HttpConfig.empty());
+    }
+
+    public DesktopOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                                @NotNull HttpConfig adhoc) throws IOException {
         this.specLocation = specLocation;
         this.httpClient = httpClient;
+        this.adhoc = adhoc;
         this.parser = new OpenAPIParser(specLocation);
+        this.baseUrl = resolveBaseUrl();
+    }
 
-        // Determine base URL from servers
+    @NotNull
+    private String resolveBaseUrl() {
         List<String> servers = parser.getServers();
         String serverUrl = !servers.isEmpty() ? servers.get(0) : "";
-
-        // If server URL is relative (empty or starts with /) and spec location is a URL,
-        // extract base URL from spec location
-        String resolvedBaseUrl;
         boolean isRelativeUrl = serverUrl.isEmpty() || serverUrl.startsWith("/");
 
         if (isRelativeUrl && specLocation.startsWith("http")) {
@@ -42,222 +69,170 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
                 String host = url.getHost();
                 int port = url.getPort();
                 String basePath = serverUrl.isEmpty() ? "" : serverUrl;
-
-                if (port != -1) {
-                    resolvedBaseUrl = protocol + "://" + host + ":" + port + basePath;
-                } else {
-                    resolvedBaseUrl = protocol + "://" + host + basePath;
-                }
-                logger.info("Resolved relative server URL '{}' to: {}", serverUrl, resolvedBaseUrl);
+                String resolved = (port != -1)
+                        ? protocol + "://" + host + ":" + port + basePath
+                        : protocol + "://" + host + basePath;
+                logger.info("Resolved relative server URL '{}' to: {}", serverUrl, resolved);
+                return resolved;
             } catch (java.net.MalformedURLException e) {
-                resolvedBaseUrl = serverUrl;
                 logger.warn("Failed to parse spec location URL: {}", e.getMessage());
+                return serverUrl;
             }
         } else if (!serverUrl.isEmpty()) {
-            resolvedBaseUrl = serverUrl;
-            logger.info("Using absolute server URL: {}", resolvedBaseUrl);
-        } else {
-            // No server URL and spec is not from HTTP - use empty
-            resolvedBaseUrl = "";
-            logger.warn("No servers defined in OpenAPI spec and cannot infer from spec location");
+            return serverUrl;
+        }
+        logger.warn("No servers defined in OpenAPI spec and cannot infer from spec location");
+        return "";
+    }
+
+    // ------------------------------------------------------------------------
+    // Typed entry point — the canonical "Python/C++ feel" API.
+    // ------------------------------------------------------------------------
+
+    /**
+     * Calls an OpenAPI method with a typed zserio request. The request is
+     * decomposed into path/query/header/cookie parameters and (if the
+     * operation declares it) a serialized {@code application/x-zserio-object}
+     * body, per {@code x-zserio-request-part} on each parameter.
+     *
+     * @param methodIdent OpenAPI {@code operationId} (matches zserio method name)
+     * @param zserioRequest typed zserio request object (must implement {@link Writer}
+     *                      if the operation declares a request body)
+     * @return raw response bytes (caller deserializes via zserio)
+     */
+    @NotNull
+    public byte[] callMethod(@NotNull String methodIdent, @NotNull Object zserioRequest) throws HttpException {
+        OpenAPIParser.MethodInfo info = parser.getMethod(methodIdent);
+        if (info == null) {
+            throw new HttpException("Method '" + methodIdent + "' is not part of the OpenAPI specification");
         }
 
-        this.baseUrl = resolvedBaseUrl;
+        Function<OpenAPIParameter, Object> resolver = param -> {
+            String requestPart = param.getRequestPart().orElse(null);
+            if (requestPart == null) {
+                // Parameters without x-zserio-request-part are not auto-filled by
+                // the dispatch; they may be supplied by HttpConfig (e.g. an
+                // API-key header). Return null to skip.
+                return null;
+            }
+            return ZserioReflection.resolveOrSerialize(zserioRequest, requestPart);
+        };
+
+        byte[] body = null;
+        if (info.hasZserioBody()) {
+            if (!(zserioRequest instanceof Writer)) {
+                throw new HttpException("Operation " + methodIdent + " declares a zserio request body, but "
+                        + zserioRequest.getClass().getName() + " does not implement zserio.runtime.io.Writer");
+            }
+            body = ZserioReflection.serialize((Writer) zserioRequest);
+        }
+
+        return dispatch(info, resolver, body);
     }
+
+    // ------------------------------------------------------------------------
+    // Map-based entry point — low-level / testing.
+    // ------------------------------------------------------------------------
 
     @Override
     @Nullable
     public byte[] callMethod(@NotNull String methodPath, @NotNull Map<String, Object> parameters,
                              @Nullable byte[] requestBody) throws HttpException {
-        // Find the method info
-        OpenAPIParser.MethodInfo methodInfo = findMethodInfo(methodPath, parameters);
-        if (methodInfo == null) {
-            throw new HttpException("Method not found in OpenAPI spec: " + methodPath);
+        OpenAPIParser.MethodInfo info = parser.getMethod(methodPath);
+        if (info == null) {
+            throw new HttpException("Method '" + methodPath + "' is not part of the OpenAPI specification");
         }
+        Function<OpenAPIParameter, Object> resolver = param -> parameters.get(param.getName());
+        return dispatch(info, resolver, requestBody);
+    }
 
-        logger.debug("Calling method: {} {}", methodInfo.getHttpMethod(), methodPath);
+    // ------------------------------------------------------------------------
+    // Shared dispatch core.
+    // ------------------------------------------------------------------------
 
-        // Build the request URL
-        String url = buildRequestUrl(methodInfo, parameters);
+    @NotNull
+    private byte[] dispatch(@NotNull OpenAPIParser.MethodInfo info,
+                            @NotNull Function<OpenAPIParameter, Object> resolver,
+                            @Nullable byte[] body) throws HttpException {
+        logger.debug("Calling {} {} ({})", info.getHttpMethod(), info.getPathTemplate(), info.getOperationId());
 
-        // Build request headers
-        Map<String, String> headers = new HashMap<>();
-        addParametersToHeaders(methodInfo, parameters, headers);
-        addSecurityHeaders(methodInfo, headers);
+        String path = info.getPathTemplate();
+        List<Map.Entry<String, String>> queryPairs = new ArrayList<>();
+        Map<String, String> opHeaders = new LinkedHashMap<>();
+        Map<String, String> opCookies = new LinkedHashMap<>();
 
-        // Build the HTTP request
-        com.ndsev.zswag.api.HttpRequest.Builder requestBuilder = com.ndsev.zswag.api.HttpRequest.builder()
-                .method(methodInfo.getHttpMethod())
-                .url(url)
-                .headers(headers);
+        for (OpenAPIParameter param : info.getParameters()) {
+            Object value = resolver.apply(param);
+            if (value == null) {
+                if (param.isRequired() && param.getRequestPart().isPresent()) {
+                    throw new HttpException("Required parameter '" + param.getName()
+                            + "' resolved to null via x-zserio-request-part: " + param.getRequestPart().get());
+                }
+                continue;
+            }
 
-        // Add request body if present
-        if (requestBody != null) {
-            requestBuilder.body(requestBody);
-            // Set content-type for binary zserio data
-            if (!headers.containsKey("Content-Type")) {
-                requestBuilder.header("Content-Type", "application/octet-stream");
+            switch (param.getLocation()) {
+                case PATH:
+                    path = path.replace("{" + param.getName() + "}",
+                            ParameterEncoder.urlEncode(ParameterEncoder.encodeForPath(param, value)));
+                    break;
+                case QUERY:
+                    queryPairs.addAll(ParameterEncoder.encodeForQuery(param, value));
+                    break;
+                case HEADER:
+                    opHeaders.put(param.getName(), ParameterEncoder.encodeForHeader(param, value));
+                    break;
+                case COOKIE:
+                    opCookies.put(param.getName(), ParameterEncoder.encodeForCookie(param, value));
+                    break;
             }
         }
 
-        // Execute the request
-        com.ndsev.zswag.api.HttpResponse response = httpClient.execute(requestBuilder.build());
+        // Reject unfilled path placeholders rather than emitting them literally.
+        if (path.matches(".*\\{[^/}]+\\}.*")) {
+            throw new HttpException("Unfilled path placeholder in '" + path + "' for " + info.getOperationId());
+        }
 
-        // Check for success
-        if (!response.isSuccessful()) {
-            String errorMsg = String.format("HTTP %d: %s", response.getStatusCode(), response.getStatusMessage());
+        // Build full URL.
+        StringBuilder fullUrl = new StringBuilder(baseUrl);
+        if (!baseUrl.isEmpty() && !baseUrl.endsWith("/") && !path.startsWith("/")) {
+            fullUrl.append("/");
+        }
+        fullUrl.append(path);
+        if (!queryPairs.isEmpty()) {
+            fullUrl.append("?").append(ParameterEncoder.buildQueryString(queryPairs));
+        }
+
+        // Operation-level cookies → Cookie header (merged with persistent/adhoc cookies in HttpClient).
+        if (!opCookies.isEmpty()) {
+            StringJoiner sj = new StringJoiner("; ");
+            for (Map.Entry<String, String> e : opCookies.entrySet()) sj.add(e.getKey() + "=" + e.getValue());
+            opHeaders.merge("Cookie", sj.toString(), (existing, incoming) -> existing + "; " + incoming);
+        }
+
+        // zswag protocol headers.
+        opHeaders.put("Accept", ZSERIO_OBJECT_CONTENT_TYPE);
+        if (body != null) {
+            opHeaders.put("Content-Type", ZSERIO_OBJECT_CONTENT_TYPE);
+        }
+
+        // Build the HTTP request.
+        com.ndsev.zswag.api.HttpRequest.Builder rb = com.ndsev.zswag.api.HttpRequest.builder()
+                .method(info.getHttpMethod())
+                .url(fullUrl.toString())
+                .headers(opHeaders);
+        if (body != null) rb.body(body);
+
+        com.ndsev.zswag.api.HttpResponse response = httpClient.execute(rb.build(), adhoc);
+
+        // Strict 200 — matches C++ openapi-client.cpp:200.
+        if (response.getStatusCode() != 200) {
+            String contextDesc = "[" + info.getHttpMethod() + " " + fullUrl + "]";
+            String errorMsg = contextDesc + " Got HTTP status: " + response.getStatusCode();
             throw new HttpException(errorMsg, response.getStatusCode(), response.getBody());
         }
-
-        return response.getBody();
-    }
-
-    /**
-     * Finds method info by operation ID or path template.
-     */
-    @Nullable
-    private OpenAPIParser.MethodInfo findMethodInfo(@NotNull String methodPath, @NotNull Map<String, Object> parameters) {
-        // Try direct operation ID lookup first (e.g., "power", "intSum")
-        OpenAPIParser.MethodInfo info = parser.getMethod(methodPath);
-        if (info != null) {
-            return info;
-        }
-
-        // Try with HTTP method prefix (e.g., "GETpower", "POST/path")
-        for (String possibleMethod : Arrays.asList("GET" + methodPath, "POST" + methodPath,
-                                                     "PUT" + methodPath, "DELETE" + methodPath, "PATCH" + methodPath)) {
-            info = parser.getMethod(possibleMethod);
-            if (info != null) {
-                return info;
-            }
-        }
-
-        // If not found, we could implement more sophisticated path template matching here
-        return null;
-    }
-
-    /**
-     * Builds the full request URL with path and query parameters.
-     */
-    @NotNull
-    private String buildRequestUrl(@NotNull OpenAPIParser.MethodInfo methodInfo, @NotNull Map<String, Object> parameters) {
-        String path = methodInfo.getPathTemplate();
-
-        // Substitute path parameters
-        Map<String, String> queryParams = new HashMap<>();
-        for (OpenAPIParameter param : methodInfo.getParameters()) {
-            Object value = parameters.get(param.getName());
-            if (value == null) {
-                if (param.isRequired()) {
-                    logger.warn("Required parameter missing: {}", param.getName());
-                }
-                continue;
-            }
-
-            String encoded = ParameterEncoder.encodeParameter(param, value);
-
-            if (param.getLocation() == ParameterLocation.PATH) {
-                // Replace path parameter
-                path = path.replace("{" + param.getName() + "}", encoded);
-            } else if (param.getLocation() == ParameterLocation.QUERY) {
-                // Add to query parameters
-                queryParams.put(param.getName(), encoded);
-            }
-        }
-
-        // Build full URL
-        StringBuilder url = new StringBuilder(baseUrl);
-        if (!baseUrl.isEmpty() && !baseUrl.endsWith("/") && !path.startsWith("/")) {
-            url.append("/");
-        }
-        url.append(path);
-
-        // Add query string
-        if (!queryParams.isEmpty()) {
-            String queryString = ParameterEncoder.buildQueryString(queryParams);
-            url.append("?").append(queryString);
-        }
-
-        // Add query parameters from settings
-        Map<String, String> settingsQueryParams = httpClient.getSettings().getQueryParameters();
-        if (!settingsQueryParams.isEmpty()) {
-            String settingsQuery = ParameterEncoder.buildQueryString(settingsQueryParams);
-            url.append(queryParams.isEmpty() ? "?" : "&").append(settingsQuery);
-        }
-
-        return url.toString();
-    }
-
-    /**
-     * Adds header parameters to the request.
-     * Note: Generic headers from HttpSettings are added by DesktopHttpClient, not here.
-     * This method only processes operation-specific header parameters from the parameters map.
-     */
-    private void addParametersToHeaders(@NotNull OpenAPIParser.MethodInfo methodInfo,
-                                         @NotNull Map<String, Object> parameters,
-                                         @NotNull Map<String, String> headers) {
-        // Process operation-specific header parameters only
-        // Generic headers from HttpSettings are added by DesktopHttpClient.execute()
-        for (OpenAPIParameter param : methodInfo.getParameters()) {
-            if (param.getLocation() == ParameterLocation.HEADER) {
-                Object value = parameters.get(param.getName());
-                if (value != null) {
-                    String encoded = ParameterEncoder.encodeParameter(param, value);
-                    headers.put(param.getName(), encoded);
-                }
-            }
-        }
-    }
-
-    /**
-     * Adds security-related headers based on the method's security requirements.
-     */
-    private void addSecurityHeaders(@NotNull OpenAPIParser.MethodInfo methodInfo, @NotNull Map<String, String> headers) {
-        Set<String> requirements = methodInfo.getSecurityRequirements();
-        Map<String, SecurityScheme> schemes = parser.getSecuritySchemes();
-
-        for (String requirement : requirements) {
-            SecurityScheme scheme = schemes.get(requirement);
-            if (scheme == null) {
-                logger.warn("Security scheme not found: {}", requirement);
-                continue;
-            }
-
-            applySecurityScheme(scheme, headers);
-        }
-    }
-
-    /**
-     * Applies a security scheme to the request.
-     */
-    private void applySecurityScheme(@NotNull SecurityScheme scheme, @NotNull Map<String, String> headers) {
-        HttpSettings settings = httpClient.getSettings();
-
-        switch (scheme.getType()) {
-            case HTTP:
-                // Basic and Bearer auth are handled by HttpClient
-                break;
-
-            case API_KEY:
-                if (scheme.getApiKeyLocation() == ParameterLocation.HEADER) {
-                    String keyName = scheme.getApiKeyName();
-                    String keyValue = settings.getApiKeys().get(keyName);
-                    if (keyValue != null) {
-                        headers.put(keyName, keyValue);
-                    }
-                }
-                // Query and cookie API keys would be handled elsewhere
-                break;
-
-            case OAUTH2:
-                // OAuth2 would be handled by an OAuth2Handler
-                logger.debug("OAuth2 security scheme: {}", scheme.getName());
-                break;
-
-            case OPEN_ID_CONNECT:
-                logger.debug("OpenID Connect security scheme: {}", scheme.getName());
-                break;
-        }
+        byte[] respBody = response.getBody();
+        return respBody != null ? respBody : new byte[0];
     }
 
     @Override
@@ -268,17 +243,13 @@ public class DesktopOpenAPIClient implements IOpenAPIClient {
 
     @Override
     @NotNull
-    public IOpenAPIClient withSettings(@NotNull HttpSettings settings) {
-        try {
-            return new DesktopOpenAPIClient(specLocation, httpClient.withSettings(settings));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to create OpenAPI client with new settings", e);
-        }
-    }
-
-    @Override
-    @NotNull
     public String getOpenAPISpecLocation() {
         return specLocation;
+    }
+
+    /** Exposes the parsed spec for callers that need to introspect operations. */
+    @NotNull
+    public OpenAPIParser getParser() {
+        return parser;
     }
 }
