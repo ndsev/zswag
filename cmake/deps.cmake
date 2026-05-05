@@ -27,7 +27,7 @@ endif()
 
 # fmt
 CPMAddPackage(
-    URI "gh:fmtlib/fmt#11.1.3"
+    URI "gh:fmtlib/fmt#11.1.4"
     OPTIONS "FMT_HEADER_ONLY OFF"
 )
 
@@ -42,7 +42,10 @@ CPMAddPackage(
 
 # yaml-cpp
 CPMAddPackage(
-    URI "gh:jbeder/yaml-cpp#aa8d4e4750ec9fe9f8cc680eb90f1b15955c817e"
+    NAME yaml-cpp
+    GITHUB_REPOSITORY jbeder/yaml-cpp
+    VERSION 0.8.0
+    GIT_TAG 0.8.0
     OPTIONS
         "YAML_CPP_BUILD_TESTS OFF"
         "YAML_CPP_BUILD_TOOLS OFF"
@@ -54,7 +57,7 @@ CPMAddPackage("gh:Klebert-Engineering/stx@1.0.0")
 
 # httplib
 CPMAddPackage(
-    URI "gh:yhirose/cpp-httplib@0.15.3"
+    URI "gh:yhirose/cpp-httplib@0.43.3"
     OPTIONS
         "HTTPLIB_USE_CERTS_FROM_MACOSX_KEYCHAIN OFF"
         "HTTPLIB_INSTALL OFF"
