@@ -28,7 +28,7 @@ import java.util.StringJoiner;
 import java.util.TreeSet;
 
 /**
- * Desktop {@link IHttpClient} on top of the JDK 11 {@link HttpClient}.
+ * JVM {@link IHttpClient} on top of the JDK 11 {@link HttpClient}.
  *
  * <p>On every request the client merges its persistent {@link HttpSettings}
  * (URL-scope-matched) with the adhoc {@link HttpConfig} passed by the caller,

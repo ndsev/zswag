@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Example CLI application demonstrating jzswag-desktop usage.
+ * Example CLI application demonstrating jzswag-jvm usage.
  *
  * Usage:
  *   java -jar jzswag-cli.jar <openapi-spec-url> <method-path> [param=value...]

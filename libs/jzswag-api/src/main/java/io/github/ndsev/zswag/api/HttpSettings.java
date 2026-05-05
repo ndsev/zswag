@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
  * entries are merged into a single effective {@link HttpConfig}.
  *
  * <p>Loading from {@code HTTP_SETTINGS_FILE} is performed by
- * {@code HttpSettingsLoader} in jzswag-desktop (which keeps this module free of
+ * {@code HttpSettingsLoader} in jzswag-jvm (which keeps this module free of
  * a YAML dependency).
  */
 public final class HttpSettings {

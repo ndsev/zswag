@@ -1,6 +1,6 @@
-# jzswag-desktop
+# jzswag-jvm
 
-Pure Java desktop port of the zswag OpenAPI client. Built on the JDK 11 `HttpClient`; no JNI.
+Pure Java JVM port of the zswag OpenAPI client. Built on the JDK 11 `HttpClient`; no JNI. Runs anywhere a standard JVM does — desktop, server, lambda, CLI, IDE plugin.
 
 ## Role in the project
 
@@ -19,8 +19,8 @@ For the OpenAPI feature support matrix (Java vs C++ vs Python), see [the interop
 ## Module layout
 
 - `ZswagClient` — public entry point; implements `ServiceClientInterface`.
-- `DesktopOpenAPIClient` — orchestrates `x-zserio-request-part` dispatch and security application.
-- `DesktopHttpClient` — JDK 11 `HttpClient` wrapper; merges persistent + adhoc config per request; applies SSL/proxy.
+- `JvmOpenAPIClient` — orchestrates `x-zserio-request-part` dispatch and security application.
+- `JvmHttpClient` — JDK 11 `HttpClient` wrapper; merges persistent + adhoc config per request; applies SSL/proxy.
 - `OpenAPIParser` — parses OpenAPI 3.0 specs with full zswag extensions.
 - `ParameterEncoder` — encodes parameter values per location/style/format.
 - `ZserioReflection` — resolves `x-zserio-request-part` paths via POJO getter reflection on the typed zserio request object.
@@ -40,7 +40,7 @@ For the OpenAPI feature support matrix (Java vs C++ vs Python), see [the interop
 ## Testing
 
 ```bash
-./gradlew :libs:jzswag-desktop:test
+./gradlew :libs:jzswag-jvm:test
 ```
 
 Unit tests cover the YAML schema, multi-scope merging, parameter encoding, OAuth1 signature conformance, and zserio reflection. Integration testing happens in `libs/jzswag-test/`.
