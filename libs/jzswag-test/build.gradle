@@ -5,7 +5,7 @@ plugins {
 description = 'zswag Java integration tests using Calculator service'
 
 application {
-    mainClass = 'com.ndsev.zswag.test.CalculatorTestClient'
+    mainClass = 'io.github.ndsev.zswag.test.CalculatorTestClient'
 }
 
 java {
