@@ -23,7 +23,9 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
+import java.util.TreeSet;
 
 /**
  * Desktop {@link IHttpClient} on top of the JDK 11 {@link HttpClient}.
@@ -136,19 +138,27 @@ public class DesktopHttpClient implements IHttpClient {
                     .uri(URI.create(url))
                     .timeout(effective.getTimeout());
 
-            // Per-request headers from the OpenAPI dispatch layer
+            // Per-request headers from the OpenAPI dispatch layer take precedence: any
+            // header set here (e.g., OAuth2 Bearer minted by applySecurity) suppresses
+            // the same header from the merged persistent + adhoc layer below. This
+            // prevents the JDK HttpRequest.Builder.header() append-semantics from
+            // emitting duplicate Authorization (or other single-valued) headers when
+            // both layers configure them.
+            Set<String> perRequestHeaderNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (Map.Entry<String, String> h : request.getHeaders().entrySet()) {
                 rb.header(h.getKey(), h.getValue());
+                perRequestHeaderNames.add(h.getKey());
             }
-            // Persistent + adhoc headers (multi-valued)
+            // Persistent + adhoc headers (multi-valued); skip names already supplied above.
             for (Map.Entry<String, List<String>> h : effective.getHeaders().entrySet()) {
+                if (perRequestHeaderNames.contains(h.getKey())) continue;
                 for (String v : h.getValue()) {
                     rb.header(h.getKey(), v);
                 }
             }
 
-            // Cookies → single Cookie header
-            if (!effective.getCookies().isEmpty()) {
+            // Cookies → single Cookie header (skip if a Cookie header was already set per-request)
+            if (!effective.getCookies().isEmpty() && !perRequestHeaderNames.contains("Cookie")) {
                 StringJoiner cookieJoiner = new StringJoiner("; ");
                 for (Map.Entry<String, String> e : effective.getCookies().entrySet()) {
                     cookieJoiner.add(e.getKey() + "=" + e.getValue());
@@ -156,8 +166,11 @@ public class DesktopHttpClient implements IHttpClient {
                 rb.header("Cookie", cookieJoiner.toString());
             }
 
-            // Basic auth — only set if Authorization isn't already provided (e.g., bearer)
-            if (effective.getAuth().isPresent() && !effective.getHeaders().containsKey("Authorization")) {
+            // Basic auth — only set if Authorization isn't already provided (e.g., bearer
+            // from per-request OAuth2 minting, or static Authorization in effective.headers)
+            if (effective.getAuth().isPresent()
+                    && !perRequestHeaderNames.contains("Authorization")
+                    && !containsHeaderIgnoreCase(effective.getHeaders(), "Authorization")) {
                 HttpConfig.BasicAuthentication auth = effective.getAuth().get();
                 String password = !auth.password.isEmpty()
                         ? auth.password
@@ -237,6 +250,13 @@ public class DesktopHttpClient implements IHttpClient {
             });
         }
         return b.build();
+    }
+
+    private static boolean containsHeaderIgnoreCase(@NotNull Map<String, List<String>> headers, @NotNull String name) {
+        for (String key : headers.keySet()) {
+            if (name.equalsIgnoreCase(key)) return true;
+        }
+        return false;
     }
 
     @NotNull

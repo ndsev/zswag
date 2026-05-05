@@ -50,8 +50,19 @@ public final class OAuth2Handler {
      * the handler is shared across calls to the same OAClient, and tokens are keyed by
      * (tokenUrl, clientId, audience, scope) so multiple schemes don't collide. */
     private static final ConcurrentHashMap<TokenKey, MintedToken> CACHE = new ConcurrentHashMap<>();
-    /** Per-key lock to serialise mint/refresh attempts for the same key. */
-    private static final ConcurrentHashMap<TokenKey, ReentrantLock> KEY_LOCKS = new ConcurrentHashMap<>();
+    /** Striped lock pool to serialise mint/refresh attempts. A fixed pool bounds memory
+     * regardless of how many distinct {@link TokenKey}s flow through the process; two
+     * unrelated keys may occasionally share a stripe (false sharing), which only blocks
+     * unrelated mints — an acceptable trade-off for the leak-free behaviour. */
+    private static final int LOCK_STRIPES = 32;
+    private static final ReentrantLock[] STRIPED_LOCKS = new ReentrantLock[LOCK_STRIPES];
+    static {
+        for (int i = 0; i < LOCK_STRIPES; i++) STRIPED_LOCKS[i] = new ReentrantLock();
+    }
+
+    private static ReentrantLock lockFor(@NotNull TokenKey key) {
+        return STRIPED_LOCKS[(key.hashCode() & 0x7fffffff) % LOCK_STRIPES];
+    }
 
     private final IHttpClient httpClient;
     private final Gson gson = new Gson();
@@ -81,7 +92,7 @@ public final class OAuth2Handler {
             return cached.accessToken;
         }
 
-        ReentrantLock lock = KEY_LOCKS.computeIfAbsent(key, k -> new ReentrantLock());
+        ReentrantLock lock = lockFor(key);
         lock.lock();
         try {
             // Recheck after acquiring lock.
@@ -186,7 +197,12 @@ public final class OAuth2Handler {
                     response.getStatusCode(), response.getBody());
         }
 
-        String responseBody = new String(response.getBody(), StandardCharsets.UTF_8);
+        byte[] bodyBytes = response.getBody();
+        if (bodyBytes == null || bodyBytes.length == 0) {
+            throw new HttpException("OAuth2 token endpoint returned 2xx with empty body for grant_type="
+                    + grantType, response.getStatusCode(), bodyBytes);
+        }
+        String responseBody = new String(bodyBytes, StandardCharsets.UTF_8);
         JsonObject json = gson.fromJson(responseBody, JsonObject.class);
 
         if (json == null || !json.has("access_token")) {
@@ -239,7 +255,6 @@ public final class OAuth2Handler {
     /** Test hook: clears the entire process-wide cache. */
     static void clearAllCachedTokens() {
         CACHE.clear();
-        KEY_LOCKS.clear();
     }
 
     private static final class TokenKey {

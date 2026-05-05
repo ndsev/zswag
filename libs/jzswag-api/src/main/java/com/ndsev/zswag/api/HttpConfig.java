@@ -31,8 +31,8 @@ public final class HttpConfig {
     private final Map<String, List<String>> headers;
     private final Map<String, List<String>> query;
     private final Map<String, String> cookies;
-    private final Duration timeout;
-    private final boolean sslStrict;
+    @Nullable private final Duration timeout;
+    @Nullable private final Boolean sslStrict;
     private final BasicAuthentication auth;
     private final Proxy proxy;
     private final OAuth2 oauth2;
@@ -65,8 +65,8 @@ public final class HttpConfig {
     @NotNull public Map<String, List<String>> getHeaders() { return headers; }
     @NotNull public Map<String, List<String>> getQuery() { return query; }
     @NotNull public Map<String, String> getCookies() { return cookies; }
-    @NotNull public Duration getTimeout() { return timeout; }
-    public boolean isSslStrict() { return sslStrict; }
+    @NotNull public Duration getTimeout() { return timeout != null ? timeout : defaultTimeout(); }
+    public boolean isSslStrict() { return sslStrict == null || sslStrict; }
     @NotNull public Optional<BasicAuthentication> getAuth() { return Optional.ofNullable(auth); }
     @NotNull public Optional<Proxy> getProxy() { return Optional.ofNullable(proxy); }
     @NotNull public Optional<OAuth2> getOAuth2() { return Optional.ofNullable(oauth2); }
@@ -107,8 +107,8 @@ public final class HttpConfig {
         if (other.oauth2 != null) {
             b.oauth2(other.oauth2.mergedOnto(this.oauth2));
         }
-        if (!Objects.equals(other.timeout, defaultTimeout())) b.timeout(other.timeout);
-        if (!other.sslStrict) b.sslStrict(false);
+        if (other.timeout != null) b.timeout(other.timeout);
+        if (other.sslStrict != null) b.sslStrict(other.sslStrict);
         return b.build();
     }
 
@@ -214,6 +214,12 @@ public final class HttpConfig {
             RFC5849_OAUTH1_SIGNATURE
         }
 
+        // Explicit-set flags for non-string fields, used by mergedOnto to know
+        // whether `this` actually configured the field or just carries the default.
+        static final int FLAG_USE_FOR_SPEC_FETCH = 1 << 0;
+        static final int FLAG_TOKEN_ENDPOINT_AUTH_METHOD = 1 << 1;
+        static final int FLAG_NONCE_LENGTH = 1 << 2;
+
         @NotNull public final String clientId;
         @NotNull public final String clientSecret;
         @NotNull public final String clientSecretKeychain;
@@ -224,6 +230,7 @@ public final class HttpConfig {
         public final boolean useForSpecFetch;
         @NotNull public final TokenEndpointAuthMethod tokenEndpointAuthMethod;
         public final int nonceLength;
+        private final int explicitFlags;
 
         public OAuth2(
                 @NotNull String clientId,
@@ -236,6 +243,26 @@ public final class HttpConfig {
                 boolean useForSpecFetch,
                 @NotNull TokenEndpointAuthMethod tokenEndpointAuthMethod,
                 int nonceLength) {
+            // Public constructor: caller passed concrete values for everything,
+            // so all non-string fields are treated as explicitly set.
+            this(clientId, clientSecret, clientSecretKeychain, tokenUrlOverride,
+                    refreshUrlOverride, audience, scopesOverride,
+                    useForSpecFetch, tokenEndpointAuthMethod, nonceLength,
+                    FLAG_USE_FOR_SPEC_FETCH | FLAG_TOKEN_ENDPOINT_AUTH_METHOD | FLAG_NONCE_LENGTH);
+        }
+
+        private OAuth2(
+                @NotNull String clientId,
+                @NotNull String clientSecret,
+                @NotNull String clientSecretKeychain,
+                @NotNull String tokenUrlOverride,
+                @NotNull String refreshUrlOverride,
+                @NotNull String audience,
+                @NotNull List<String> scopesOverride,
+                boolean useForSpecFetch,
+                @NotNull TokenEndpointAuthMethod tokenEndpointAuthMethod,
+                int nonceLength,
+                int explicitFlags) {
             this.clientId = Objects.requireNonNull(clientId);
             this.clientSecret = Objects.requireNonNull(clientSecret);
             this.clientSecretKeychain = Objects.requireNonNull(clientSecretKeychain);
@@ -246,11 +273,20 @@ public final class HttpConfig {
             this.useForSpecFetch = useForSpecFetch;
             this.tokenEndpointAuthMethod = Objects.requireNonNull(tokenEndpointAuthMethod);
             this.nonceLength = nonceLength;
+            this.explicitFlags = explicitFlags;
         }
 
         @NotNull
         OAuth2 mergedOnto(@Nullable OAuth2 base) {
             if (base == null) return this;
+            boolean newUseForSpecFetch = (explicitFlags & FLAG_USE_FOR_SPEC_FETCH) != 0
+                    ? useForSpecFetch : base.useForSpecFetch;
+            TokenEndpointAuthMethod newTokenAuthMethod = (explicitFlags & FLAG_TOKEN_ENDPOINT_AUTH_METHOD) != 0
+                    ? tokenEndpointAuthMethod : base.tokenEndpointAuthMethod;
+            int newNonceLength = (explicitFlags & FLAG_NONCE_LENGTH) != 0
+                    ? nonceLength : base.nonceLength;
+            // Union the flags so further merges still see the explicit-set state from either side.
+            int mergedFlags = explicitFlags | base.explicitFlags;
             return new OAuth2(
                     !clientId.isEmpty() ? clientId : base.clientId,
                     !clientSecret.isEmpty() ? clientSecret : base.clientSecret,
@@ -259,9 +295,10 @@ public final class HttpConfig {
                     !refreshUrlOverride.isEmpty() ? refreshUrlOverride : base.refreshUrlOverride,
                     !audience.isEmpty() ? audience : base.audience,
                     !scopesOverride.isEmpty() ? scopesOverride : base.scopesOverride,
-                    useForSpecFetch,
-                    tokenEndpointAuthMethod,
-                    nonceLength);
+                    newUseForSpecFetch,
+                    newTokenAuthMethod,
+                    newNonceLength,
+                    mergedFlags);
         }
 
         public static Builder builder() { return new Builder(); }
@@ -277,6 +314,7 @@ public final class HttpConfig {
             private boolean useForSpecFetch = true;
             private TokenEndpointAuthMethod tokenEndpointAuthMethod = TokenEndpointAuthMethod.RFC6749_CLIENT_SECRET_BASIC;
             private int nonceLength = 16;
+            private int explicitFlags = 0;
 
             public Builder clientId(String v) { this.clientId = v == null ? "" : v; return this; }
             public Builder clientSecret(String v) { this.clientSecret = v == null ? "" : v; return this; }
@@ -285,19 +323,28 @@ public final class HttpConfig {
             public Builder refreshUrl(String v) { this.refreshUrlOverride = v == null ? "" : v; return this; }
             public Builder audience(String v) { this.audience = v == null ? "" : v; return this; }
             public Builder scopes(List<String> v) { this.scopesOverride = v == null ? new ArrayList<>() : new ArrayList<>(v); return this; }
-            public Builder useForSpecFetch(boolean v) { this.useForSpecFetch = v; return this; }
-            public Builder tokenEndpointAuthMethod(TokenEndpointAuthMethod v) { this.tokenEndpointAuthMethod = v; return this; }
+            public Builder useForSpecFetch(boolean v) {
+                this.useForSpecFetch = v;
+                this.explicitFlags |= FLAG_USE_FOR_SPEC_FETCH;
+                return this;
+            }
+            public Builder tokenEndpointAuthMethod(TokenEndpointAuthMethod v) {
+                this.tokenEndpointAuthMethod = v;
+                this.explicitFlags |= FLAG_TOKEN_ENDPOINT_AUTH_METHOD;
+                return this;
+            }
             public Builder nonceLength(int v) {
                 if (v < 8 || v > 64) {
                     throw new IllegalArgumentException("tokenEndpointAuth.nonceLength must be between 8 and 64");
                 }
                 this.nonceLength = v;
+                this.explicitFlags |= FLAG_NONCE_LENGTH;
                 return this;
             }
             public OAuth2 build() {
                 return new OAuth2(clientId, clientSecret, clientSecretKeychain, tokenUrlOverride,
                         refreshUrlOverride, audience, scopesOverride, useForSpecFetch,
-                        tokenEndpointAuthMethod, nonceLength);
+                        tokenEndpointAuthMethod, nonceLength, explicitFlags);
             }
         }
     }
@@ -306,8 +353,8 @@ public final class HttpConfig {
         private final Map<String, List<String>> headers = new LinkedHashMap<>();
         private final Map<String, List<String>> query = new LinkedHashMap<>();
         private final Map<String, String> cookies = new LinkedHashMap<>();
-        private Duration timeout = HttpConfig.defaultTimeout();
-        private boolean sslStrict = true;
+        @Nullable private Duration timeout;
+        @Nullable private Boolean sslStrict;
         private BasicAuthentication auth;
         private Proxy proxy;
         private OAuth2 oauth2;
@@ -370,6 +417,10 @@ public final class HttpConfig {
 
         @NotNull public Builder timeout(@NotNull Duration timeout) { this.timeout = timeout; return this; }
         @NotNull public Builder sslStrict(boolean sslStrict) { this.sslStrict = sslStrict; return this; }
+        /** Clears the explicit-set state of timeout, restoring the inherited default behaviour. */
+        @NotNull public Builder unsetTimeout() { this.timeout = null; return this; }
+        /** Clears the explicit-set state of sslStrict, restoring the inherited default (true). */
+        @NotNull public Builder unsetSslStrict() { this.sslStrict = null; return this; }
 
         @NotNull public Builder auth(@Nullable BasicAuthentication auth) { this.auth = auth; return this; }
         @NotNull public Builder basicAuth(@NotNull String user, @NotNull String password) {

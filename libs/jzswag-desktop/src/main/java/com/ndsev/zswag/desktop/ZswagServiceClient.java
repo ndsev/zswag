@@ -77,37 +77,39 @@ public class ZswagServiceClient implements IZswagServiceClient {
     }
 
     /**
-     * Extracts parameters from the zserio service context.
-     * The context may contain reflection objects with parameters.
+     * Extracts parameters from the zserio service context. The context may contain
+     * reflection objects with parameters. Throws {@link HttpException} on reflection
+     * failure so the caller does not silently dispatch a request with a partial or
+     * empty parameter map.
+     *
+     * <p>For the canonical typed entry point (Calculator.CalculatorClient(zswagClient)
+     * via ZswagClient + ZserioReflection), this legacy path is unused. It exists for
+     * direct {@link IZswagServiceClient#callMethod} consumers.
      */
     @NotNull
-    private Map<String, Object> extractParameters(@NotNull Object context) {
+    private Map<String, Object> extractParameters(@NotNull Object context) throws HttpException {
         Map<String, Object> parameters = new HashMap<>();
+        Class<?> contextClass = context.getClass();
+        Method[] methods = contextClass.getMethods();
 
-        // Use reflection to extract parameters from the context object
-        // This would need to be customized based on the zserio-generated types
-        try {
-            Class<?> contextClass = context.getClass();
-            Method[] methods = contextClass.getMethods();
-
-            for (Method method : methods) {
-                String methodName = method.getName();
-                // Look for getter methods
-                if (methodName.startsWith("get") && method.getParameterCount() == 0) {
-                    String paramName = methodName.substring(3);
-                    if (!paramName.isEmpty()) {
-                        paramName = Character.toLowerCase(paramName.charAt(0)) + paramName.substring(1);
-                        Object value = method.invoke(context);
-                        if (value != null) {
-                            parameters.put(paramName, value);
-                        }
-                    }
+        for (Method method : methods) {
+            String methodName = method.getName();
+            // Skip Object.class accessors that aren't user-defined parameter getters.
+            if (!methodName.startsWith("get") || method.getParameterCount() != 0) continue;
+            if (method.getDeclaringClass() == Object.class) continue;
+            String paramName = methodName.substring(3);
+            if (paramName.isEmpty()) continue;
+            paramName = Character.toLowerCase(paramName.charAt(0)) + paramName.substring(1);
+            try {
+                Object value = method.invoke(context);
+                if (value != null) {
+                    parameters.put(paramName, value);
                 }
+            } catch (ReflectiveOperationException e) {
+                throw new HttpException("Failed to read parameter '" + paramName + "' from context "
+                        + contextClass.getName() + ": " + e.getMessage(), e);
             }
-        } catch (Exception e) {
-            logger.debug("Could not extract parameters from context: {}", e.getMessage());
         }
-
         return parameters;
     }
 
