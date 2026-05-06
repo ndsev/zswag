@@ -224,9 +224,15 @@ public class AndroidHttpClient implements IHttpClient {
         try (Response response = call.execute()) {
             int code = response.code();
             byte[] respBody = response.body() != null ? response.body().bytes() : null;
+            // Return the first value per header name (OkHttp's response.header(name)
+            // returns the *last* value, which would diverge from JvmHttpClient's
+            // behaviour). Iterate explicitly.
             Map<String, String> headers = new LinkedHashMap<>();
             for (String name : response.headers().names()) {
-                headers.put(name, response.header(name));
+                List<String> values = response.headers().values(name);
+                if (!values.isEmpty()) {
+                    headers.put(name, values.get(0));
+                }
             }
             logger.debug("Received response with status code: {}", code);
             return new HttpResponse(code, response.message(), headers, respBody);
