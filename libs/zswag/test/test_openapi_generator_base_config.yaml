@@ -57,24 +57,24 @@ securitySchemes:
   BasicAuth:
     type: http
     scheme: basic
-    x-basicInfoFunc: zswag.test.calc.server.validate_basic_auth
+    x-basicInfoFunc: server.validate_basic_auth
   BearerAuth:
     type: http
     scheme: bearer
-    x-bearerInfoFunc: zswag.test.calc.server.validate_bearer
+    x-bearerInfoFunc: server.validate_bearer
   CookieAuth:
     type: apiKey
     in: cookie
     name: api-cookie
-    x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+    x-apikeyInfoFunc: server.validate_apikey
   HeaderAuth:
     type: apiKey
     in: header
     name: X-Generic-Token
-    x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+    x-apikeyInfoFunc: server.validate_apikey
   QueryAuth:
     type: apiKey
     in: query
     name: api-key
-    x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+    x-apikeyInfoFunc: server.validate_apikey
 security: [{HeaderAuth: []}]

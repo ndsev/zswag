@@ -27,7 +27,7 @@ endif()
 
 # fmt
 CPMAddPackage(
-    URI "gh:fmtlib/fmt#11.1.3"
+    URI "gh:fmtlib/fmt#11.1.4"
     OPTIONS "FMT_HEADER_ONLY OFF"
 )
 
@@ -42,7 +42,10 @@ CPMAddPackage(
 
 # yaml-cpp
 CPMAddPackage(
-    URI "gh:jbeder/yaml-cpp#aa8d4e4750ec9fe9f8cc680eb90f1b15955c817e"
+    NAME yaml-cpp
+    GITHUB_REPOSITORY jbeder/yaml-cpp
+    VERSION 0.9.0
+    GIT_TAG yaml-cpp-0.9.0
     OPTIONS
         "YAML_CPP_BUILD_TESTS OFF"
         "YAML_CPP_BUILD_TOOLS OFF"
@@ -54,7 +57,7 @@ CPMAddPackage("gh:Klebert-Engineering/stx@1.0.0")
 
 # httplib
 CPMAddPackage(
-    URI "gh:yhirose/cpp-httplib@0.15.3"
+    URI "gh:yhirose/cpp-httplib@0.43.3"
     OPTIONS
         "HTTPLIB_USE_CERTS_FROM_MACOSX_KEYCHAIN OFF"
         "HTTPLIB_INSTALL OFF"
@@ -71,7 +74,7 @@ endif()
 
 # python-cmake-wheel (only needed when building wheels)
 if(ZSWAG_BUILD_WHEELS)
-    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel@1.1.0")
+    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel@1.2.8")
 endif()
 
 # keychain
@@ -104,6 +107,12 @@ endif()
 if (TARGET httplib)
     target_compile_definitions(httplib INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
     target_link_libraries(httplib INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # cpp-httplib's async DNS resolver path uses getaddrinfo_a/gai_*.
+        # On manylinux/glibc these still come from libanl, even though newer
+        # desktop glibc versions may expose them from libc as well.
+        target_link_libraries(httplib INTERFACE anl)
+    endif()
 endif()
 
 # =============================================================================

@@ -3,26 +3,26 @@ components:
     BasicAuth:
       scheme: basic
       type: http
-      x-basicInfoFunc: zswag.test.calc.server.validate_basic_auth
+      x-basicInfoFunc: server.validate_basic_auth
     BearerAuth:
       scheme: bearer
       type: http
-      x-bearerInfoFunc: zswag.test.calc.server.validate_bearer
+      x-bearerInfoFunc: server.validate_bearer
     CookieAuth:
       in: cookie
       name: api-cookie
       type: apiKey
-      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+      x-apikeyInfoFunc: server.validate_apikey
     HeaderAuth:
       in: header
       name: X-Generic-Token
       type: apiKey
-      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+      x-apikeyInfoFunc: server.validate_apikey
     QueryAuth:
       in: query
       name: api-key
       type: apiKey
-      x-apikeyInfoFunc: zswag.test.calc.server.validate_apikey
+      x-apikeyInfoFunc: server.validate_apikey
 info:
   contact:
     email: support@nds-association.org

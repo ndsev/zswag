@@ -2,7 +2,7 @@
 CLI entry point for OAuth2 Mock Server.
 
 Usage:
-    python -m zswag.test.oauth2_mock [--host HOST] [--port PORT]
+    python -m oauth2_mock [--host HOST] [--port PORT]
 """
 
 import argparse

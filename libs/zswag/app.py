@@ -7,7 +7,7 @@ import yaml
 from typing import Type
 from flask import request as flask_request
 
-from pyzswagcl import \
+from .pyzswagcl import \
     parse_openapi_config, \
     OAMethod
 
@@ -204,4 +204,3 @@ class OAServer(connexion.App):
         for method_name in self.service_instance.method_names:
             if method_name not in self.spec:
                 raise IncompleteSchemaError(self.yaml_path, method_name)
-

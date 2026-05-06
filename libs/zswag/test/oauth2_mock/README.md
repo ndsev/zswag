@@ -26,7 +26,7 @@ A standalone OAuth2 server for testing OAuth 1.0 signature and HTTP Basic Auth t
 ### Start the Server
 
 ```bash
-python -m zswag.test.oauth2_mock --host 127.0.0.1 --port 8080
+python ../run_oauth2_mock.py --host 127.0.0.1 --port 8080
 ```
 
 The server logs authentication method used for each request.

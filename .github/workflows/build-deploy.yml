@@ -65,7 +65,10 @@ jobs:
       - name: Configure
         run: |
           python3 -m venv venv && . ./venv/bin/activate
-          pip install -U setuptools wheel pip delocate
+          # The manylinux image still ships auditwheel 6.4.0, which falsely
+          # rejects this wheel as having too-recent symbols. Use a newer
+          # auditwheel from the venv for the repair step.
+          pip install -U setuptools wheel pip delocate auditwheel
           mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
       - name: Build
         working-directory: build
@@ -74,8 +77,8 @@ jobs:
           . ../venv/bin/activate
           cmake --build .
           mv bin/wheel bin/wheel-auditme
-          mkdir bin/wheel && mv bin/wheel-auditme/zswag*.whl bin/wheel
-          auditwheel repair bin/wheel-auditme/pyzswagcl*.whl -w bin/wheel
+          mkdir bin/wheel
+          auditwheel repair bin/wheel-auditme/zswag*.whl -w bin/wheel
       - name: Test
         working-directory: build
         run: |
@@ -85,7 +88,7 @@ jobs:
         working-directory: build
         run: |
           . ../venv/bin/activate
-          pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+          pip install bin/wheel/zswag-*.whl
           python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
       - name: Deploy
         uses: actions/upload-artifact@v4
@@ -135,7 +138,6 @@ jobs:
         mv bin/wheel bin/wheel-final
         mkdir bin/wheel
         mv bin/wheel-final/zswag*.whl bin/wheel/
-        mv bin/wheel-final/pyzswagcl*.whl bin/wheel/
     - name: Build (Windows)
       if: startsWith(matrix.os, 'windows')
       working-directory: build
@@ -154,8 +156,7 @@ jobs:
         # Bundle DLLs into wheel using delvewheel (like auditwheel on Linux)
         Rename-Item -Path bin/wheel -NewName wheel-auditme
         New-Item -ItemType Directory -Path bin/wheel
-        Move-Item -Path bin/wheel-auditme/zswag*.whl -Destination bin/wheel/
-        delvewheel repair --add-path bin/Release (Get-Item bin/wheel-auditme/pyzswagcl*.whl) -w bin/wheel
+        delvewheel repair --add-path bin/Release (Get-Item bin/wheel-auditme/zswag*.whl) -w bin/wheel
     - name: Deploy
       uses: actions/upload-artifact@v4
       with:
@@ -171,7 +172,7 @@ jobs:
       env:
         PYTHONIOENCODING: utf-8
       run: |
-        pip install bin/wheel/pyzswagcl-*.whl bin/wheel/zswag-*.whl
+        pip install bin/wheel/zswag-*.whl
         python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
 
   deploy:
@@ -213,11 +214,6 @@ jobs:
           ls -la dist/
           echo "Wheel details:"
           ls dist/*.whl
-      
-      - name: Build source distribution for zswag
-        run: |
-          # Create source distribution for pure Python package
-          python setup.py ${{ needs.determine-version.outputs.version }} sdist --dist-dir dist/
       
       - name: Upload to PyPI
         env:
@@ -267,10 +263,6 @@ jobs:
           path: dist/
           merge-multiple: true
 
-      - name: Build source distribution for zswag
-        run: |
-          python setup.py ${{ needs.determine-version.outputs.version }} sdist --dist-dir dist/
-
       - name: Create release tag name
         id: release_info
         run: |
@@ -313,20 +305,19 @@ jobs:
              ```
              [Learn more about virtual environments](https://docs.python.org/3/tutorial/venv.html)
 
-          2. **Install/upgrade both packages** (force reinstall to ensure version consistency):
+          2. **Install/upgrade the wheel** (force reinstall to ensure version consistency):
              ```bash
-             pip install --force-reinstall dist/pyzswagcl-${VERSION}-*.whl dist/zswag-${VERSION}-*.whl
+             pip install --force-reinstall dist/zswag-${VERSION}-*.whl
              ```
 
-          ⚠️ **Warning:** This will remove any existing `zswag` and `pyzswagcl` installations.
+          ⚠️ **Warning:** This will remove any existing `zswag` installation.
 
           ### Direct Installation from Release
 
           You can install directly from this release (replace `<platform-python>` with your platform, e.g., `cp310-manylinux_x86_64`):
           ```bash
           pip install --force-reinstall \
-            https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/pyzswagcl-${VERSION}-<platform-python>.whl \
-            https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/zswag-${VERSION}-py3-none-any.whl
+            https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/zswag-${VERSION}-<platform-python>.whl
           ```
 
           EOF

@@ -8,6 +8,7 @@
 #include "zswagcl/oaclient.hpp"
 #include "zswagcl/private/openapi-oauth.hpp"
 #include "httpcl/http-client.hpp"
+#include "httplib.h"
 #include "yaml-cpp/yaml.h"
 #include "service_client_test/Request.h"
 
@@ -170,8 +171,7 @@ private:
             if (pos != std::string::npos) {
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
-                // Simple URL decode (not complete, but sufficient for tests)
-                std::replace(value.begin(), value.end(), '+', ' ');
+                value = httplib::decode_uri_component(value);
                 params[key] = value;
             }
         }
@@ -463,4 +463,3 @@ TEST_CASE("OAuth2 Client Credentials Flow", "[oauth2]") {
         oaClient->callMethod("test", zserio::ReflectableServiceData(request.reflectable()), nullptr);
     }
 }
-

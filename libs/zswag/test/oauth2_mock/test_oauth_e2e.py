@@ -20,10 +20,28 @@ import re
 import threading
 from pathlib import Path
 
-# Import zswag.test.oauth2_mock to trigger oauth_test API generation
-import zswag.test.oauth2_mock
+import zserio
 
 from zswag import OAClient
+
+
+WORKING_DIR = Path(__file__).resolve().parent
+RUNNER_PATH = WORKING_DIR.parent / "run_oauth2_mock.py"
+
+
+def prepare_generated_api():
+    zserio.generate(
+        zs_dir=str(WORKING_DIR),
+        main_zs_file="oauth_test.zs",
+        gen_dir=str(WORKING_DIR),
+        extra_args=["-withTypeInfoCode"],
+    )
+    if str(WORKING_DIR) not in sys.path:
+        sys.path.insert(0, str(WORKING_DIR))
+
+
+prepare_generated_api()
+
 import oauth_test.api as api
 
 
@@ -245,7 +263,7 @@ def main():
         env['PYTHONIOENCODING'] = 'utf-8'
         env['PYTHONUNBUFFERED'] = '1'  # Force unbuffered output on Windows
         server_process = subprocess.Popen(
-            [sys.executable, '-m', 'zswag.test.oauth2_mock', '--port', str(port)],
+            [sys.executable, str(RUNNER_PATH), '--port', str(port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

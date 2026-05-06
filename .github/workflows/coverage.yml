@@ -21,8 +21,8 @@ jobs:
 
       - name: Install coverage tools
         run: |
-          yum install -y lcov
           pip install gcovr
+          gcovr --version
 
       - name: Configure with coverage enabled
         run: |
@@ -48,132 +48,46 @@ jobs:
           . ../venv/bin/activate
           ctest -C Debug --verbose --no-tests=error
 
-      - name: Generate Coverage Report
-        working-directory: build
+      - name: Generate Coverage Reports
         run: |
-          # Generate coverage report with lcov
-          lcov --capture \
-            --directory . \
-            --output-file coverage.info \
-            --rc lcov_branch_coverage=1
+          mkdir -p coverage
+          gcovr \
+            --root . \
+            --filter 'libs/httpcl/(src|include)/.*' \
+            --filter 'libs/zswagcl/(src|include)/.*' \
+            --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
+            --html-details coverage/coverage.html
+          gcovr \
+            --root . \
+            --filter 'libs/httpcl/(src|include)/.*' \
+            --filter 'libs/zswagcl/(src|include)/.*' \
+            --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
+            --cobertura coverage.xml \
+            --html coverage.html
 
-          # Extract only the library source files we want to track
-          lcov --extract coverage.info \
-            '*/libs/httpcl/src/*' '*/libs/httpcl/include/*' \
-            '*/libs/zswagcl/src/*' '*/libs/zswagcl/include/*' \
-            --output-file coverage_temp.info \
-            --rc lcov_branch_coverage=1
-
-          # Strip the workspace prefix to make paths relative
-          # GitHub Actions uses /__w/ as the actual working directory path
-          sed 's|/__w/zswag/zswag/||g' coverage_temp.info > coverage_cleaned.info
-
-          # Show coverage summary
-          lcov --list coverage_cleaned.info
-
-      - name: Generate SonarQube Coverage XML
-        run: |
-          # Generate SonarQube XML format using gcovr from project root
-          # This ensures paths match what SonarCloud expects
-          gcovr --sonarqube build/coverage.xml \
-            --filter 'libs/httpcl/src/.*' \
-            --filter 'libs/httpcl/include/.*' \
-            --filter 'libs/zswagcl/src/.*' \
-            --filter 'libs/zswagcl/include/.*'
-
-          # Debug: Show sample paths from coverage XML
-          echo "=== Sample paths from coverage.xml (first 10) ==="
-          grep '<file ' build/coverage.xml | head -10
-
-      - name: Cleanup Coverage Data
-        working-directory: build
-        run: |
-          # Remove raw coverage data to prevent codecov-cli from re-processing
-          find . -name '*.gcda' -delete
-          find . -name '*.gcno' -delete
-          echo "Cleaned up .gcda and .gcno files to prevent duplicate processing"
-
-      - name: Upload Coverage to Codecov
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          # Use Python-based codecov-cli to avoid GLIBC issues in manylinux
-          . ./venv/bin/activate
-          pip install codecov-cli
-
-          # Verify paths in coverage file are relative
-          echo "=== Coverage file paths (first 20) ==="
-          grep "^SF:" build/coverage_cleaned.info | head -20
-
-          # Upload from repo root to prevent codecov-cli from finding .gcno files
-          codecovcli upload-process \
-            --fail-on-error \
-            --file build/coverage_cleaned.info \
-            --disable-search \
-            --network-root-folder ${{ github.workspace }} \
-            --flag unittests \
-            --name codecov-cpp \
-            --git-service github
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.coverageReportPaths=build/coverage.xml
-
-      - name: Generate HTML Coverage Report
-        run: |
-          # Generate browsable HTML report from repo root where source files are
-          genhtml build/coverage_cleaned.info \
-            --output-directory build/coverage-html \
-            --title "zswag Code Coverage" \
-            --legend \
-            --show-details \
-            --branch-coverage \
-            --prefix ${{ github.workspace }}
-
-          echo "📊 HTML coverage report generated in build/coverage-html/"
-
-      - name: Upload HTML Coverage Report
+      - name: Publish Coverage HTML
         uses: actions/upload-artifact@v4
         with:
           name: coverage-html-report
-          path: build/coverage-html/
+          path: coverage
           retention-days: 30
 
-      - name: Deploy Coverage Report to GitHub Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Code Coverage Report
+        uses: irongut/CodeCoverageSummary@v1.3.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build/coverage-html
-          destination_dir: coverage
-          keep_files: false
+          filename: coverage.xml
+          badge: false
+          fail_below_min: true
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: '65 80'
 
-      - name: Add Coverage to Job Summary
-        run: |
-          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          lcov --summary build/coverage_cleaned.info 2>&1 | tail -n 6 >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/master" ]; then
-            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-            echo "🌐 [View coverage report on GitHub Pages](https://${{ github.repository_owner }}.github.io/${REPO_NAME}/coverage/)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "📥 [Download full HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-
-      - name: Coverage PR Comment (Blocking Check)
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
         if: github.event_name == 'pull_request'
-        uses: zgosalvez/github-actions-report-lcov@v5.0.1
         with:
-          coverage-files: ./build/coverage_cleaned.info
-          minimum-coverage: 65
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          update-comment: true
-          working-directory: ${{ github.workspace }}
+          recreate: true
+          path: code-coverage-results.md
