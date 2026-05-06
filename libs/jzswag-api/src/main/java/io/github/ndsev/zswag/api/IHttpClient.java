@@ -21,4 +21,18 @@ public interface IHttpClient {
      */
     @NotNull
     HttpResponse execute(@NotNull HttpRequest request, @NotNull HttpConfig adhoc) throws HttpException;
+
+    /**
+     * Returns the persistent settings registry this client applies on every
+     * request. Exposed so that higher layers (e.g. the OpenAPI dispatch core)
+     * can compute the effective {@link HttpConfig} for a URL without having to
+     * downcast to a platform-specific implementation.
+     *
+     * <p>Default returns {@link HttpSettings#empty()} so simple lambda-based
+     * implementations (e.g. test stubs) don't need to override.
+     */
+    @NotNull
+    default HttpSettings getPersistentSettings() {
+        return HttpSettings.empty();
+    }
 }

@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.jvm;
+package io.github.ndsev.zswag.shared;
 
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpException;
@@ -28,7 +28,7 @@ class OAuth2HandlerTest {
         // Regression: previously `new String(response.getBody(), UTF-8)` NPE'd if a
         // misbehaving token endpoint returned 200 with an empty/null body.
         IHttpClient stub = (request, adhoc) -> new HttpResponse(200, null, new LinkedHashMap<>(), null);
-        OAuth2Handler handler = new OAuth2Handler(stub);
+        OAuth2Handler handler = new OAuth2Handler(stub, (s,u) -> "test-keychain-secret");
         HttpConfig.OAuth2 oauth = HttpConfig.OAuth2.builder()
                 .clientId("cid").clientSecret("csec").build();
         assertThatThrownBy(() -> handler.getAccessToken(oauth, "https://idp.example/token", "https://idp.example/token", Collections.emptyList()))
@@ -41,7 +41,7 @@ class OAuth2HandlerTest {
         IHttpClient stub = (request, adhoc) -> new HttpResponse(
                 200, null, new LinkedHashMap<>(),
                 "{\"token_type\":\"bearer\"}".getBytes());
-        OAuth2Handler handler = new OAuth2Handler(stub);
+        OAuth2Handler handler = new OAuth2Handler(stub, (s,u) -> "test-keychain-secret");
         HttpConfig.OAuth2 oauth = HttpConfig.OAuth2.builder()
                 .clientId("cid").clientSecret("csec").build();
         assertThatThrownBy(() -> handler.getAccessToken(oauth, "https://idp.example/token", "https://idp.example/token", Collections.emptyList()))
@@ -54,7 +54,7 @@ class OAuth2HandlerTest {
         IHttpClient stub = (request, adhoc) -> new HttpResponse(
                 401, null, new LinkedHashMap<>(),
                 "{\"error\":\"invalid_client\"}".getBytes());
-        OAuth2Handler handler = new OAuth2Handler(stub);
+        OAuth2Handler handler = new OAuth2Handler(stub, (s,u) -> "test-keychain-secret");
         HttpConfig.OAuth2 oauth = HttpConfig.OAuth2.builder()
                 .clientId("cid").clientSecret("csec").build();
         assertThatThrownBy(() -> handler.getAccessToken(oauth, "https://idp.example/token", "https://idp.example/token", Collections.emptyList()))

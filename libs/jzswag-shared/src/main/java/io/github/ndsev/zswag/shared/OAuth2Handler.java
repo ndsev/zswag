@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.jvm;
+package io.github.ndsev.zswag.shared;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -7,6 +7,7 @@ import io.github.ndsev.zswag.api.HttpException;
 import io.github.ndsev.zswag.api.HttpRequest;
 import io.github.ndsev.zswag.api.HttpResponse;
 import io.github.ndsev.zswag.api.IHttpClient;
+import io.github.ndsev.zswag.api.IKeychain;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,10 +66,12 @@ public final class OAuth2Handler {
     }
 
     private final IHttpClient httpClient;
+    private final IKeychain keychain;
     private final Gson gson = new Gson();
 
-    public OAuth2Handler(@NotNull IHttpClient httpClient) {
+    public OAuth2Handler(@NotNull IHttpClient httpClient, @NotNull IKeychain keychain) {
         this.httpClient = httpClient;
+        this.keychain = keychain;
     }
 
     /**
@@ -149,7 +152,7 @@ public final class OAuth2Handler {
         // Resolve client secret (cleartext or keychain).
         String secret = oauth.clientSecret;
         if (secret.isEmpty() && !oauth.clientSecretKeychain.isEmpty()) {
-            secret = Keychain.load(oauth.clientSecretKeychain, oauth.clientId);
+            secret = keychain.load(oauth.clientSecretKeychain, oauth.clientId);
         }
 
         // Public client (no secret): send client_id in the body.

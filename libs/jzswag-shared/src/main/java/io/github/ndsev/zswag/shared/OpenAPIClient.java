@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.jvm;
+package io.github.ndsev.zswag.shared;
 
 import io.github.ndsev.zswag.api.*;
 import org.jetbrains.annotations.NotNull;
@@ -31,8 +31,8 @@ import java.util.function.Function;
  *       endpoints or for testing.</li>
  * </ul>
  */
-public class JvmOpenAPIClient implements IOpenAPIClient {
-    private static final Logger logger = LoggerFactory.getLogger(JvmOpenAPIClient.class);
+public class OpenAPIClient implements IOpenAPIClient {
+    private static final Logger logger = LoggerFactory.getLogger(OpenAPIClient.class);
 
     /** zswag MIME type for both request bodies and response Accept header. */
     public static final String ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
@@ -40,18 +40,21 @@ public class JvmOpenAPIClient implements IOpenAPIClient {
     private final String specLocation;
     private final IHttpClient httpClient;
     private final HttpConfig adhoc;
+    private final IKeychain keychain;
     private final OpenAPIParser parser;
     private final String baseUrl;
 
-    public JvmOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient) throws IOException {
-        this(specLocation, httpClient, HttpConfig.empty());
+    public OpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                         @NotNull IKeychain keychain) throws IOException {
+        this(specLocation, httpClient, HttpConfig.empty(), keychain);
     }
 
-    public JvmOpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
-                                @NotNull HttpConfig adhoc) throws IOException {
+    public OpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                         @NotNull HttpConfig adhoc, @NotNull IKeychain keychain) throws IOException {
         this.specLocation = specLocation;
         this.httpClient = httpClient;
         this.adhoc = adhoc;
+        this.keychain = keychain;
         this.parser = new OpenAPIParser(specLocation);
         this.baseUrl = resolveBaseUrl();
     }
@@ -253,16 +256,12 @@ public class JvmOpenAPIClient implements IOpenAPIClient {
 
     /**
      * Computes the effective {@link HttpConfig} for a given URL: the persistent
-     * settings from the underlying {@link JvmHttpClient} (scope-matched
+     * settings exposed by the underlying {@link IHttpClient} (scope-matched
      * against the URL) merged with this client's adhoc config.
      */
     @NotNull
     private HttpConfig mergedConfigFor(@NotNull String url) {
-        if (httpClient instanceof JvmHttpClient) {
-            HttpSettings persistent = ((JvmHttpClient) httpClient).getPersistentSettings();
-            return persistent.forUrl(url).mergedWith(adhoc);
-        }
-        return adhoc;
+        return httpClient.getPersistentSettings().forUrl(url).mergedWith(adhoc);
     }
 
     /**
@@ -382,7 +381,7 @@ public class JvmOpenAPIClient implements IOpenAPIClient {
                 }
                 List<String> scopes = !oauth.scopesOverride.isEmpty() ? oauth.scopesOverride : requiredScopes;
 
-                OAuth2Handler handler = new OAuth2Handler(httpClient);
+                OAuth2Handler handler = new OAuth2Handler(httpClient, keychain);
                 String token = handler.getAccessToken(oauth, tokenUrl, refreshUrl, scopes);
                 opHeaders.put("Authorization", "Bearer " + token);
                 break;

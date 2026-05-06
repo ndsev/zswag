@@ -22,7 +22,7 @@ class KeychainTest {
 
     @Test
     void emptyServiceThrows() {
-        assertThatThrownBy(() -> Keychain.load("", "user"))
+        assertThatThrownBy(() -> new Keychain().load("", "user"))
                 .isInstanceOf(Keychain.KeychainException.class)
                 .hasMessageContaining("service identifier");
     }
@@ -30,7 +30,7 @@ class KeychainTest {
     @Test
     void unknownPlatformThrowsUnsupported() {
         System.setProperty("os.name", "PalmOS");
-        assertThatThrownBy(() -> Keychain.load("svc", "user"))
+        assertThatThrownBy(() -> new Keychain().load("svc", "user"))
                 .isInstanceOf(Keychain.KeychainException.class)
                 .hasMessageContaining("unsupported platform");
     }
@@ -38,7 +38,7 @@ class KeychainTest {
     @Test
     void windowsThrowsNotImplemented() {
         System.setProperty("os.name", "Windows 10");
-        assertThatThrownBy(() -> Keychain.load("svc", "user"))
+        assertThatThrownBy(() -> new Keychain().load("svc", "user"))
                 .isInstanceOf(Keychain.KeychainException.class)
                 .hasMessageContaining("Windows credential manager");
     }
@@ -50,7 +50,7 @@ class KeychainTest {
         // If a developer happens to have secret-tool installed locally, the test asserts a
         // generic KeychainException — either way, we exercise loadLinux().
         System.setProperty("os.name", "Linux");
-        assertThatThrownBy(() -> Keychain.load("zswag.test.does-not-exist", "no.such.user"))
+        assertThatThrownBy(() -> new Keychain().load("zswag.test.does-not-exist", "no.such.user"))
                 .isInstanceOf(Keychain.KeychainException.class);
     }
 
@@ -59,7 +59,7 @@ class KeychainTest {
         // 'security' is macOS-only and unlikely on Linux CI; this exercises the IOException path
         // ("not installed or not on PATH") on non-mac runners.
         System.setProperty("os.name", "Mac OS X");
-        assertThatThrownBy(() -> Keychain.load("zswag.test.does-not-exist", "no.such.user"))
+        assertThatThrownBy(() -> new Keychain().load("zswag.test.does-not-exist", "no.such.user"))
                 .isInstanceOf(Keychain.KeychainException.class);
     }
 

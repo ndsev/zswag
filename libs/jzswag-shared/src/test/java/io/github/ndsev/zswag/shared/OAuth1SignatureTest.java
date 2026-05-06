@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.jvm;
+package io.github.ndsev.zswag.shared;
 
 import org.junit.jupiter.api.Test;
 

@@ -1,6 +1,7 @@
 package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.*;
+import io.github.ndsev.zswag.shared.HttpSettingsLoader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,7 @@ public class JvmHttpClient implements IHttpClient {
     private static final int DEFAULT_TIMEOUT_SECONDS = 60;
 
     private final HttpSettings persistentSettings;
+    private final IKeychain keychain;
     private final HttpClient strictClient;
     private final HttpClient permissiveClient;
 
@@ -54,8 +56,13 @@ public class JvmHttpClient implements IHttpClient {
     }
 
     public JvmHttpClient(@NotNull HttpSettings persistentSettings) {
+        this(persistentSettings, new Keychain());
+    }
+
+    public JvmHttpClient(@NotNull HttpSettings persistentSettings, @NotNull IKeychain keychain) {
         JzswagLogging.init();
         this.persistentSettings = persistentSettings;
+        this.keychain = keychain;
         Duration timeout = readTimeoutFromEnv();
         this.strictClient = buildJdkClient(timeout, true);
         this.permissiveClient = buildJdkClient(timeout, false);
@@ -64,6 +71,7 @@ public class JvmHttpClient implements IHttpClient {
     /** For tests: explicit timeout override. */
     JvmHttpClient(@NotNull HttpSettings persistentSettings, @NotNull Duration timeout) {
         this.persistentSettings = persistentSettings;
+        this.keychain = new Keychain();
         this.strictClient = buildJdkClient(timeout, true);
         this.permissiveClient = buildJdkClient(timeout, false);
     }
@@ -174,7 +182,7 @@ public class JvmHttpClient implements IHttpClient {
                 HttpConfig.BasicAuthentication auth = effective.getAuth().get();
                 String password = !auth.password.isEmpty()
                         ? auth.password
-                        : Keychain.load(auth.keychain, auth.user);
+                        : keychain.load(auth.keychain, auth.user);
                 String credentials = auth.user + ":" + password;
                 String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
                 rb.header("Authorization", "Basic " + encoded);
@@ -225,7 +233,7 @@ public class JvmHttpClient implements IHttpClient {
         }
     }
 
-    private static HttpClient buildClientWithProxy(@NotNull Duration timeout, boolean sslStrict, @NotNull HttpConfig.Proxy proxy) {
+    private HttpClient buildClientWithProxy(@NotNull Duration timeout, boolean sslStrict, @NotNull HttpConfig.Proxy proxy) {
         HttpClient.Builder b = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -241,7 +249,7 @@ public class JvmHttpClient implements IHttpClient {
             }
         }
         if (!proxy.user.isEmpty()) {
-            String password = !proxy.password.isEmpty() ? proxy.password : Keychain.load(proxy.keychain, proxy.user);
+            String password = !proxy.password.isEmpty() ? proxy.password : keychain.load(proxy.keychain, proxy.user);
             b.authenticator(new java.net.Authenticator() {
                 @Override
                 protected java.net.PasswordAuthentication getPasswordAuthentication() {

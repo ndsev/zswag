@@ -1,14 +1,10 @@
-package io.github.ndsev.zswag.jvm;
+package io.github.ndsev.zswag.shared;
 
 import io.github.ndsev.zswag.api.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import zserio.runtime.io.ByteArrayBitStreamReader;
-import zserio.runtime.io.ByteArrayBitStreamWriter;
-import zserio.runtime.io.SerializeUtil;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,26 +22,6 @@ public class ZswagServiceClient implements IZswagServiceClient {
     public ZswagServiceClient(@NotNull String serviceIdentifier, @NotNull IOpenAPIClient openAPIClient) {
         this.serviceIdentifier = serviceIdentifier;
         this.openAPIClient = openAPIClient;
-    }
-
-    /**
-     * Creates a ZswagServiceClient that uses the persistent {@link HttpSettings}
-     * from the {@code HTTP_SETTINGS_FILE} environment variable.
-     */
-    @NotNull
-    public static ZswagServiceClient create(@NotNull String serviceIdentifier, @NotNull String specLocation) throws IOException {
-        return create(serviceIdentifier, specLocation, HttpSettingsLoader.loadFromEnvironment());
-    }
-
-    /**
-     * Creates a ZswagServiceClient with explicit persistent settings.
-     */
-    @NotNull
-    public static ZswagServiceClient create(@NotNull String serviceIdentifier, @NotNull String specLocation,
-                                            @NotNull HttpSettings settings) throws IOException {
-        IHttpClient httpClient = new JvmHttpClient(settings);
-        IOpenAPIClient openAPIClient = new JvmOpenAPIClient(specLocation, httpClient);
-        return new ZswagServiceClient(serviceIdentifier, openAPIClient);
     }
 
     @Override

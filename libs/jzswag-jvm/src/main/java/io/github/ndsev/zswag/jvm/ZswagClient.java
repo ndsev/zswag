@@ -3,6 +3,9 @@ package io.github.ndsev.zswag.jvm;
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpException;
 import io.github.ndsev.zswag.api.HttpSettings;
+import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.shared.HttpSettingsLoader;
+import io.github.ndsev.zswag.shared.OpenAPIClient;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -15,7 +18,7 @@ import zserio.runtime.service.ServiceData;
 import java.io.IOException;
 
 /**
- * The Java port of Python's {@code services.MyService.Client(OAClient(url))}
+ * JVM Java port of Python's {@code services.MyService.Client(OAClient(url))}
  * idiom. Implements zserio's {@link ServiceClientInterface} so that any
  * zserio-Java-generated {@code XClient} class accepts an instance of this
  * class as its transport.
@@ -27,13 +30,13 @@ import java.io.IOException;
  * Double result = calc.powerMethod(new BaseAndExponent(...));
  * }</pre>
  *
- * <p>Internally delegates to {@link JvmOpenAPIClient}, which performs
- * {@code x-zserio-request-part} request decomposition via {@link ZserioReflection}.
+ * <p>Internally delegates to {@link OpenAPIClient}, which performs
+ * {@code x-zserio-request-part} request decomposition.
  */
 public final class ZswagClient implements ServiceClientInterface {
     private static final Logger logger = LoggerFactory.getLogger(ZswagClient.class);
 
-    private final JvmOpenAPIClient delegate;
+    private final OpenAPIClient delegate;
 
     /**
      * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}
@@ -58,29 +61,25 @@ public final class ZswagClient implements ServiceClientInterface {
      */
     public ZswagClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc)
             throws IOException {
-        JvmHttpClient http = new JvmHttpClient(persistent);
-        this.delegate = new JvmOpenAPIClient(openApiSpecUrl, http, adhoc);
+        IKeychain keychain = new Keychain();
+        JvmHttpClient http = new JvmHttpClient(persistent, keychain);
+        this.delegate = new OpenAPIClient(openApiSpecUrl, http, adhoc, keychain);
     }
 
     /** Lower-level constructor — for tests / advanced use. */
-    public ZswagClient(@NotNull JvmOpenAPIClient delegate) {
+    public ZswagClient(@NotNull OpenAPIClient delegate) {
         this.delegate = delegate;
     }
 
     /** Exposes the underlying OpenAPI client (read-only) for introspection. */
     @NotNull
-    public JvmOpenAPIClient getOpenAPIClient() {
+    public OpenAPIClient getOpenAPIClient() {
         return delegate;
     }
 
     /**
      * Implementation of zserio's {@link ServiceClientInterface}: decomposes the
      * typed request, dispatches the HTTP call, returns response bytes.
-     *
-     * <p>The {@code requestData} carries both the serialized request bytes
-     * ({@link ServiceData#getByteArray()}) and the typed object
-     * ({@link ServiceData#getZserioObject()}); we use the typed object for
-     * {@code x-zserio-request-part} resolution.
      */
     @Override
     public byte[] callMethod(java.lang.String methodName,
@@ -93,8 +92,6 @@ public final class ZswagClient implements ServiceClientInterface {
         try {
             return delegate.callMethod(methodName, typed);
         } catch (HttpException e) {
-            // Surface as ZserioError so that zserio-generated client code can propagate it
-            // through its standard exception channel.
             ZserioError err = new ZserioError("ZswagClient: " + methodName + " failed: " + e.getMessage(), e);
             throw err;
         }

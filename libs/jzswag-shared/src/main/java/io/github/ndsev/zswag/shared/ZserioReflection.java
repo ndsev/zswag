@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.jvm;
+package io.github.ndsev.zswag.shared;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

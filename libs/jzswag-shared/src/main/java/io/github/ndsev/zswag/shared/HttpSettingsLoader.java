@@ -1,4 +1,4 @@
-package io.github.ndsev.zswag.jvm;
+package io.github.ndsev.zswag.shared;
 
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpSettings;

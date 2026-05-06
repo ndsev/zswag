@@ -1,5 +1,6 @@
 package io.github.ndsev.zswag.jvm;
 
+import io.github.ndsev.zswag.api.IKeychain;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,18 +13,18 @@ import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
- * OS keychain integration: load/store/remove credentials. Mirrors C++
- * {@code httpcl::secret} (which wraps the {@code keychain} library).
+ * JVM keychain integration: load credentials from the OS-native credential
+ * store. Mirrors C++ {@code httpcl::secret} (which wraps the {@code keychain}
+ * library).
  *
  * <p>Implementation strategy: shells out to the platform-native keychain CLI
  * (no JNI). Linux: {@code secret-tool}; macOS: {@code security}; Windows:
- * {@code cmdkey}/{@code powershell}.
+ * not yet implemented.
  *
  * <p>If the platform tool is unavailable or returns no entry, callers see a
- * {@link KeychainException} with a clear message — preferable to silently
- * sending an empty password.
+ * {@link KeychainException} — preferable to silently sending an empty password.
  */
-public final class Keychain {
+public final class Keychain implements IKeychain {
     private static final Logger logger = LoggerFactory.getLogger(Keychain.class);
 
     /** Matches C++ {@code KEYCHAIN_PACKAGE} so secrets stored by C++ are visible to Java. */
@@ -31,14 +32,11 @@ public final class Keychain {
 
     private static final long TIMEOUT_SECONDS = 60;
 
-    private Keychain() {}
+    public Keychain() {}
 
-    /**
-     * Loads a password for {@code (service, user)} from the platform keychain.
-     * Throws if the keychain tool is missing or the entry doesn't exist.
-     */
+    @Override
     @NotNull
-    public static String load(@NotNull String service, @NotNull String user) {
+    public String load(@NotNull String service, @NotNull String user) {
         if (service.isEmpty()) {
             throw new KeychainException("keychain: service identifier must not be empty");
         }
@@ -62,7 +60,6 @@ public final class Keychain {
     }
 
     private static String loadLinux(String service, String user) throws IOException, InterruptedException {
-        // secret-tool lookup package <PACKAGE> service <service> user <user>
         ProcessBuilder pb = new ProcessBuilder("secret-tool", "lookup",
                 "package", PACKAGE,
                 "service", service,
@@ -71,7 +68,6 @@ public final class Keychain {
     }
 
     private static String loadMacOs(String service, String user) throws IOException, InterruptedException {
-        // security find-generic-password -s <service> -a <user> -w
         ProcessBuilder pb = new ProcessBuilder("security", "find-generic-password",
                 "-s", service,
                 "-a", user,
@@ -80,7 +76,6 @@ public final class Keychain {
     }
 
     private static String loadWindows(String service, String user) {
-        // Windows credential manager lookup is awkward without PowerShell module access.
         throw new KeychainException("keychain: Windows credential manager lookup is not yet implemented; use cleartext password");
     }
 
@@ -112,7 +107,6 @@ public final class Keychain {
             throw new KeychainException("keychain: '" + tool + "' exited " + p.exitValue() +
                     (stderr.isEmpty() ? "" : ": " + stderr));
         }
-        // Strip a trailing newline from the password (secret-tool always appends one).
         String s = out.toString();
         if (s.endsWith("\n")) s = s.substring(0, s.length() - 1);
         return s;
