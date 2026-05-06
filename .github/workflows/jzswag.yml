@@ -37,7 +37,7 @@ jobs:
           restore-keys: ${{ runner.os }}-gradle-
 
       - name: Build & test
-        run: ./gradlew :libs:jzswag-api:build :libs:jzswag-jvm:test :libs:jzswag-test:assemble --console=plain --stacktrace
+        run: ./gradlew :libs:jzswag-api:test :libs:jzswag-shared:test :libs:jzswag-jvm:test :libs:jzswag-android:test :libs:jzswag-test:assemble --console=plain --stacktrace
 
       - name: Upload JUnit reports
         if: always()
@@ -47,12 +47,12 @@ jobs:
           path: libs/jzswag-*/build/test-results/test/*.xml
           retention-days: 14
 
-      - name: Upload JaCoCo HTML report
+      - name: Upload JaCoCo HTML reports
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-html
-          path: libs/jzswag-jvm/build/reports/jacoco/test/html/
+          path: libs/jzswag-*/build/reports/jacoco/test/html/
           retention-days: 14
 
   coverage:
@@ -83,12 +83,18 @@ jobs:
           restore-keys: ${{ runner.os }}-gradle-
 
       - name: Run tests with coverage
-        run: ./gradlew :libs:jzswag-jvm:test :libs:jzswag-jvm:jacocoTestReport --console=plain
+        run: |
+          ./gradlew \
+            :libs:jzswag-api:test :libs:jzswag-api:jacocoTestReport \
+            :libs:jzswag-shared:test :libs:jzswag-shared:jacocoTestReport \
+            :libs:jzswag-jvm:test :libs:jzswag-jvm:jacocoTestReport \
+            :libs:jzswag-android:test :libs:jzswag-android:jacocoTestReport \
+            --console=plain
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: libs/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml
+          files: libs/jzswag-api/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag-shared/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag-android/build/reports/jacoco/test/jacocoTestReport.xml
           flags: unittests-java
           name: codecov-java
           fail_ci_if_error: false
@@ -99,12 +105,11 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: madrapps/jacoco-report@v1.7.1
         with:
-          paths: libs/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml
+          paths: libs/jzswag-api/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag-shared/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag-android/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
-          title: Java Coverage (jzswag-jvm)
-          # Starting threshold — current baseline is ~29% line coverage from unit tests
-          # alone (dispatch core is exercised by integration tests that need the Python
-          # server, not yet wired into CI). Ratchet up as more unit tests land.
-          min-coverage-overall: 25
+          title: Java Coverage (api / shared / jvm / android)
+          # Threshold per the parity goal — every module ships with ≥60% line coverage
+          # on its own tests. Ratchet up as more tests land.
+          min-coverage-overall: 60
           min-coverage-changed-files: 50
           update-comment: true
