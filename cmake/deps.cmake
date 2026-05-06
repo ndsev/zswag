@@ -44,8 +44,8 @@ CPMAddPackage(
 CPMAddPackage(
     NAME yaml-cpp
     GITHUB_REPOSITORY jbeder/yaml-cpp
-    VERSION 0.8.0
-    GIT_TAG 0.8.0
+    VERSION 0.9.0
+    GIT_TAG yaml-cpp-0.9.0
     OPTIONS
         "YAML_CPP_BUILD_TESTS OFF"
         "YAML_CPP_BUILD_TOOLS OFF"
@@ -107,6 +107,9 @@ endif()
 if (TARGET httplib)
     target_compile_definitions(httplib INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
     target_link_libraries(httplib INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_link_libraries(httplib INTERFACE rt)
+    endif()
 endif()
 
 # =============================================================================
