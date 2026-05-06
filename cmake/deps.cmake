@@ -108,7 +108,10 @@ if (TARGET httplib)
     target_compile_definitions(httplib INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
     target_link_libraries(httplib INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_link_libraries(httplib INTERFACE rt)
+        # cpp-httplib's async DNS resolver path uses getaddrinfo_a/gai_*.
+        # On manylinux/glibc these still come from libanl, even though newer
+        # desktop glibc versions may expose them from libc as well.
+        target_link_libraries(httplib INTERFACE anl)
     endif()
 endif()
 
