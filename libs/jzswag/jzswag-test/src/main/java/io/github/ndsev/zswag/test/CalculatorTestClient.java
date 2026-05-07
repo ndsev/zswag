@@ -16,7 +16,6 @@ import calculator.Strings;
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpSettings;
 import io.github.ndsev.zswag.jvm.JvmHttpClient;
-import io.github.ndsev.zswag.jvm.JvmOpenAPIClient;
 import io.github.ndsev.zswag.jvm.ZswagClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
