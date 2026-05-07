@@ -11,7 +11,7 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 
 ## Components
 
-![Component overview](doc/zswag-architecture.png)
+![Component overview](docs/assets/zswag-architecture.png)
 
 | Component | Language | Role |
 |---|---|---|
