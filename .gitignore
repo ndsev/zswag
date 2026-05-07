@@ -148,6 +148,7 @@ links
 .gradle/
 .gradletasknamecache
 gradle-app.setting
+.kotlin/
 *.class
 *.jar
 *.war
