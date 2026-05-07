@@ -55,8 +55,47 @@ public class OpenAPIClient implements IOpenAPIClient {
         this.httpClient = httpClient;
         this.adhoc = adhoc;
         this.keychain = keychain;
-        this.parser = new OpenAPIParser(specLocation);
+        this.parser = parseSpec(specLocation, httpClient, adhoc, keychain);
         this.baseUrl = resolveBaseUrl();
+    }
+
+    /**
+     * Parses the OpenAPI spec, optionally pre-acquiring an OAuth2 access token
+     * and injecting it as an {@code Authorization: Bearer} header on the spec
+     * fetch request. This is required when the spec endpoint itself sits
+     * behind OAuth2 (the user opts in via
+     * {@link HttpConfig.OAuth2#useForSpecFetch}, default {@code true}).
+     *
+     * <p>When {@code useForSpecFetch=true} but the merged config lacks
+     * {@code tokenUrl} (we have nothing else to fall back on at this point
+     * — the spec hasn't been parsed yet so its {@code flows.clientCredentials.tokenUrl}
+     * is unknown), throws {@link IOException} with a descriptive message
+     * rather than silently fetching unauthenticated and 401-ing.
+     */
+    @NotNull
+    private static OpenAPIParser parseSpec(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                                           @NotNull HttpConfig adhoc, @NotNull IKeychain keychain) throws IOException {
+        HttpConfig effective = httpClient.getPersistentSettings().forUrl(specLocation).mergedWith(adhoc);
+        HttpConfig.OAuth2 oauth = effective.getOAuth2().orElse(null);
+        if (oauth == null || !oauth.useForSpecFetch) {
+            return new OpenAPIParser(specLocation);
+        }
+        if (oauth.tokenUrlOverride.isEmpty()) {
+            throw new IOException("OAuth2 useForSpecFetch=true requires oauth2.tokenUrl in http-settings "
+                    + "(the spec has not been fetched yet so its flows.clientCredentials.tokenUrl is "
+                    + "unknown). Either set oauth2.tokenUrl, or set useForSpecFetch=false if the spec "
+                    + "endpoint is publicly readable.");
+        }
+        try {
+            OAuth2Handler handler = new OAuth2Handler(httpClient, keychain);
+            String token = handler.getAccessToken(
+                    oauth, oauth.tokenUrlOverride, oauth.tokenUrlOverride, oauth.scopesOverride);
+            logger.debug("[OAuth2] Pre-fetch token acquired for spec endpoint {}", specLocation);
+            return new OpenAPIParser(specLocation,
+                    conn -> conn.setRequestProperty("Authorization", "Bearer " + token));
+        } catch (HttpException e) {
+            throw new IOException("OAuth2 token mint for spec fetch failed: " + e.getMessage(), e);
+        }
     }
 
     @NotNull
