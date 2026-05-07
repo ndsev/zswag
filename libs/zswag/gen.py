@@ -18,7 +18,7 @@ from zserio.typeinfo import MemberAttribute
 from openapi_spec_validator import validate_spec
 import uuid
 import zserio
-from pyzswagcl import \
+from .pyzswagcl import \
     ZSERIO_OBJECT_CONTENT_TYPE, \
     ZSERIO_REQUEST_PART_WHOLE, \
     ZSERIO_REQUEST_PART, \

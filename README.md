@@ -18,7 +18,7 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 | `zswagcl` | C++ | Core OpenAPI client (`OAClient`, `OpenApiClient`, `OpenApiConfig`); reused by the Python client via pybind11. |
 | `httpcl` | C++ | HTTP wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib); request configuration; OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain). |
 | `zswag` | Python | Python `OAClient`, the Flask/Connexion-based `OAServer`, and the `zswag.gen` OpenAPI generator. |
-| `pyzswagcl` | Python | pybind11 bindings exposing `zswagcl` to Python. **Internal.** |
+| `pyzswagcl` | Python | pybind11 bindings exposing `zswagcl` to Python. Bundled inside the `zswag` wheel; not installed separately. |
 | `jzswag-api` | Java | Platform-agnostic contracts (`HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `IHttpClient`, `IKeychain`, …). No third-party deps. |
 | `jzswag-shared` | Java | Portable core: OpenAPI dispatch, `x-zserio-request-part`, parameter encoding, OAuth2/OAuth1 token endpoint flow, YAML loader. Used by both platform modules. |
 | `jzswag-jvm` | Java | JVM port using JDK 11 `HttpClient`. Runs on any standard JVM (server, desktop, lambda, CLI). Implements zserio's `ServiceClientInterface`. |
