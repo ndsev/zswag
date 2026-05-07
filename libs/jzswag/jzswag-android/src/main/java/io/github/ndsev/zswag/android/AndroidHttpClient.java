@@ -90,6 +90,7 @@ public class AndroidHttpClient implements IHttpClient {
     }
 
     public AndroidHttpClient(@NotNull HttpSettings persistentSettings, @NotNull IKeychain keychain) {
+        AndroidLogging.init();
         this.persistentSettings = persistentSettings;
         this.keychain = keychain;
         Duration timeout = readTimeoutFromEnv();
@@ -157,7 +158,17 @@ public class AndroidHttpClient implements IHttpClient {
         OkHttpClient client = sslStrict ? strictClient : permissiveClient;
 
         if (effective.getProxy().isPresent()) {
-            client = buildClientWithProxy(readTimeoutFromEnv(), sslStrict, effective.getProxy().get());
+            client = buildClientWithProxy(effective.getTimeout(), sslStrict, effective.getProxy().get());
+        }
+
+        // Honour the merged HttpConfig's per-request timeout. JvmHttpClient applies this
+        // via HttpRequest.Builder#timeout; on OkHttp we derive a client from the pool so
+        // the connection cache is shared but callTimeout reflects the per-call value.
+        Duration callTimeout = effective.getTimeout();
+        if (!callTimeout.equals(readTimeoutFromEnv())) {
+            client = client.newBuilder()
+                    .callTimeout(callTimeout.getSeconds(), TimeUnit.SECONDS)
+                    .build();
         }
 
         String url = applyQueryParams(request.getUrl(), effective.getQuery());

@@ -53,8 +53,12 @@ public final class Keychain implements IKeychain {
                 default:
                     throw new KeychainException("keychain: unsupported platform " + System.getProperty("os.name"));
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            // Real interruption — restore the interrupt flag so callers can react.
             Thread.currentThread().interrupt();
+            throw new KeychainException("keychain: interrupted while loading secret: " + e.getMessage(), e);
+        } catch (IOException e) {
+            // I/O failure — do NOT touch the interrupt flag.
             throw new KeychainException("keychain: failed to load secret: " + e.getMessage(), e);
         }
     }

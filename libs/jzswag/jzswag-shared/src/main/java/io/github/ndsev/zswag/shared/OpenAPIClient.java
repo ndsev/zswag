@@ -267,8 +267,8 @@ public class OpenAPIClient implements IOpenAPIClient {
     /**
      * Walks the operation's security alternatives and applies each scheme:
      * <ul>
-     *   <li>HTTP basic / bearer: validated by {@link JvmHttpClient} from
-     *       the merged config; throws here if neither is configured.</li>
+     *   <li>HTTP basic / bearer: validated by the underlying {@link IHttpClient}
+     *       from the merged config; throws here if neither is configured.</li>
      *   <li>API-key: routes the merged config's {@link HttpConfig#getApiKey()}
      *       to header / query / cookie based on the scheme's {@code in}.</li>
      *   <li>OAuth2: mints (or pulls cached) bearer token via

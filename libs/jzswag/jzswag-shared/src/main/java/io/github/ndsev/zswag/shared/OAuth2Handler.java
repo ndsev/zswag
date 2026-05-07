@@ -215,8 +215,11 @@ public final class OAuth2Handler {
         MintedToken minted = new MintedToken();
         minted.accessToken = json.get("access_token").getAsString();
         int expiresIn = json.has("expires_in") ? json.get("expires_in").getAsInt() : 3600;
-        // 30-second jiggle to match C++.
-        minted.expiresAt = Instant.now().plusSeconds(expiresIn - 30);
+        // 30-second jiggle to match C++; clamp the floor at 1s so a short-lived test
+        // token (expires_in < 30) doesn't go straight into the past and trigger an
+        // infinite re-mint loop.
+        long effectiveLifetime = Math.max(expiresIn - 30, 1);
+        minted.expiresAt = Instant.now().plusSeconds(effectiveLifetime);
         if (json.has("refresh_token")) {
             minted.refreshToken = json.get("refresh_token").getAsString();
         } else if (GRANT_TYPE_REFRESH_TOKEN.equals(grantType) && !refreshToken.isEmpty()) {
