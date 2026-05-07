@@ -8,7 +8,9 @@ import org.jetbrains.annotations.NotNull;
  *
  * <p>Implementations live in the platform modules: {@code jzswag-jvm} shells
  * out to {@code secret-tool} (Linux) / {@code security} (macOS); {@code
- * jzswag-android} uses the Android Keystore via {@code EncryptedSharedPreferences}.
+ * jzswag-android} uses the Android Keystore (AES-256-GCM master key in the
+ * platform secure enclave) to encrypt entries stored in a private
+ * {@code SharedPreferences} file.
  *
  * <p>Implementations should throw an unchecked exception if the platform tool
  * is missing or the entry doesn't exist — preferable to silently sending an
