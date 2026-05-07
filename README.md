@@ -157,7 +157,7 @@ Pushes to `main` create development releases — version format `{base_version}.
 | `HTTP_LOG_FILE` | Logfile path with rotation (Python/C++); not yet wired in Java. |
 | `HTTP_LOG_FILE_MAXSIZE` | Rotation size in bytes; default 1 GB (Python/C++ only). |
 | `HTTP_TIMEOUT` | Request timeout (connect + transfer) in seconds. Default 60. |
-| `HTTP_SSL_STRICT` | Non-empty value enables strict SSL certificate validation. |
+| `HTTP_SSL_STRICT` | Strict SSL certificate validation is on by default. Set to `0` or `false` to disable (any other non-empty value is treated as enabled). |
 
 <!-- --8<-- [end:env] -->
 

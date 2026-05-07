@@ -1,13 +1,17 @@
 package io.github.ndsev.zswag.jvm;
 
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
+/**
+ * Smoke tests for {@link JzswagLogging}. The full HTTP_LOG_LEVEL → logback
+ * root-logger plumbing isn't testable in pure JUnit — env vars can't reliably
+ * be set at runtime. We verify that {@code init()} is idempotent and doesn't
+ * throw on the env-var-unset branch (the typical CI path).
+ */
 class JzswagLoggingTest {
 
     private void resetInitialised() throws Exception {
@@ -18,22 +22,15 @@ class JzswagLoggingTest {
 
     @Test
     void initIsIdempotent() {
-        // Calling init() repeatedly must not throw and the second call must short-circuit
-        // because `initialised` is already true.
-        JzswagLogging.init();
-        JzswagLogging.init();
-        // No assertion of state here other than absence of exception — env var is not under test control.
-        Logger root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-        assertThat(root).isNotNull();
+        assertThatCode(() -> {
+            JzswagLogging.init();
+            JzswagLogging.init();
+        }).doesNotThrowAnyException();
     }
 
     @Test
-    void initWithoutEnvVarDoesNotChangeLogbackLevel() throws Exception {
-        // Force reinit so that the System.getenv branch is exercised.
+    void initWithoutEnvVarDoesNotThrow() throws Exception {
         resetInitialised();
-        JzswagLogging.init();
-        // No assertion needed: we are exercising the branch where HTTP_LOG_LEVEL is unset.
-        // (HTTP_LOG_LEVEL cannot be reliably set at runtime in pure JDK; tested via integration.)
-        assertThat(LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).isNotNull();
+        assertThatCode(JzswagLogging::init).doesNotThrowAnyException();
     }
 }
