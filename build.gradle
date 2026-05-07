@@ -25,3 +25,19 @@ allprojects {
         google()
     }
 }
+
+// Pin every Java subproject to a Temurin 17 toolchain. Gradle auto-downloads the
+// JDK if it isn't installed locally — contributors only need *some* JDK 17+ on
+// PATH to launch the daemon, and Gradle takes care of compile/test JDK from
+// there. The per-module `sourceCompatibility/targetCompatibility = VERSION_11`
+// blocks keep the produced bytecode at Java 11 for runtime compatibility.
+subprojects {
+    plugins.withId('java') {
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(17)
+                vendor = JvmVendorSpec.ADOPTIUM
+            }
+        }
+    }
+}
