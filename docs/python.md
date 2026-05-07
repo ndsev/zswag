@@ -54,7 +54,7 @@ client = services.MyService.Client(
     OAClient("http://localhost:8080/openapi.json", api_key="token", bearer="token"))
 ```
 
-The adhoc `config` enriches the [persistent settings](http-settings.md) loaded from `HTTP_SETTINGS_FILE`; it does not replace them. To suppress persistent settings (e.g. in tests), set `HTTP_SETTINGS_FILE` to empty.
+The adhoc `config` enriches the [persistent settings](../README.md#http-settings-file) loaded from `HTTP_SETTINGS_FILE`; it does not replace them. To suppress persistent settings (e.g. in tests), set `HTTP_SETTINGS_FILE` to empty.
 
 ## Server usage
 
@@ -118,11 +118,11 @@ If a Connexion-supported `[swagger-ui]` extra is installed (`pip install "connex
 
 ## Persistent HTTP settings
 
-See [`http-settings.md`](http-settings.md) for the YAML format. The Python client auto-loads `HTTP_SETTINGS_FILE` and applies it to every request whose URL matches a registered scope.
+See [HTTP Settings File in README.md](../README.md#http-settings-file) for the YAML format. The Python client auto-loads `HTTP_SETTINGS_FILE` and applies it to every request whose URL matches a registered scope.
 
 ## Environment variables
 
-See the [environment variables table](http-settings.md#environment-variables).
+See the [client environment variables table](../README.md#client-environment-variables) in the README.
 
 ## OpenAPI feature support
 

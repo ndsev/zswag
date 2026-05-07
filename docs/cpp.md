@@ -141,7 +141,7 @@ adhoc.auth = httpcl::Config::BasicAuthentication{"alice", "secret", ""};
 auto openApiClient = OAClient(openApiConfig, std::move(httpClient), adhoc);
 ```
 
-The adhoc config layers on top of the [persistent settings](http-settings.md) loaded from `HTTP_SETTINGS_FILE`.
+The adhoc config layers on top of the [persistent settings](../README.md#http-settings-file) loaded from `HTTP_SETTINGS_FILE`.
 
 ## Code coverage
 
@@ -173,7 +173,7 @@ sudo ln -s /usr/bin/gcov-13 /usr/bin/gcov
 
 ## Persistent HTTP settings
 
-See [`http-settings.md`](http-settings.md). `HttpLibHttpClient` auto-loads `HTTP_SETTINGS_FILE` on construction and applies it per-request based on URL scope matching.
+See [HTTP Settings File in README.md](../README.md#http-settings-file). `HttpLibHttpClient` auto-loads `HTTP_SETTINGS_FILE` on construction and applies it per-request based on URL scope matching.
 
 ## OpenAPI feature support
 
