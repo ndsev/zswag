@@ -28,7 +28,7 @@ This module is a peer dependency of the platform implementations; you don't depe
 ## Testing
 
 ```bash
-./gradlew :libs:jzswag-shared:test
+./gradlew :libs:jzswag:jzswag-shared:test
 ```
 
 Coverage is ≥60% line on the suite. Unit tests cover the YAML loader, multi-scope merging, parameter encoding, OAuth1 signature conformance, OAuth2 flow edge cases, and zserio reflection.

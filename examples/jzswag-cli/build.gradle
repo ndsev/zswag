@@ -15,7 +15,7 @@ application {
 
 dependencies {
     // JVM client
-    implementation project(':libs:jzswag-jvm')
+    implementation project(':libs:jzswag:jzswag-jvm')
 
     // Logging
     implementation 'org.slf4j:slf4j-api:2.0.9'

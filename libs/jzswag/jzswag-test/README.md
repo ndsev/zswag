@@ -33,7 +33,7 @@ pip install zswag        # the test depends on the Python server as the counterp
 ### Automated harness
 
 ```bash
-./libs/jzswag-test/test-java-client.bash
+./libs/jzswag/jzswag-test/test-java-client.bash
 ```
 
 The script builds the Java test client, starts the Python Calculator server on port 5555, runs `CalculatorTestClient`, and stops the server on exit.
@@ -45,7 +45,7 @@ The script builds the Java test client, starts the Python Calculator server on p
 python3 -m zswag.test.calc server localhost:5555
 
 # In another:
-./gradlew :libs:jzswag-test:run --args="localhost:5555"
+./gradlew :libs:jzswag:jzswag-test:run --args="localhost:5555"
 ```
 
 ## Why this test matters

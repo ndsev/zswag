@@ -8,7 +8,7 @@ jacoco {
     toolVersion = '0.8.11'
 }
 
-description = 'zswag Java JVM Client - Pure Java implementation using Java 11 HttpClient'
+description = 'zswag Java Shared - Platform-agnostic core (OpenAPI dispatch, parsing, OAuth2). Used by jzswag-jvm and jzswag-android.'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -33,11 +33,20 @@ jacocoTestReport {
 }
 
 dependencies {
-    // Shared core (transitively pulls in jzswag-api, zserio-runtime, SnakeYAML, Gson, slf4j-api)
-    api project(':libs:jzswag-shared')
+    api project(':libs:jzswag:jzswag-api')
 
-    // Logging binding — Logback root for HTTP_LOG_LEVEL plumbing
-    runtimeOnly 'ch.qos.logback:logback-classic:1.4.14'
+    // zserio runtime
+    implementation "io.github.ndsev:zserio-runtime:${rootProject.ext.zserio_version}"
+
+    // YAML parsing (OpenAPI specs + HTTP_SETTINGS_FILE)
+    implementation 'org.yaml:snakeyaml:2.2'
+
+    // JSON parsing (OAuth2 token responses)
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Logging API only — platform modules pick the binding (logback-classic on JVM,
+    // slf4j-android on Android). Exposed transitively so consumers can use loggers too.
+    api 'org.slf4j:slf4j-api:2.0.9'
 
     // Annotations
     compileOnly 'org.jetbrains:annotations:24.1.0'
@@ -47,17 +56,17 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.1'
+    testRuntimeOnly 'ch.qos.logback:logback-classic:1.4.14'
     testImplementation 'org.mockito:mockito-core:5.8.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
     testImplementation 'org.assertj:assertj-core:3.24.2'
-    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
 }
 
 publishing {
     publications {
         maven(MavenPublication) {
             from components.java
-            artifactId = 'jzswag-jvm'
+            artifactId = 'jzswag-shared'
         }
     }
 }

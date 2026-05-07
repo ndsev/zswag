@@ -33,7 +33,7 @@ For the OpenAPI feature support matrix (Java vs C++ vs Python), see [the interop
 ## Testing
 
 ```bash
-./gradlew :libs:jzswag-jvm:test
+./gradlew :libs:jzswag:jzswag-jvm:test
 ```
 
-Line coverage ≥60%. Unit tests cover header / cookie / query / basic-auth merging via OkHttp's `MockWebServer`, the `Keychain` OS-detection branches, and the `JzswagLogging` init paths. Integration testing happens in `libs/jzswag-test/`.
+Line coverage ≥60%. Unit tests cover header / cookie / query / basic-auth merging via OkHttp's `MockWebServer`, the `Keychain` OS-detection branches, and the `JzswagLogging` init paths. Integration testing happens in `libs/jzswag/jzswag-test/`.

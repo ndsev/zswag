@@ -81,7 +81,7 @@ auto resp = client.myApiMethod(Request(1));
 
 ```gradle
 dependencies {
-    implementation project(':libs:jzswag-jvm')
+    implementation project(':libs:jzswag:jzswag-jvm')
     implementation "io.github.ndsev:zserio-runtime:2.16.1"
 }
 ```
@@ -98,7 +98,7 @@ Response r = client.myApiMethod(new Request(1));
 
 ```gradle
 dependencies {
-    implementation project(':libs:jzswag-android')
+    implementation project(':libs:jzswag:jzswag-android')
     implementation "io.github.ndsev:zserio-runtime:2.16.1"
 }
 ```

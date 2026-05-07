@@ -8,7 +8,7 @@ set -e
 
 # Get script directory
 my_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-project_root="$my_dir/../.."
+project_root="$my_dir/../../.."
 
 # Configuration
 TEST_HOST="localhost"
@@ -34,7 +34,7 @@ fi
 # Build the Java test client
 echo "→ [1/4] Building Java test client..."
 cd "$project_root"
-./gradlew :libs:jzswag-test:build --quiet || {
+./gradlew :libs:jzswag:jzswag-test:build --quiet || {
     echo "ERROR: Failed to build Java test client"
     exit 1
 }
@@ -67,7 +67,7 @@ echo ""
 # Run Java test client
 echo "→ [3/4] Running Java test client..."
 echo "========================================="
-./gradlew :libs:jzswag-test:run --quiet --args="$TEST_HOST:$TEST_PORT"
+./gradlew :libs:jzswag:jzswag-test:run --quiet --args="$TEST_HOST:$TEST_PORT"
 TEST_EXIT_CODE=$?
 echo "========================================="
 echo ""

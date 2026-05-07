@@ -76,7 +76,7 @@ jacocoTestReport {
 
 dependencies {
     // Shared core (transitively pulls in jzswag-api, zserio-runtime, SnakeYAML, Gson, slf4j-api)
-    api project(':libs:jzswag-shared')
+    api project(':libs:jzswag:jzswag-shared')
 
     // OkHttp — Android-friendly HTTP client (replaces JDK 11 java.net.http on JVM)
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'

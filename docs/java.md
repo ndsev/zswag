@@ -21,7 +21,7 @@ The Java port of the zswag client ships in two flavours: **JVM** (`jzswag-jvm`, 
 ## Quick start
 
 ```bash
-./gradlew :libs:jzswag-jvm:build       # or :libs:jzswag-android:build
+./gradlew :libs:jzswag:jzswag-jvm:build       # or :libs:jzswag:jzswag-android:build
 ```
 
 In your project, depend on the platform module that matches your target:
@@ -29,10 +29,10 @@ In your project, depend on the platform module that matches your target:
 ```gradle
 dependencies {
     // JVM (server / desktop / CLI / lambda)
-    implementation project(':libs:jzswag-jvm')
+    implementation project(':libs:jzswag:jzswag-jvm')
 
     // OR — Android
-    implementation project(':libs:jzswag-android')
+    implementation project(':libs:jzswag:jzswag-android')
 
     implementation "io.github.ndsev:zserio-runtime:2.16.1"
 }
@@ -232,7 +232,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install zswag
 
 # 2. Run the test harness
-./libs/jzswag-test/test-java-client.bash
+./libs/jzswag/jzswag-test/test-java-client.bash
 ```
 
 The script starts the Python `zswag.test.calc` server on port 5555, builds the Java client, and runs `CalculatorTestClient` end-to-end. All 10 tests should pass.
@@ -252,5 +252,5 @@ The script starts the Python `zswag.test.calc` server on port 5555, builds the J
 ## Looking deeper
 
 - [`http-settings.md`](http-settings.md) — full spec of the HTTP_SETTINGS_FILE YAML format, shared with Python and C++ clients.
-- [`../libs/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java`](../libs/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java) — exhaustive working examples covering each parameter style, format, and authentication scheme.
+- [`../libs/jzswag/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java`](../libs/jzswag/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java) — exhaustive working examples covering each parameter style, format, and authentication scheme.
 - [`../libs/zswag/test/calc/api.yaml`](../libs/zswag/test/calc/api.yaml) — the OpenAPI spec the integration test uses; useful reference for what `x-zserio-request-part` looks like in practice.

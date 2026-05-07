@@ -37,7 +37,7 @@ On an x86_64 build host (or with Rosetta on Apple Silicon Macs), the module can 
 ## Testing
 
 ```bash
-./gradlew :libs:jzswag-android:test
+./gradlew :libs:jzswag:jzswag-android:test
 ```
 
 Line coverage ≥60%, but with caveats: AndroidHttpClient has full coverage via OkHttp's `MockWebServer` (it's pure Java around OkHttp, no `android.*` refs). AndroidKeychain's encrypt/decrypt round trip and AndroidLogging's log-level routing path can't run on the aarch64 sandbox (Robolectric pulls Conscrypt which has no aarch64-linux native, and `androidx.test:monitor` is AAR-only) — those paths need a device or an x86_64 host with Robolectric.
