@@ -19,9 +19,10 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 | `httpcl` | C++ | HTTP wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib); request configuration; OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain). |
 | `zswag` | Python | Python `OAClient`, the Flask/Connexion-based `OAServer`, and the `zswag.gen` OpenAPI generator. |
 | `pyzswagcl` | Python | pybind11 bindings exposing `zswagcl` to Python. **Internal.** |
-| `jzswag-api` | Java | Platform-agnostic types (`HttpConfig`, `HttpSettings`, `OpenAPIParameter`, …). |
-| `jzswag-jvm` | Java | Pure-Java port (no JNI) using JDK 11 `HttpClient`. Runs on any standard JVM (server, desktop, lambda). Implements zserio's `ServiceClientInterface`. |
-| `jzswag-android` | Java | Android implementation (planned). |
+| `jzswag-api` | Java | Platform-agnostic contracts (`HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `IHttpClient`, `IKeychain`, …). No third-party deps. |
+| `jzswag-shared` | Java | Portable core: OpenAPI dispatch, `x-zserio-request-part`, parameter encoding, OAuth2/OAuth1 token endpoint flow, YAML loader. Used by both platform modules. |
+| `jzswag-jvm` | Java | JVM port using JDK 11 `HttpClient`. Runs on any standard JVM (server, desktop, lambda, CLI). Implements zserio's `ServiceClientInterface`. |
+| `jzswag-android` | Java | Android port using OkHttp + Android Keystore + AES-GCM-encrypted SharedPreferences. Implements zserio's `ServiceClientInterface`. |
 
 ## Per-language documentation
 
@@ -76,11 +77,11 @@ auto client = MyService::Client(transport);
 auto resp = client.myApiMethod(Request(1));
 ```
 
-### Java
+### Java (JVM)
 
 ```gradle
 dependencies {
-    implementation project(':libs:jzswag-jvm')
+    implementation project(':libs:jzswag:jzswag-jvm')
     implementation "io.github.ndsev:zserio-runtime:2.16.1"
 }
 ```
@@ -92,6 +93,25 @@ ZswagClient transport = new ZswagClient("http://localhost:5000/openapi.json");
 MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
 Response r = client.myApiMethod(new Request(1));
 ```
+
+### Java (Android)
+
+```gradle
+dependencies {
+    implementation project(':libs:jzswag:jzswag-android')
+    implementation "io.github.ndsev:zserio-runtime:2.16.1"
+}
+```
+
+```java
+import io.github.ndsev.zswag.android.ZswagClient;
+
+ZswagClient transport = new ZswagClient(context, "http://localhost:5000/openapi.json");
+MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
+Response r = client.myApiMethod(new Request(1));
+```
+
+The only difference is the `Context` parameter on the constructor — needed so `AndroidKeychain` can reach `SharedPreferences` for credential storage.
 
 ## Setup details
 

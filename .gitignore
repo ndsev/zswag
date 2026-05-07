@@ -157,8 +157,16 @@ hs_err_pid*
 # later pattern overrides earlier ones. The Gradle wrapper jar is checked in.
 !gradle/wrapper/gradle-wrapper.jar
 
+# Android
+local.properties
+captures/
+*.apk
+*.aab
+*.aar
+.cxx/
+
 # Generated zserio sources (regenerated during build)
-libs/jzswag-test/src/main/java/calculator/
+libs/jzswag/jzswag-test/src/main/java/calculator/
 
 # Kotlin temporarily disabled
 **/kotlin-disabled/

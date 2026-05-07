@@ -11,7 +11,8 @@ buildscript {
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.android.tools.build:gradle:8.2.2'
+        // AGP version chosen for Gradle 9 compatibility (the project uses Gradle 9.2.1).
+        classpath 'com.android.tools.build:gradle:8.7.2'
     }
 }
 

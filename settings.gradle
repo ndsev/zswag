@@ -1,10 +1,12 @@
 rootProject.name = 'zswag'
 
-// Java modules
-include 'libs:jzswag-api'
-include 'libs:jzswag-jvm'
-include 'libs:jzswag-android'
-include 'libs:jzswag-test'
+// Java modules — grouped under libs/jzswag/ so the libs/ root stays focused
+// on the C++/Python siblings (httpcl, zswagcl, zswag, pyzswagcl).
+include 'libs:jzswag:jzswag-api'
+include 'libs:jzswag:jzswag-shared'
+include 'libs:jzswag:jzswag-jvm'
+include 'libs:jzswag:jzswag-android'
+include 'libs:jzswag:jzswag-test'
 
 // Examples
 include 'examples:jzswag-cli'

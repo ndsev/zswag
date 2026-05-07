@@ -2,7 +2,7 @@
 // Kept as a plain java-library so a checkout builds without an Android SDK.
 // When implementation begins, switch to:
 //   plugins { id 'com.android.application' }
-// and depend on :libs:jzswag-android plus androidx.car.app:app-automotive.
+// and depend on :libs:jzswag:jzswag-android plus androidx.car.app:app-automotive.
 
 plugins {
     id 'java-library'
@@ -16,5 +16,5 @@ java {
 }
 
 dependencies {
-    api project(':libs:jzswag-android')
+    api project(':libs:jzswag:jzswag-android')
 }

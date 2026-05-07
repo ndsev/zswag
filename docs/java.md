@@ -1,15 +1,16 @@
 # Java Client
 
-`jzswag-jvm` is the JVM Java port of the zswag client — works on any standard JVM (server, desktop, lambda, CLI). It implements zserio's `ServiceClientInterface`, so a zserio-Java-generated `XClient` accepts an instance as its transport — the same idiom as Python's `services.MyService.Client(OAClient(url))`.
+The Java port of the zswag client ships in two flavours: **JVM** (`jzswag-jvm`, for servers / desktops / CLIs / lambdas) and **Android** (`jzswag-android`). Both implement zserio's `ServiceClientInterface`, so a zserio-Java-generated `XClient` accepts either one as its transport — the same idiom as Python's `services.MyService.Client(OAClient(url))`.
 
 ## Modules
 
 | Module | Role |
 |---|---|
-| `jzswag-api` | Platform-agnostic types: `HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `SecurityScheme`, `IHttpClient`. No external dependencies beyond zserio-runtime. |
-| `jzswag-jvm` | JVM implementation on top of the JDK 11 `HttpClient`. Provides `ZswagClient`, `JvmHttpClient`, `JvmOpenAPIClient`, OAuth2/OAuth1-signature support, and OS keychain integration (Linux + macOS). |
-| `jzswag-test` | Integration tests against the Python Calculator server. |
-| `jzswag-android` | Android implementation (planned). |
+| `jzswag-api` | Platform-agnostic contracts: `HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `SecurityScheme`, `IHttpClient`, `IKeychain`. No third-party dependencies. |
+| `jzswag-shared` | Portable core: `OpenAPIClient` (request decomposition + dispatch), `OpenAPIParser`, `ParameterEncoder`, `OAuth2Handler`, `OAuth1Signature` (RFC 5849 HMAC-SHA256 token-endpoint auth), `HttpSettingsLoader`. Used by both platform modules. |
+| `jzswag-jvm` | JVM platform module on top of the JDK 11 `HttpClient`. Provides `ZswagClient`, `JvmHttpClient`, `Keychain` (Linux `secret-tool` / macOS `security`). |
+| `jzswag-android` | Android platform module on top of OkHttp. Provides `ZswagClient`, `AndroidHttpClient`, `AndroidKeychain` (Android Keystore + AES-GCM-encrypted SharedPreferences). |
+| `jzswag-test` | Cross-stack integration tests (Java client ↔ Python Calculator server). |
 
 ## Requirements
 
@@ -20,17 +21,24 @@
 ## Quick start
 
 ```bash
-./gradlew :libs:jzswag-jvm:build
+./gradlew :libs:jzswag:jzswag-jvm:build       # or :libs:jzswag:jzswag-android:build
 ```
 
-In your project:
+In your project, depend on the platform module that matches your target:
 
 ```gradle
 dependencies {
-    implementation project(':libs:jzswag-jvm')
+    // JVM (server / desktop / CLI / lambda)
+    implementation project(':libs:jzswag:jzswag-jvm')
+
+    // OR — Android
+    implementation project(':libs:jzswag:jzswag-android')
+
     implementation "io.github.ndsev:zserio-runtime:2.16.1"
 }
 ```
+
+The platform module pulls in `jzswag-shared` and `jzswag-api` transitively. Both platforms expose the same `ZswagClient` API; on Android the constructor takes a `Context` so that `AndroidKeychain` can reach `SharedPreferences`.
 
 (Until artifacts are published to Maven Central, depend on the source modules.)
 
@@ -52,10 +60,22 @@ service MyService {
 Run zserio-Java codegen on `services.zs`, then:
 
 ```java
+// JVM
 import io.github.ndsev.zswag.jvm.ZswagClient;
 import services.MyService;
 
 ZswagClient transport = new ZswagClient("http://localhost:5000/openapi.json");
+MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
+
+Response r = client.myApiMethod(new Request(42));
+```
+
+```java
+// Android — same idiom, plus a Context for AndroidKeychain
+import io.github.ndsev.zswag.android.ZswagClient;
+import services.MyService;
+
+ZswagClient transport = new ZswagClient(context, "http://localhost:5000/openapi.json");
 MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
 
 Response r = client.myApiMethod(new Request(42));
@@ -212,7 +232,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install zswag
 
 # 2. Run the test harness
-./libs/jzswag-test/test-java-client.bash
+./libs/jzswag/jzswag-test/test-java-client.bash
 ```
 
 The script starts the Python `zswag.test.calc` server on port 5555, builds the Java client, and runs `CalculatorTestClient` end-to-end. All 10 tests should pass.
@@ -232,5 +252,5 @@ The script starts the Python `zswag.test.calc` server on port 5555, builds the J
 ## Looking deeper
 
 - [`http-settings.md`](http-settings.md) — full spec of the HTTP_SETTINGS_FILE YAML format, shared with Python and C++ clients.
-- [`../libs/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java`](../libs/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java) — exhaustive working examples covering each parameter style, format, and authentication scheme.
+- [`../libs/jzswag/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java`](../libs/jzswag/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java) — exhaustive working examples covering each parameter style, format, and authentication scheme.
 - [`../libs/zswag/test/calc/api.yaml`](../libs/zswag/test/calc/api.yaml) — the OpenAPI spec the integration test uses; useful reference for what `x-zserio-request-part` looks like in practice.
