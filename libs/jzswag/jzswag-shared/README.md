@@ -11,7 +11,6 @@ Platform-agnostic core of the zswag Java client. Sits between `jzswag-api` (inte
 - **`OAuth1Signature`** — RFC 5849 HMAC-SHA256 signature builder used by the `rfc5849-oauth1-signature` token-endpoint auth method.
 - **`HttpSettingsLoader`** — YAML loader for the multi-scope settings file (`HTTP_SETTINGS_FILE`). Schema documented in [`docs/http-settings.md`](../../docs/http-settings.md), shared with the C++ and Python clients.
 - **`ZserioReflection`** — POJO getter reflection that resolves dotted `x-zserio-request-part` paths against zserio-Java-generated request structs.
-- **`ZswagServiceClient`** — legacy `IZswagServiceClient` adapter for callers that want a method-name-and-bytes interface rather than the typed `ServiceClientInterface` path.
 
 ## Dependencies
 
