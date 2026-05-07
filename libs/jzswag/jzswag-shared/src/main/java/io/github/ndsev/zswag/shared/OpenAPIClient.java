@@ -77,7 +77,9 @@ public class OpenAPIClient implements IOpenAPIClient {
                                            @NotNull HttpConfig adhoc, @NotNull IKeychain keychain) throws IOException {
         HttpConfig effective = httpClient.getPersistentSettings().forUrl(specLocation).mergedWith(adhoc);
         HttpConfig.OAuth2 oauth = effective.getOAuth2().orElse(null);
-        if (oauth == null || !oauth.useForSpecFetch) {
+        boolean isHttpSpec = specLocation.startsWith("http://") || specLocation.startsWith("https://");
+        if (oauth == null || !oauth.useForSpecFetch || !isHttpSpec) {
+            // No OAuth2 configured, useForSpecFetch disabled, or spec is local — nothing to inject.
             return new OpenAPIParser(specLocation);
         }
         if (oauth.tokenUrlOverride.isEmpty()) {
