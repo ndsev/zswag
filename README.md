@@ -20,7 +20,7 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 | `zswag` | Python | Python `OAClient`, the Flask/Connexion-based `OAServer`, and the `zswag.gen` OpenAPI generator. |
 | `pyzswagcl` | Python | pybind11 bindings exposing `zswagcl` to Python. **Internal.** |
 | `jzswag-api` | Java | Platform-agnostic types (`HttpConfig`, `HttpSettings`, `OpenAPIParameter`, …). |
-| `jzswag-desktop` | Java | Pure-Java port (no JNI) using JDK 11 `HttpClient`. Implements zserio's `ServiceClientInterface`. |
+| `jzswag-jvm` | Java | Pure-Java port (no JNI) using JDK 11 `HttpClient`. Runs on any standard JVM (server, desktop, lambda). Implements zserio's `ServiceClientInterface`. |
 | `jzswag-android` | Java | Android implementation (planned). |
 
 ## Per-language documentation
@@ -80,13 +80,13 @@ auto resp = client.myApiMethod(Request(1));
 
 ```gradle
 dependencies {
-    implementation project(':libs:jzswag-desktop')
+    implementation project(':libs:jzswag-jvm')
     implementation "io.github.ndsev:zserio-runtime:2.16.1"
 }
 ```
 
 ```java
-import com.ndsev.zswag.desktop.ZswagClient;
+import io.github.ndsev.zswag.jvm.ZswagClient;
 
 ZswagClient transport = new ZswagClient("http://localhost:5000/openapi.json");
 MyService.MyServiceClient client = new MyService.MyServiceClient(transport);

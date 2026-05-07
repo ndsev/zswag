@@ -1,13 +1,13 @@
 # Java Client
 
-`jzswag-desktop` is the desktop / server-side Java port of the zswag client. It implements zserio's `ServiceClientInterface`, so a zserio-Java-generated `XClient` accepts an instance as its transport — the same idiom as Python's `services.MyService.Client(OAClient(url))`.
+`jzswag-jvm` is the JVM Java port of the zswag client — works on any standard JVM (server, desktop, lambda, CLI). It implements zserio's `ServiceClientInterface`, so a zserio-Java-generated `XClient` accepts an instance as its transport — the same idiom as Python's `services.MyService.Client(OAClient(url))`.
 
 ## Modules
 
 | Module | Role |
 |---|---|
 | `jzswag-api` | Platform-agnostic types: `HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `SecurityScheme`, `IHttpClient`. No external dependencies beyond zserio-runtime. |
-| `jzswag-desktop` | Desktop implementation on top of the JDK 11 `HttpClient`. Provides `ZswagClient`, `DesktopHttpClient`, `DesktopOpenAPIClient`, OAuth2/OAuth1-signature support, and OS keychain integration (Linux + macOS). |
+| `jzswag-jvm` | JVM implementation on top of the JDK 11 `HttpClient`. Provides `ZswagClient`, `JvmHttpClient`, `JvmOpenAPIClient`, OAuth2/OAuth1-signature support, and OS keychain integration (Linux + macOS). |
 | `jzswag-test` | Integration tests against the Python Calculator server. |
 | `jzswag-android` | Android implementation (planned). |
 
@@ -20,14 +20,14 @@
 ## Quick start
 
 ```bash
-./gradlew :libs:jzswag-desktop:build
+./gradlew :libs:jzswag-jvm:build
 ```
 
 In your project:
 
 ```gradle
 dependencies {
-    implementation project(':libs:jzswag-desktop')
+    implementation project(':libs:jzswag-jvm')
     implementation "io.github.ndsev:zserio-runtime:2.16.1"
 }
 ```
@@ -52,7 +52,7 @@ service MyService {
 Run zserio-Java codegen on `services.zs`, then:
 
 ```java
-import com.ndsev.zswag.desktop.ZswagClient;
+import io.github.ndsev.zswag.jvm.ZswagClient;
 import services.MyService;
 
 ZswagClient transport = new ZswagClient("http://localhost:5000/openapi.json");
@@ -93,7 +93,7 @@ http-settings:
       scope: ["api.read", "api.write"]
 ```
 
-Settings are loaded automatically on `DesktopHttpClient` construction:
+Settings are loaded automatically on `JvmHttpClient` construction:
 
 ```java
 ZswagClient transport = new ZswagClient(specUrl);  // reads HTTP_SETTINGS_FILE

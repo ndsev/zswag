@@ -16,7 +16,7 @@ buildscript {
 }
 
 allprojects {
-    group = 'com.ndsev.zswag'
+    group = 'io.github.ndsev.zswag'
     version = '1.11.0'
 
     repositories {
