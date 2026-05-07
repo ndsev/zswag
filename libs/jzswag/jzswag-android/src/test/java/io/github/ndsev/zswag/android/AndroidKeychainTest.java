@@ -2,6 +2,7 @@ package io.github.ndsev.zswag.android;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import io.github.ndsev.zswag.api.KeychainException;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,7 @@ class AndroidKeychainTest {
         when(ctx.getApplicationContext()).thenReturn(ctx);
         AndroidKeychain kc = new AndroidKeychain(ctx);
         assertThatThrownBy(() -> kc.load("", "user"))
-                .isInstanceOf(AndroidKeychain.KeychainException.class)
+                .isInstanceOf(KeychainException.class)
                 .hasMessageContaining("service identifier");
     }
 
@@ -36,7 +37,7 @@ class AndroidKeychainTest {
         when(ctx.getApplicationContext()).thenReturn(ctx);
         AndroidKeychain kc = new AndroidKeychain(ctx);
         assertThatThrownBy(() -> kc.store("", "user", "secret"))
-                .isInstanceOf(AndroidKeychain.KeychainException.class);
+                .isInstanceOf(KeychainException.class);
     }
 
     @Test
@@ -48,7 +49,7 @@ class AndroidKeychainTest {
         when(prefs.getString(eq("svc.does-not-exist|user.does-not-exist"), eq(null))).thenReturn(null);
         AndroidKeychain kc = new AndroidKeychain(ctx);
         assertThatThrownBy(() -> kc.load("svc.does-not-exist", "user.does-not-exist"))
-                .isInstanceOf(AndroidKeychain.KeychainException.class)
+                .isInstanceOf(KeychainException.class)
                 .hasMessageContaining("no entry");
     }
 
@@ -69,10 +70,10 @@ class AndroidKeychainTest {
 
     @Test
     void exceptionConstructorsPreserveMessageAndCause() {
-        AndroidKeychain.KeychainException simple = new AndroidKeychain.KeychainException("just msg");
+        KeychainException simple = new KeychainException("just msg");
         assertThat(simple).hasMessage("just msg");
         Throwable cause = new RuntimeException("inner");
-        AndroidKeychain.KeychainException withCause = new AndroidKeychain.KeychainException("outer", cause);
+        KeychainException withCause = new KeychainException("outer", cause);
         assertThat(withCause).hasCause(cause).hasMessage("outer");
     }
 }

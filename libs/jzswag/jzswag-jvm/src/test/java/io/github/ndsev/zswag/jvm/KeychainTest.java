@@ -1,11 +1,16 @@
 package io.github.ndsev.zswag.jvm;
 
+import io.github.ndsev.zswag.api.KeychainException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+// @Isolated guards against parallel test execution: this class mutates the
+// global os.name system property which other tests might read concurrently.
+@Isolated
 class KeychainTest {
 
     private String savedOsName;
@@ -23,7 +28,7 @@ class KeychainTest {
     @Test
     void emptyServiceThrows() {
         assertThatThrownBy(() -> new Keychain().load("", "user"))
-                .isInstanceOf(Keychain.KeychainException.class)
+                .isInstanceOf(KeychainException.class)
                 .hasMessageContaining("service identifier");
     }
 
@@ -31,7 +36,7 @@ class KeychainTest {
     void unknownPlatformThrowsUnsupported() {
         System.setProperty("os.name", "PalmOS");
         assertThatThrownBy(() -> new Keychain().load("svc", "user"))
-                .isInstanceOf(Keychain.KeychainException.class)
+                .isInstanceOf(KeychainException.class)
                 .hasMessageContaining("unsupported platform");
     }
 
@@ -39,7 +44,7 @@ class KeychainTest {
     void windowsThrowsNotImplemented() {
         System.setProperty("os.name", "Windows 10");
         assertThatThrownBy(() -> new Keychain().load("svc", "user"))
-                .isInstanceOf(Keychain.KeychainException.class)
+                .isInstanceOf(KeychainException.class)
                 .hasMessageContaining("Windows credential manager");
     }
 
@@ -51,7 +56,7 @@ class KeychainTest {
         // generic KeychainException — either way, we exercise loadLinux().
         System.setProperty("os.name", "Linux");
         assertThatThrownBy(() -> new Keychain().load("zswag.test.does-not-exist", "no.such.user"))
-                .isInstanceOf(Keychain.KeychainException.class);
+                .isInstanceOf(KeychainException.class);
     }
 
     @Test
@@ -60,19 +65,19 @@ class KeychainTest {
         // ("not installed or not on PATH") on non-mac runners.
         System.setProperty("os.name", "Mac OS X");
         assertThatThrownBy(() -> new Keychain().load("zswag.test.does-not-exist", "no.such.user"))
-                .isInstanceOf(Keychain.KeychainException.class);
+                .isInstanceOf(KeychainException.class);
     }
 
     @Test
     void keychainExceptionMessageAndCausePreserved() {
-        Keychain.KeychainException simple = new Keychain.KeychainException("just msg");
+        KeychainException simple = new KeychainException("just msg");
         assertThatThrownBy(() -> { throw simple; })
-                .isInstanceOf(Keychain.KeychainException.class)
+                .isInstanceOf(KeychainException.class)
                 .hasMessage("just msg");
         Throwable cause = new RuntimeException("inner");
-        Keychain.KeychainException withCause = new Keychain.KeychainException("outer", cause);
+        KeychainException withCause = new KeychainException("outer", cause);
         assertThatThrownBy(() -> { throw withCause; })
-                .isInstanceOf(Keychain.KeychainException.class)
+                .isInstanceOf(KeychainException.class)
                 .hasCause(cause);
     }
 }

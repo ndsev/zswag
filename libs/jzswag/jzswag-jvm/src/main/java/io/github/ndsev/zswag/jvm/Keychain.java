@@ -1,6 +1,7 @@
 package io.github.ndsev.zswag.jvm;
 
 import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.api.KeychainException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,9 +127,4 @@ public final class Keychain implements IKeychain {
         return Os.UNKNOWN;
     }
 
-    /** Thrown when a keychain lookup fails. */
-    public static class KeychainException extends RuntimeException {
-        public KeychainException(String message) { super(message); }
-        public KeychainException(String message, Throwable cause) { super(message, cause); }
-    }
 }

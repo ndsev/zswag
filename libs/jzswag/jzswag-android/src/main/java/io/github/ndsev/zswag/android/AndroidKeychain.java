@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.api.KeychainException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,9 +165,4 @@ public final class AndroidKeychain implements IKeychain {
         return new String(cipher.doFinal(ct), StandardCharsets.UTF_8);
     }
 
-    /** Thrown when a keychain operation fails. */
-    public static class KeychainException extends RuntimeException {
-        public KeychainException(String message) { super(message); }
-        public KeychainException(String message, Throwable cause) { super(message, cause); }
-    }
 }
