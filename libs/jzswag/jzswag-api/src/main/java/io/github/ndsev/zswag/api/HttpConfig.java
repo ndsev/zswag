@@ -66,6 +66,13 @@ public final class HttpConfig {
     @NotNull public Map<String, List<String>> getQuery() { return query; }
     @NotNull public Map<String, String> getCookies() { return cookies; }
     @NotNull public Duration getTimeout() { return timeout != null ? timeout : defaultTimeout(); }
+    /**
+     * Per-request SSL strictness override. Defaults to {@code true} meaning
+     * "no opinion" — the effective SSL behavior is determined by the
+     * {@code HTTP_SSL_STRICT} environment variable (matching C++/Python). An
+     * explicit {@code false} on this config forces permissive mode regardless
+     * of env (no C++ equivalent — Java-only extension).
+     */
     public boolean isSslStrict() { return sslStrict == null || sslStrict; }
     @NotNull public Optional<BasicAuthentication> getAuth() { return Optional.ofNullable(auth); }
     @NotNull public Optional<Proxy> getProxy() { return Optional.ofNullable(proxy); }
@@ -419,7 +426,8 @@ public final class HttpConfig {
         @NotNull public Builder sslStrict(boolean sslStrict) { this.sslStrict = sslStrict; return this; }
         /** Clears the explicit-set state of timeout, restoring the inherited default behaviour. */
         @NotNull public Builder unsetTimeout() { this.timeout = null; return this; }
-        /** Clears the explicit-set state of sslStrict, restoring the inherited default (true). */
+        /** Clears the explicit-set state of sslStrict, restoring "no opinion" — the
+         *  effective behaviour is then determined by {@code HTTP_SSL_STRICT}. */
         @NotNull public Builder unsetSslStrict() { this.sslStrict = null; return this; }
 
         @NotNull public Builder auth(@Nullable BasicAuthentication auth) { this.auth = auth; return this; }

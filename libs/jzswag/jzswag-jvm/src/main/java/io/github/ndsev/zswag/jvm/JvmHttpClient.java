@@ -96,9 +96,13 @@ public class JvmHttpClient implements IHttpClient {
     }
 
     private static boolean envSslStrict() {
+        // Match C++ httpcl::HttpLibHttpClient (libs/httpcl/src/http-client.cpp:57-58):
+        // any non-empty value enables strict; unset or empty disables. The Python
+        // client inherits this via pyzswagcl. Keep the semantics aligned across all
+        // three clients so a shared http-settings + env-var setup behaves identically.
+        // Surprising consequence: HTTP_SSL_STRICT=0 enables strict (any non-empty does).
         String env = System.getenv("HTTP_SSL_STRICT");
-        if (env == null || env.isEmpty()) return true;
-        return "1".equals(env) || "true".equalsIgnoreCase(env);
+        return env != null && !env.isEmpty();
     }
 
     private static HttpClient buildJdkClient(@NotNull Duration connectTimeout, boolean sslStrict) {
