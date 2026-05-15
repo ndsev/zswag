@@ -32,6 +32,7 @@ Detailed guides for each client + the server + the generator:
 - [`docs/cpp.md`](docs/cpp.md) — C++ client and CMake integration.
 - [`docs/java.md`](docs/java.md) — Java client.
 - [`docs/openapi-generator.md`](docs/openapi-generator.md) — `zswag.gen` CLI reference.
+- [`docs/release-process.md`](docs/release-process.md) — CI/CD platforms, release tagging, and dev snapshot conventions (maintainer-facing).
 
 The shared YAML format for `HTTP_SETTINGS_FILE` (used by all three clients) is documented in the [HTTP Settings File](#http-settings-file) section below.
 
@@ -127,24 +128,6 @@ zswag uses CMake's `FetchContent` for dependencies; CMake ≥ 3.22.3 required. S
 ### Java users
 
 Java 11+ source/target. The integration test depends on `pip install zswag` for its counterparty server. See [`docs/java.md`](docs/java.md).
-
-## CI/CD and Release Process
-
-The project uses GitHub Actions for automated build and deploy:
-
-- **Platforms**: Linux (x86_64), macOS (Intel x86_64 and Apple Silicon arm64), Windows (x64).
-- **Python versions**: 3.10, 3.11, 3.12, 3.13.
-- **Triggers**: Pull requests, pushes to main, version tags.
-
-### Release process
-
-1. Update `ZSWAG_VERSION` in `CMakeLists.txt` (and the matching version in root `build.gradle`).
-2. Tag commit with `v{version}` (e.g. `v1.11.1`).
-3. CI validates that the tag version matches the CMake version and deploys wheels to PyPI.
-
-### Development snapshots
-
-Pushes to `main` create development releases — version format `{base_version}.dev{commit_count}` (e.g. `1.11.1.dev3`) — automatically deployed to PyPI for testing.
 
 ## Client environment variables
 
