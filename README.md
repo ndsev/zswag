@@ -12,44 +12,56 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 ## Components
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'fontFamily': 'system-ui, -apple-system, sans-serif',
+  'fontSize': '14px',
+  'lineColor': '#6c757d',
+  'clusterBkg': '#fafbfc',
+  'clusterBorder': '#cbd5e0'
+}}}%%
 flowchart TB
-    spec["OpenAPI spec<br/>(zserio-derived YAML/JSON)"]
+    spec(["<b>OpenAPI spec</b><br/>zserio-derived &middot; YAML / JSON"]):::spec
 
-    subgraph clients["Clients"]
+    subgraph clients[" Clients "]
       direction LR
-      py["<b>Python</b><br/>OAClient<br/>(zswag wheel, uses pyzswagcl)"]
-      cpp["<b>C++</b><br/>OAClient<br/>(zswagcl)"]
-      jvm["<b>Java JVM</b><br/>ZswagClient<br/>(jzswag-jvm)"]
-      andr["<b>Java Android</b><br/>ZswagClient<br/>(jzswag-android)"]
+      py["<b>Python</b><br/>OAClient<br/>zswag wheel"]:::py
+      cpp["<b>C++</b><br/>OAClient<br/>zswagcl"]:::cpp
+      jvm["<b>Java JVM</b><br/>ZswagClient<br/>jzswag-jvm"]:::java
+      andr["<b>Java Android</b><br/>ZswagClient<br/>jzswag-android"]:::java
     end
 
-    subgraph cppcore["C++ core (shared with Python via pybind11)"]
+    subgraph cppcore[" C++ core &middot; shared with Python via pybind11 "]
       direction LR
-      zswagcl["zswagcl<br/>OpenAPI parser + dispatch"]
-      httpcl["httpcl<br/>HTTP transport + OS keychain"]
+      zswagcl["<b>zswagcl</b><br/>OpenAPI parser + dispatch"]:::cpp
+      httpcl["<b>httpcl</b><br/>HTTP + OS keychain"]:::cpp
     end
 
-    subgraph javacore["Java core"]
+    subgraph javacore[" Java core "]
       direction LR
-      jshared["jzswag-shared<br/>dispatch, encoding,<br/>OAuth2/OAuth1, YAML loader"]
-      japi["jzswag-api<br/>interfaces, value types"]
+      jshared["<b>jzswag-shared</b><br/>dispatch, encoding,<br/>OAuth2/OAuth1, YAML loader"]:::java
+      japi["<b>jzswag-api</b><br/>interfaces, value types"]:::java
     end
 
-    server["<b>OAServer</b> (Python only)<br/>Flask/Connexion-based"]
+    server["<b>OAServer</b> &middot; Python only<br/>Flask / Connexion"]:::py
 
-    py --> zswagcl
-    cpp --> zswagcl
-    zswagcl --> httpcl
+    py ==> zswagcl
+    cpp ==> zswagcl
+    zswagcl ==> httpcl
 
-    jvm --> jshared
-    andr --> jshared
-    jshared --> japi
+    jvm ==> jshared
+    andr ==> jshared
+    jshared ==> japi
 
-    py -.reads.-> spec
-    cpp -.reads.-> spec
-    jvm -.reads.-> spec
-    andr -.reads.-> spec
-    server -.exposes.-> spec
+    py -.->|reads| spec
+    cpp -.->|reads| spec
+    jvm -.->|reads| spec
+    andr -.->|reads| spec
+    server -.->|exposes| spec
+
+    classDef py    fill:#e7f5ec,stroke:#2f855a,stroke-width:2px,color:#1c4532
+    classDef cpp   fill:#e6f0fb,stroke:#2c5282,stroke-width:2px,color:#1a365d
+    classDef java  fill:#fdf3e7,stroke:#9c4221,stroke-width:2px,color:#652b19
+    classDef spec  fill:#fffbea,stroke:#975a16,stroke-width:2.5px,color:#5f370e
 ```
 
 | Component | Language | Role |
