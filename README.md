@@ -11,7 +11,46 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 
 ## Components
 
-![Component overview](docs/assets/zswag-architecture.png)
+```mermaid
+flowchart TB
+    spec["OpenAPI spec<br/>(zserio-derived YAML/JSON)"]
+
+    subgraph clients["Clients"]
+      direction LR
+      py["<b>Python</b><br/>OAClient<br/>(zswag wheel, uses pyzswagcl)"]
+      cpp["<b>C++</b><br/>OAClient<br/>(zswagcl)"]
+      jvm["<b>Java JVM</b><br/>ZswagClient<br/>(jzswag-jvm)"]
+      andr["<b>Java Android</b><br/>ZswagClient<br/>(jzswag-android)"]
+    end
+
+    subgraph cppcore["C++ core (shared with Python via pybind11)"]
+      direction LR
+      zswagcl["zswagcl<br/>OpenAPI parser + dispatch"]
+      httpcl["httpcl<br/>HTTP transport + OS keychain"]
+    end
+
+    subgraph javacore["Java core"]
+      direction LR
+      jshared["jzswag-shared<br/>dispatch, encoding,<br/>OAuth2/OAuth1, YAML loader"]
+      japi["jzswag-api<br/>interfaces, value types"]
+    end
+
+    server["<b>OAServer</b> (Python only)<br/>Flask/Connexion-based"]
+
+    py --> zswagcl
+    cpp --> zswagcl
+    zswagcl --> httpcl
+
+    jvm --> jshared
+    andr --> jshared
+    jshared --> japi
+
+    py -.reads.-> spec
+    cpp -.reads.-> spec
+    jvm -.reads.-> spec
+    andr -.reads.-> spec
+    server -.exposes.-> spec
+```
 
 | Component | Language | Role |
 |---|---|---|
