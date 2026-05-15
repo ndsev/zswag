@@ -24,7 +24,9 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
   }
 }}%%
 flowchart TB
+    gen["<b>zswag.gen</b> (Python CLI)<br/>generates spec from a<br/>zserio service definition"]:::py
     spec(["<b>OpenAPI spec</b> &middot; zserio-derived<br/>shared contract: clients read it, server exposes it"]):::spec
+    zserio["<b>zserio</b><br/>schema compiler + runtimes<br/>(C++ / Python / Java)"]:::ext
 
     subgraph clients[" &nbsp;Clients&nbsp; "]
       direction LR
@@ -35,10 +37,10 @@ flowchart TB
     end
 
     subgraph server[" &nbsp;Server&nbsp; "]
-      oaserver["<b>OAServer</b> (Python only)<br/>Flask / Connexion<br/>&nbsp;"]:::py
+      oaserver["<b>OAServer</b> (Python only)<br/>request dispatch<br/>+ auth enforcement"]:::py
     end
 
-    subgraph cppcore[" &nbsp;C++ core &middot; shared with Python via pybind11&nbsp; "]
+    subgraph cppcore[" &nbsp;C++ core (shared with Python via pybind11)&nbsp; "]
       direction LR
       zswagcl["<b>zswagcl</b><br/>OpenAPI parser<br/>+ dispatch"]:::cpp
       httpcl["<b>httpcl</b><br/>HTTP transport<br/>+ OS keychain"]:::cpp
@@ -50,21 +52,37 @@ flowchart TB
       japi["<b>jzswag-api</b><br/>interfaces,<br/>value types"]:::java
     end
 
+    subgraph extlibs[" &nbsp;External libraries&nbsp; "]
+      direction LR
+      cpphttplib["cpp-httplib"]:::ext
+      keychain["keychain"]:::ext
+      flask["Flask /<br/>Connexion"]:::ext
+      okhttp["OkHttp /<br/>Android Keystore"]:::ext
+    end
+
+    zserio --> gen
+    gen --> spec
     spec --> clients
     spec --> server
 
     py ==> zswagcl
     cpp ==> zswagcl
     zswagcl ==> httpcl
+    httpcl --> cpphttplib
+    httpcl --> keychain
 
     jvm ==> jshared
     andr ==> jshared
     jshared ==> japi
+    andr --> okhttp
+
+    oaserver --> flask
 
     classDef py    fill:#e7f5ec,stroke:#2f855a,stroke-width:2px,color:#1c4532
     classDef cpp   fill:#e6f0fb,stroke:#2c5282,stroke-width:2px,color:#1a365d
     classDef java  fill:#fdf3e7,stroke:#9c4221,stroke-width:2px,color:#652b19
     classDef spec  fill:#fffbea,stroke:#975a16,stroke-width:2.5px,color:#5f370e
+    classDef ext   fill:#f1f3f5,stroke:#868e96,stroke-width:1.5px,color:#495057
 ```
 
 | Component | Language | Role |
