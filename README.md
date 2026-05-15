@@ -12,17 +12,21 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 ## Components
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': {
-  'fontFamily': 'system-ui, -apple-system, sans-serif',
-  'fontSize': '14px',
-  'lineColor': '#6c757d',
-  'clusterBkg': '#fafbfc',
-  'clusterBorder': '#cbd5e0'
-}}}%%
+%%{init: {
+  'theme':'base',
+  'flowchart': {'defaultRenderer': 'elk', 'curve': 'stepAfter', 'nodeSpacing': 40, 'rankSpacing': 60},
+  'themeVariables': {
+    'fontFamily': 'system-ui, -apple-system, sans-serif',
+    'fontSize': '14px',
+    'lineColor': '#6c757d',
+    'clusterBkg': '#fafbfc',
+    'clusterBorder': '#cbd5e0'
+  }
+}}%%
 flowchart TB
-    spec(["<b>OpenAPI spec</b><br/>zserio-derived &middot; YAML / JSON"]):::spec
+    spec(["<b>OpenAPI spec</b><br/>zserio-derived schema<br/>YAML / JSON"]):::spec
 
-    subgraph clients[" Clients "]
+    subgraph clients[" &nbsp;Clients&nbsp; "]
       direction LR
       py["<b>Python</b><br/>OAClient<br/>zswag wheel"]:::py
       cpp["<b>C++</b><br/>OAClient<br/>zswagcl"]:::cpp
@@ -30,19 +34,19 @@ flowchart TB
       andr["<b>Java Android</b><br/>ZswagClient<br/>jzswag-android"]:::java
     end
 
-    subgraph cppcore[" C++ core &middot; shared with Python via pybind11 "]
+    subgraph cppcore[" &nbsp;C++ core (shared with Python via pybind11)&nbsp; "]
       direction LR
-      zswagcl["<b>zswagcl</b><br/>OpenAPI parser + dispatch"]:::cpp
-      httpcl["<b>httpcl</b><br/>HTTP + OS keychain"]:::cpp
+      zswagcl["<b>zswagcl</b><br/>OpenAPI parser<br/>+ dispatch"]:::cpp
+      httpcl["<b>httpcl</b><br/>HTTP transport<br/>+ OS keychain"]:::cpp
     end
 
-    subgraph javacore[" Java core "]
+    subgraph javacore[" &nbsp;Java core&nbsp; "]
       direction LR
-      jshared["<b>jzswag-shared</b><br/>dispatch, encoding,<br/>OAuth2/OAuth1, YAML loader"]:::java
-      japi["<b>jzswag-api</b><br/>interfaces, value types"]:::java
+      jshared["<b>jzswag-shared</b><br/>dispatch, encoding,<br/>OAuth2 / YAML loader"]:::java
+      japi["<b>jzswag-api</b><br/>interfaces,<br/>value types"]:::java
     end
 
-    server["<b>OAServer</b> &middot; Python only<br/>Flask / Connexion"]:::py
+    server["<b>OAServer</b> (Python only)<br/>Flask / Connexion<br/>&nbsp;"]:::py
 
     py ==> zswagcl
     cpp ==> zswagcl
