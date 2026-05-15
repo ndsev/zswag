@@ -14,7 +14,7 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
 ```mermaid
 %%{init: {
   'theme':'base',
-  'flowchart': {'defaultRenderer': 'elk', 'curve': 'stepAfter', 'nodeSpacing': 40, 'rankSpacing': 60},
+  'flowchart': {'curve': 'stepAfter', 'nodeSpacing': 50, 'rankSpacing': 70, 'padding': 20},
   'themeVariables': {
     'fontFamily': 'system-ui, -apple-system, sans-serif',
     'fontSize': '14px',
@@ -24,7 +24,7 @@ zswag is a set of libraries for using and hosting [zserio](http://zserio.org) se
   }
 }}%%
 flowchart TB
-    spec(["<b>OpenAPI spec</b><br/>zserio-derived schema<br/>YAML / JSON"]):::spec
+    spec(["<b>OpenAPI spec</b> &middot; zserio-derived<br/>shared contract: clients read it, server exposes it"]):::spec
 
     subgraph clients[" &nbsp;Clients&nbsp; "]
       direction LR
@@ -34,7 +34,11 @@ flowchart TB
       andr["<b>Java Android</b><br/>ZswagClient<br/>jzswag-android"]:::java
     end
 
-    subgraph cppcore[" &nbsp;C++ core (shared with Python via pybind11)&nbsp; "]
+    subgraph server[" &nbsp;Server&nbsp; "]
+      oaserver["<b>OAServer</b> (Python only)<br/>Flask / Connexion<br/>&nbsp;"]:::py
+    end
+
+    subgraph cppcore[" &nbsp;C++ core &middot; shared with Python via pybind11&nbsp; "]
       direction LR
       zswagcl["<b>zswagcl</b><br/>OpenAPI parser<br/>+ dispatch"]:::cpp
       httpcl["<b>httpcl</b><br/>HTTP transport<br/>+ OS keychain"]:::cpp
@@ -46,7 +50,8 @@ flowchart TB
       japi["<b>jzswag-api</b><br/>interfaces,<br/>value types"]:::java
     end
 
-    server["<b>OAServer</b> (Python only)<br/>Flask / Connexion<br/>&nbsp;"]:::py
+    spec --> clients
+    spec --> server
 
     py ==> zswagcl
     cpp ==> zswagcl
@@ -55,12 +60,6 @@ flowchart TB
     jvm ==> jshared
     andr ==> jshared
     jshared ==> japi
-
-    py -.->|reads| spec
-    cpp -.->|reads| spec
-    jvm -.->|reads| spec
-    andr -.->|reads| spec
-    server -.->|exposes| spec
 
     classDef py    fill:#e7f5ec,stroke:#2f855a,stroke-width:2px,color:#1c4532
     classDef cpp   fill:#e6f0fb,stroke:#2c5282,stroke-width:2px,color:#1a365d
