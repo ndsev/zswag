@@ -12,9 +12,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.zip.GZIPOutputStream;
+import okio.Buffer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -267,6 +271,25 @@ class JvmHttpClientTest {
         // Stripped-down construction: just ensure the no-arg constructor doesn't throw.
         JvmHttpClient c = new JvmHttpClient();
         assertThat(c.getPersistentSettings()).isNotNull();
+    }
+
+    @Test
+    void gzipResponseIsAutoDecompressed() throws Exception {
+        // JDK HttpClient does NOT auto-decompress gzip (unlike cpp-httplib and OkHttp);
+        // JvmHttpClient compensates by inspecting Content-Encoding and decoding the body.
+        // Without this, the calling zserio deserialization would see garbled bytes.
+        String payload = "{\"answer\":42}";
+        ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        try (GZIPOutputStream gz = new GZIPOutputStream(raw)) {
+            gz.write(payload.getBytes(StandardCharsets.UTF_8));
+        }
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .addHeader("Content-Encoding", "gzip")
+                .setBody(new Buffer().write(raw.toByteArray())));
+        HttpRequest req = HttpRequest.builder().method("GET").url(server.url("/p").toString()).build();
+        HttpResponse resp = newClient().execute(req, HttpConfig.empty());
+        assertThat(new String(resp.getBody(), StandardCharsets.UTF_8)).isEqualTo(payload);
     }
 
     @Test

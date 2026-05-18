@@ -9,8 +9,11 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.zip.GZIPInputStream;
 import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -221,11 +224,27 @@ public class JvmHttpClient implements IHttpClient {
             HttpResponse<byte[]> response = jdk.send(rb.build(), HttpResponse.BodyHandlers.ofByteArray());
             logger.debug("Received response with status code: {}", response.statusCode());
 
+            // JDK HttpClient does NOT auto-decompress gzip responses (cpp-httplib and OkHttp do).
+            // If the server returns Content-Encoding: gzip we have to decompress here ourselves;
+            // otherwise the caller sees garbled bytes. Match the C++/Android behaviour transparently.
+            byte[] body = response.body();
+            String contentEncoding = response.headers().firstValue("Content-Encoding").orElse(null);
+            if (body != null && contentEncoding != null
+                    && "gzip".equalsIgnoreCase(contentEncoding.trim())) {
+                try {
+                    body = decompressGzip(body);
+                } catch (IOException e) {
+                    logger.warn("Failed to decompress gzip response from {}: {}", url, e.getMessage());
+                    // Fall through with the original (compressed) bytes — caller will see the
+                    // raw body and can decide.
+                }
+            }
+
             return new io.github.ndsev.zswag.api.HttpResponse(
                     response.statusCode(),
                     null,
                     convertHeaders(response.headers().map()),
-                    response.body());
+                    body);
 
         } catch (IOException e) {
             logger.error("HTTP request failed: {}", e.getMessage(), e);
@@ -262,6 +281,24 @@ public class JvmHttpClient implements IHttpClient {
             });
         }
         return b.build();
+    }
+
+    /**
+     * Decompresses a gzip-encoded byte buffer. Used to transparently handle
+     * Content-Encoding: gzip responses, since the JDK HttpClient (unlike cpp-httplib
+     * and OkHttp) does not auto-decompress.
+     */
+    @NotNull
+    private static byte[] decompressGzip(@NotNull byte[] gzipped) throws IOException {
+        try (GZIPInputStream gz = new GZIPInputStream(new ByteArrayInputStream(gzipped));
+             ByteArrayOutputStream out = new ByteArrayOutputStream(gzipped.length * 2)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = gz.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        }
     }
 
     private static boolean containsHeaderIgnoreCase(@NotNull Map<String, List<String>> headers, @NotNull String name) {
