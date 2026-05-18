@@ -49,6 +49,14 @@ public class JvmHttpClient implements IHttpClient {
     private final IKeychain keychain;
     private final HttpClient strictClient;
     private final HttpClient permissiveClient;
+    /**
+     * Cache of proxied {@link HttpClient} instances, keyed on the proxy host:port
+     * + (strict|permissive) tuple. Avoids constructing a fresh JDK HttpClient
+     * (which spins up a new executor) on every request when persistent settings
+     * select a proxy. Cleared in tests via package-private helper.
+     */
+    private final java.util.concurrent.ConcurrentMap<String, HttpClient> proxyClientCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Creates a client that loads persistent settings from {@code HTTP_SETTINGS_FILE}
@@ -137,12 +145,15 @@ public class JvmHttpClient implements IHttpClient {
         boolean sslStrict = envSslStrict() && effective.isSslStrict();
         HttpClient jdk = sslStrict ? strictClient : permissiveClient;
 
-        // Resolve proxy if configured. JDK HttpClient takes proxy on the client builder, so for
-        // configs that vary per-URL we'd need a per-request client; since proxy is rare, build
-        // a one-shot client when proxy is set.
+        // JDK HttpClient takes proxy on the builder, not per-call. Cache per proxy + sslStrict
+        // tuple so concurrent requests through the same proxy share a connection pool /
+        // executor instead of each spawning a fresh HttpClient (which the previous version did).
         if (effective.getProxy().isPresent()) {
-            jdk = buildClientWithProxy(jdk.connectTimeout().orElse(Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS)),
-                    sslStrict, effective.getProxy().get());
+            HttpConfig.Proxy proxy = effective.getProxy().get();
+            String cacheKey = proxy.host + ":" + proxy.port + "|" + (sslStrict ? "strict" : "permissive");
+            Duration ctimeout = jdk.connectTimeout().orElse(Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS));
+            jdk = proxyClientCache.computeIfAbsent(cacheKey,
+                    k -> buildClientWithProxy(ctimeout, sslStrict, proxy));
         }
 
         try {

@@ -71,6 +71,10 @@ public class AndroidHttpClient implements IHttpClient {
     private final IKeychain keychain;
     private final OkHttpClient strictClient;
     private final OkHttpClient permissiveClient;
+    /** Cache of proxied clients keyed on host:port|strict|permissive — see comment on
+     *  the proxy branch in {@link #execute}. */
+    private final java.util.concurrent.ConcurrentMap<String, OkHttpClient> proxyClientCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Loads persistent settings from {@code HTTP_SETTINGS_FILE} and uses an in-memory IKeychain stub. */
     public AndroidHttpClient() {
@@ -159,8 +163,16 @@ public class AndroidHttpClient implements IHttpClient {
         boolean sslStrict = envSslStrict() && effective.isSslStrict();
         OkHttpClient client = sslStrict ? strictClient : permissiveClient;
 
+        // Cache proxied OkHttpClients per (host:port, sslStrict) so concurrent requests
+        // share the connection pool / dispatcher threads. OkHttp explicitly recommends one
+        // client per process; rebuilding per-request loses keep-alive and adds visible
+        // battery / memory cost on Android.
         if (effective.getProxy().isPresent()) {
-            client = buildClientWithProxy(effective.getTimeout(), sslStrict, effective.getProxy().get());
+            HttpConfig.Proxy proxy = effective.getProxy().get();
+            String cacheKey = proxy.host + ":" + proxy.port + "|" + (sslStrict ? "strict" : "permissive");
+            Duration callTimeoutForProxy = effective.getTimeout();
+            client = proxyClientCache.computeIfAbsent(cacheKey,
+                    k -> buildClientWithProxy(callTimeoutForProxy, sslStrict, proxy));
         }
 
         // Honour the merged HttpConfig's per-request timeout. JvmHttpClient applies this
