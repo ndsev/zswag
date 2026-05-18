@@ -46,6 +46,24 @@ struct URIComponents
     static URIComponents fromStrPath(std::string const& pathAndQueryString);
 
     /**
+     * Resolve a URI reference against a base URI per RFC 3986 §5.3 (Strict
+     * Resolution). Supports the three reference forms permitted in OpenAPI
+     * 3.0+ {@code servers[].url}:
+     *   - Absolute URI:           {@code https://example.com/v1}   returned as-is
+     *   - Server-relative path:   {@code /v1}                       base scheme+host + /v1
+     *   - Document-relative path: {@code .}, {@code ./v2}, {@code ../v2}, {@code v2}
+     *                                                               base scheme+host + base
+     *                                                               directory merged with the
+     *                                                               reference, with dot-segments
+     *                                                               (§5.2.4) removed.
+     *
+     * The base URI must be absolute (scheme and host present); otherwise
+     * URIError is thrown for non-absolute references.
+     */
+    static URIComponents resolveReference(std::string const& reference,
+                                          URIComponents const& base);
+
+    /**
      * Append one or multiple path-parts ("/a/b/c") to the URIs
      * path.
      */
