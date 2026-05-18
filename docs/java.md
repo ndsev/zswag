@@ -212,6 +212,12 @@ Non-200 responses raise `HttpException` carrying the status code, response body,
 
 Strict 200 matches C++; if your service uses 204 or 206 successfully, catch `HttpException` and inspect `getStatusCode()`.
 
+## Code coverage
+
+[![codecov](https://codecov.io/github/ndsev/zswag/graph/badge.svg?token=5DTX2M8IDE)](https://codecov.io/github/ndsev/zswag)
+
+JaCoCo runs per module on every CI build. Coverage is uploaded to [Codecov](https://codecov.io/gh/ndsev/zswag) under flag `unittests-java`. Browsable HTML reports per module at <https://ndsev.github.io/zswag/java/>.
+
 ## OpenAPI feature support
 
 The Java client matches the C++/Python clients in feature coverage. See [the interop matrix in README.md](../README.md#openapi-options-interoperability) for the exhaustive ✅/❌ table across all clients.

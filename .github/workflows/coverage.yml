@@ -2,7 +2,7 @@ name: Code Coverage
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -91,3 +91,40 @@ jobs:
         with:
           recreate: true
           path: code-coverage-results.md
+
+      # ----------------------------------------------------------------------
+      # Publish HTML report to GitHub Pages (main pushes only).
+      # Java coverage is deployed alongside by jzswag.yml under /java/; this
+      # workflow writes /cpp/ + the root landing index.html. Both jobs use
+      # peaceiris/actions-gh-pages with keep_files=true so they coexist.
+      # ----------------------------------------------------------------------
+      - name: Stage C++ report for GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p site/cpp
+          cp -r coverage/* site/cpp/
+          # gcovr writes its entry point as coverage.html; an index.html
+          # redirect lets https://ndsev.github.io/zswag/cpp/ land on the report.
+          cat > site/cpp/index.html <<'EOF'
+          <!DOCTYPE html><meta http-equiv="refresh" content="0;url=coverage.html">
+          EOF
+          # Root landing page linking to both language reports.
+          cat > site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <title>zswag coverage</title>
+          <style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5}</style>
+          <h1>zswag coverage reports</h1>
+          <ul>
+            <li><a href="cpp/">C++</a> — httpcl + zswagcl (gcovr)</li>
+            <li><a href="java/">Java</a> — jzswag-api / shared / jvm / android (JaCoCo)</li>
+          </ul>
+          <p>Aggregated coverage is also tracked on <a href="https://codecov.io/gh/ndsev/zswag">Codecov</a>.</p>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          keep_files: true

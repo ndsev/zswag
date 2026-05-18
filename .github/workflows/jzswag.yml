@@ -2,7 +2,7 @@ name: jzswag (Java)
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -117,3 +117,36 @@ jobs:
           min-coverage-overall: 60
           min-coverage-changed-files: 50
           update-comment: true
+
+      # ----------------------------------------------------------------------
+      # Publish JaCoCo HTML reports to GitHub Pages (main pushes only).
+      # Coexists with /cpp/ + root index.html written by coverage.yml; both
+      # workflows use keep_files=true to avoid clobbering each other.
+      # ----------------------------------------------------------------------
+      - name: Stage Java reports for GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p site/java
+          for m in api shared jvm android; do
+            cp -r libs/jzswag/jzswag-$m/build/reports/jacoco/test/html site/java/$m
+          done
+          cat > site/java/index.html <<'EOF'
+          <!DOCTYPE html>
+          <title>jzswag JaCoCo coverage</title>
+          <style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5}</style>
+          <h1>jzswag JaCoCo coverage</h1>
+          <ul>
+            <li><a href="api/">jzswag-api</a></li>
+            <li><a href="shared/">jzswag-shared</a></li>
+            <li><a href="jvm/">jzswag-jvm</a></li>
+            <li><a href="android/">jzswag-android</a></li>
+          </ul>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          keep_files: true

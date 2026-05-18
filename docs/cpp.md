@@ -147,7 +147,7 @@ The adhoc config layers on top of the [persistent settings](../README.md#http-se
 
 [![codecov](https://codecov.io/github/ndsev/zswag/graph/badge.svg?token=5DTX2M8IDE)](https://codecov.io/github/ndsev/zswag)
 
-Coverage is automatically collected in CI and reported to [Codecov](https://codecov.io/gh/ndsev/zswag).
+Coverage is automatically collected in CI and reported to [Codecov](https://codecov.io/gh/ndsev/zswag). Browsable HTML report at <https://ndsev.github.io/zswag/cpp/>.
 
 Locally:
 
