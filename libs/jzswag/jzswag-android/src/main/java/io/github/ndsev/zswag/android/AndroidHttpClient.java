@@ -67,7 +67,7 @@ public class AndroidHttpClient implements IHttpClient {
     private static final int DEFAULT_TIMEOUT_SECONDS = 60;
     private static final MediaType OCTET_STREAM = MediaType.parse("application/octet-stream");
 
-    private final HttpSettings persistentSettings;
+    private final HttpSettingsLoader.HotReloader settingsReloader;
     private final IKeychain keychain;
     private final OkHttpClient strictClient;
     private final OkHttpClient permissiveClient;
@@ -76,9 +76,12 @@ public class AndroidHttpClient implements IHttpClient {
     private final java.util.concurrent.ConcurrentMap<String, OkHttpClient> proxyClientCache =
             new java.util.concurrent.ConcurrentHashMap<>();
 
-    /** Loads persistent settings from {@code HTTP_SETTINGS_FILE} and uses an in-memory IKeychain stub. */
+    /**
+     * Loads persistent settings from {@code HTTP_SETTINGS_FILE} (auto-reloads on mtime change,
+     * matching C++ behaviour) and uses an in-memory IKeychain stub.
+     */
     public AndroidHttpClient() {
-        this(HttpSettingsLoader.loadFromEnvironment(), (s, u) -> {
+        this(HttpSettingsLoader.HotReloader.fromEnvironment(), (s, u) -> {
             throw new IllegalStateException(
                     "AndroidHttpClient was created without an IKeychain; basic-auth keychain lookup is not available. "
                     + "Pass an AndroidKeychain to the constructor.");
@@ -94,18 +97,24 @@ public class AndroidHttpClient implements IHttpClient {
     }
 
     public AndroidHttpClient(@NotNull HttpSettings persistentSettings, @NotNull IKeychain keychain) {
+        // Caller-supplied snapshot: no source file -> no hot-reload.
+        this(HttpSettingsLoader.HotReloader.of(null, persistentSettings), keychain);
+    }
+
+    AndroidHttpClient(@NotNull HttpSettingsLoader.HotReloader reloader, @NotNull IKeychain keychain) {
         AndroidLogging.init();
-        this.persistentSettings = persistentSettings;
+        this.settingsReloader = reloader;
         this.keychain = keychain;
         Duration timeout = readTimeoutFromEnv();
         this.strictClient = buildOkHttpClient(timeout, true);
         this.permissiveClient = buildOkHttpClient(timeout, false);
     }
 
+    /** Returns the current persistent settings, re-reading the source file if its mtime changed. */
     @Override
     @NotNull
     public HttpSettings getPersistentSettings() {
-        return persistentSettings;
+        return settingsReloader.current();
     }
 
     @NotNull
@@ -158,7 +167,7 @@ public class AndroidHttpClient implements IHttpClient {
     @Override
     @NotNull
     public HttpResponse execute(@NotNull HttpRequest request, @NotNull HttpConfig adhoc) throws HttpException {
-        HttpConfig effective = persistentSettings.forUrl(request.getUrl()).mergedWith(adhoc);
+        HttpConfig effective = settingsReloader.current().forUrl(request.getUrl()).mergedWith(adhoc);
 
         boolean sslStrict = envSslStrict() && effective.isSslStrict();
         OkHttpClient client = sslStrict ? strictClient : permissiveClient;

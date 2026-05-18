@@ -45,25 +45,21 @@ public class JvmHttpClient implements IHttpClient {
 
     private static final int DEFAULT_TIMEOUT_SECONDS = 60;
 
-    private final HttpSettings persistentSettings;
+    private final HttpSettingsLoader.HotReloader settingsReloader;
     private final IKeychain keychain;
     private final HttpClient strictClient;
     private final HttpClient permissiveClient;
-    /**
-     * Cache of proxied {@link HttpClient} instances, keyed on the proxy host:port
-     * + (strict|permissive) tuple. Avoids constructing a fresh JDK HttpClient
-     * (which spins up a new executor) on every request when persistent settings
-     * select a proxy. Cleared in tests via package-private helper.
-     */
     private final java.util.concurrent.ConcurrentMap<String, HttpClient> proxyClientCache =
             new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Creates a client that loads persistent settings from {@code HTTP_SETTINGS_FILE}
-     * and applies {@code HTTP_TIMEOUT} / {@code HTTP_SSL_STRICT} env vars.
+     * and applies {@code HTTP_TIMEOUT} / {@code HTTP_SSL_STRICT} env vars. Subsequent
+     * mtime changes to {@code HTTP_SETTINGS_FILE} are picked up automatically — matches
+     * the C++ {@code Settings::operator[]} hot-reload behaviour for credential rotation.
      */
     public JvmHttpClient() {
-        this(HttpSettingsLoader.loadFromEnvironment());
+        this(HttpSettingsLoader.HotReloader.fromEnvironment(), new Keychain());
     }
 
     public JvmHttpClient(@NotNull HttpSettings persistentSettings) {
@@ -71,8 +67,13 @@ public class JvmHttpClient implements IHttpClient {
     }
 
     public JvmHttpClient(@NotNull HttpSettings persistentSettings, @NotNull IKeychain keychain) {
+        // Caller-supplied settings: no associated source file, so no hot-reload.
+        this(HttpSettingsLoader.HotReloader.of(null, persistentSettings), keychain);
+    }
+
+    JvmHttpClient(@NotNull HttpSettingsLoader.HotReloader reloader, @NotNull IKeychain keychain) {
         JzswagLogging.init();
-        this.persistentSettings = persistentSettings;
+        this.settingsReloader = reloader;
         this.keychain = keychain;
         Duration timeout = readTimeoutFromEnv();
         this.strictClient = buildJdkClient(timeout, true);
@@ -81,15 +82,17 @@ public class JvmHttpClient implements IHttpClient {
 
     /** For tests: explicit timeout override. */
     JvmHttpClient(@NotNull HttpSettings persistentSettings, @NotNull Duration timeout) {
-        this.persistentSettings = persistentSettings;
+        this.settingsReloader = HttpSettingsLoader.HotReloader.of(null, persistentSettings);
         this.keychain = new Keychain();
         this.strictClient = buildJdkClient(timeout, true);
         this.permissiveClient = buildJdkClient(timeout, false);
     }
 
+    /** Returns the current persistent settings, re-reading the source file if its mtime changed. */
+    @Override
     @NotNull
     public HttpSettings getPersistentSettings() {
-        return persistentSettings;
+        return settingsReloader.current();
     }
 
     @NotNull
@@ -137,8 +140,11 @@ public class JvmHttpClient implements IHttpClient {
     @NotNull
     public io.github.ndsev.zswag.api.HttpResponse execute(@NotNull io.github.ndsev.zswag.api.HttpRequest request,
                                                     @NotNull HttpConfig adhoc) throws HttpException {
-        // Merge: persistent (scope-matched) | adhoc — matches C++ Settings[uri] |= httpConfig_
-        HttpConfig effective = persistentSettings.forUrl(request.getUrl()).mergedWith(adhoc);
+        // Merge: persistent (scope-matched) | adhoc — matches C++ Settings[uri] |= httpConfig_.
+        // settingsReloader.current() re-reads HTTP_SETTINGS_FILE if its mtime advanced since
+        // the last call, so credential rotation in long-running clients is picked up
+        // transparently (matches C++ Settings::operator[]).
+        HttpConfig effective = settingsReloader.current().forUrl(request.getUrl()).mergedWith(adhoc);
 
         // Effective SSL strictness: request.adhoc has the final say if it ever sets sslStrict=false,
         // otherwise honor env. (Persistent settings file does not carry sslStrict in C++ either.)

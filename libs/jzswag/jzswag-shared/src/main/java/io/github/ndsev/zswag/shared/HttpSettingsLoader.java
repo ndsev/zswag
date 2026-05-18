@@ -50,6 +50,99 @@ public final class HttpSettingsLoader {
     private HttpSettingsLoader() {}
 
     /**
+     * Tracks the source path that {@link #loadFromEnvironment} most recently resolved,
+     * so {@link HotReloader} can rebuild a fresh {@link HttpSettings} when the file
+     * changes on disk. Per-thread? No — the env var is process-wide and reading it
+     * twice in close succession is fine. Lazy holder keeps things thread-safe.
+     */
+    @org.jetbrains.annotations.Nullable
+    public static Path environmentSourcePath() {
+        String path = System.getenv(ENV_SETTINGS_FILE);
+        if (path == null || path.isEmpty()) return null;
+        Path file = Paths.get(path);
+        return Files.isRegularFile(file) ? file : null;
+    }
+
+    /**
+     * Tracks an {@link HttpSettings} object that gets re-read from disk when the
+     * source file's last-modified timestamp advances. Mirrors C++
+     * {@code httpcl::Settings::operator[]} (http-settings.cpp:520-543) which checks
+     * mtime per call and re-parses on change — supports credential rotation in
+     * long-running clients.
+     *
+     * <p>Thread-safe via double-checked locking on the {@code current} reference.
+     * Failed reloads log a warning and keep the previous snapshot rather than
+     * dropping to empty (better than losing all credentials mid-flight).
+     */
+    public static final class HotReloader {
+        @org.jetbrains.annotations.Nullable
+        private final Path source;
+        private final java.util.concurrent.atomic.AtomicReference<HttpSettings> current;
+        private volatile long lastMtimeMillis;
+
+        private HotReloader(@org.jetbrains.annotations.Nullable Path source, @NotNull HttpSettings initial) {
+            this.source = source;
+            this.current = new java.util.concurrent.atomic.AtomicReference<>(initial);
+            this.lastMtimeMillis = readMtimeOrZero();
+        }
+
+        /** Builds a reloader wired to {@code HTTP_SETTINGS_FILE} (or a no-op one if unset). */
+        @NotNull
+        public static HotReloader fromEnvironment() {
+            Path src = environmentSourcePath();
+            return new HotReloader(src, loadFromEnvironment());
+        }
+
+        /** Builds a reloader against an explicit path (or a no-op one if {@code source} null). */
+        @NotNull
+        public static HotReloader of(@org.jetbrains.annotations.Nullable Path source, @NotNull HttpSettings initial) {
+            return new HotReloader(source, initial);
+        }
+
+        /**
+         * Returns the current settings, reloading from disk if the source file's mtime
+         * has advanced since last call. Calling this once per request is cheap (single
+         * {@code stat}), comparable to the C++ implementation.
+         */
+        @NotNull
+        public HttpSettings current() {
+            if (source == null) return current.get();
+            long mtime = readMtimeOrZero();
+            if (mtime > lastMtimeMillis) {
+                synchronized (this) {
+                    if (mtime > lastMtimeMillis) {
+                        try {
+                            HttpSettings reloaded = loadFromFile(source);
+                            current.set(reloaded);
+                            lastMtimeMillis = mtime;
+                            logger.debug("Reloaded HTTP_SETTINGS_FILE from '{}' (mtime advanced).", source);
+                        } catch (IOException | RuntimeException e) {
+                            // SnakeYAML throws ParserException (RuntimeException) on malformed YAML;
+                            // IOException on disk failures. Either way: keep the old snapshot
+                            // rather than dropping to empty during an in-flight rotation.
+                            logger.warn("Failed to reload HTTP_SETTINGS_FILE '{}': {}. "
+                                    + "Keeping previous snapshot.", source, e.getMessage());
+                            // Bump lastMtimeMillis so we don't try to reload the same broken
+                            // file every request.
+                            lastMtimeMillis = mtime;
+                        }
+                    }
+                }
+            }
+            return current.get();
+        }
+
+        private long readMtimeOrZero() {
+            if (source == null) return 0L;
+            try {
+                return Files.getLastModifiedTime(source).toMillis();
+            } catch (IOException e) {
+                return 0L;
+            }
+        }
+    }
+
+    /**
      * Loads settings from {@code HTTP_SETTINGS_FILE} if set; returns empty
      * settings otherwise. Empty/unset env var, or non-existent path, yield
      * empty settings (logged at debug level), matching C++ semantics.
