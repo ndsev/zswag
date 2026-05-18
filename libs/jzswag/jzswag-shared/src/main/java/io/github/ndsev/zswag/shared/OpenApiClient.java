@@ -100,33 +100,77 @@ public class OpenApiClient implements IOpenApiClient {
         }
     }
 
+    /**
+     * Resolves the base URL for API requests by resolving the OpenAPI spec's
+     * {@code servers[0].url} against the spec location, per OpenAPI 3.0+
+     * (clarified in OpenAPI 3.2.0 §4.5.2.1).
+     *
+     * <p>Supports the three permitted URL forms:
+     * <ul>
+     *   <li><b>Absolute</b> — {@code https://api.example.com/v1}: returned as-is.</li>
+     *   <li><b>Server-relative</b> — {@code /v1}: base scheme+host from the spec URL, with the
+     *       given path.</li>
+     *   <li><b>Document-relative</b> — {@code .}, {@code ./v2}, {@code ../v2}, {@code v2}:
+     *       resolved as a URI reference against the spec URL via {@link java.net.URI#resolve},
+     *       which implements RFC 3986 §5.3.</li>
+     * </ul>
+     *
+     * <p>Works for HTTP(S) and local-file spec locations alike. An empty/absent
+     * {@code servers} array defaults to {@code "/"} per the spec.
+     */
     @NotNull
     private String resolveBaseUrl() {
         List<String> servers = parser.getServers();
-        String serverUrl = !servers.isEmpty() ? servers.get(0) : "";
-        boolean isRelativeUrl = serverUrl.isEmpty() || serverUrl.startsWith("/");
+        // Per OpenAPI 3.0+ §4.7.5, absent/empty `servers` implies `[{ "url": "/" }]`.
+        String serverUrl = !servers.isEmpty() ? servers.get(0) : "/";
 
-        if (isRelativeUrl && specLocation.startsWith("http")) {
-            try {
-                java.net.URL url = new java.net.URL(specLocation);
-                String protocol = url.getProtocol();
-                String host = url.getHost();
-                int port = url.getPort();
-                String basePath = serverUrl.isEmpty() ? "" : serverUrl;
-                String resolved = (port != -1)
-                        ? protocol + "://" + host + ":" + port + basePath
-                        : protocol + "://" + host + basePath;
-                logger.info("Resolved relative server URL '{}' to: {}", serverUrl, resolved);
-                return resolved;
-            } catch (java.net.MalformedURLException e) {
-                logger.warn("Failed to parse spec location URL: {}", e.getMessage());
-                return serverUrl;
-            }
-        } else if (!serverUrl.isEmpty()) {
+        java.net.URI specBase;
+        try {
+            specBase = specLocationAsUri();
+        } catch (java.net.URISyntaxException e) {
+            logger.warn("Spec location '{}' is not a valid URI; returning server URL as-is: {}",
+                    specLocation, e.getMessage());
             return serverUrl;
         }
-        logger.warn("No servers defined in OpenAPI spec and cannot infer from spec location");
-        return "";
+
+        java.net.URI serverRef;
+        try {
+            serverRef = new java.net.URI(serverUrl);
+        } catch (java.net.URISyntaxException e) {
+            logger.warn("Server URL '{}' is not a valid URI reference: {}", serverUrl, e.getMessage());
+            return serverUrl;
+        }
+
+        java.net.URI resolved = specBase.resolve(serverRef);
+        // If the spec location was a local file (file:// scheme), the resolved URI inherits
+        // it. Callers expect an http(s)-style base for issuing requests, so when the resolved
+        // URI is still local we fall back to returning the server URL as-is — this preserves
+        // the historical behaviour where local-file specs assume an absolute server URL.
+        if ("file".equalsIgnoreCase(resolved.getScheme())) {
+            if (serverRef.isAbsolute()) {
+                return serverUrl;
+            }
+            logger.warn("Spec location '{}' is a local file but the server URL '{}' is "
+                    + "relative; the resulting base URL is also a file:// URI which is "
+                    + "almost certainly not what you want. Use an absolute server URL or "
+                    + "load the spec over HTTP.", specLocation, serverUrl);
+        }
+        logger.debug("Resolved server URL '{}' against spec '{}' -> {}", serverUrl, specLocation, resolved);
+        return resolved.toString();
+    }
+
+    /**
+     * Treat the spec location as a URI for resolution. http(s) URLs come through verbatim;
+     * a path or file:// URL becomes a file URI so RFC 3986 reference resolution works against
+     * its parent directory.
+     */
+    @NotNull
+    private java.net.URI specLocationAsUri() throws java.net.URISyntaxException {
+        if (specLocation.startsWith("http://") || specLocation.startsWith("https://")
+                || specLocation.startsWith("file://")) {
+            return new java.net.URI(specLocation);
+        }
+        return java.nio.file.Paths.get(specLocation).toUri();
     }
 
     // ------------------------------------------------------------------------
