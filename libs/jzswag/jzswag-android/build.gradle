@@ -24,7 +24,7 @@
 // TESTING NOTE: AndroidHttpClient is a pure-Java class (only references
 // OkHttp + java.net + javax.net.ssl), so it has full unit-test coverage via
 // MockWebServer on plain JUnit + Mockito. AndroidKeychain, AndroidLogging,
-// and the Context-taking ZswagClient constructors touch `android.*` APIs
+// and the Context-taking OAClient constructors touch `android.*` APIs
 // and need either Robolectric (which fails on aarch64 due to Conscrypt
 // lacking an aarch64-linux native) or an Android instrumentation test
 // running on a real device. Those are documented as gaps and tracked for

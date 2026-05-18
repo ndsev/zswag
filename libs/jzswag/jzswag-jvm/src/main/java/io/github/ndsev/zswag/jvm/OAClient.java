@@ -25,7 +25,7 @@ import java.io.IOException;
  *
  * <p>Usage:
  * <pre>{@code
- * ZswagClient transport = new ZswagClient("http://api.example.com/openapi.json");
+ * OAClient transport = new OAClient("http://api.example.com/openapi.json");
  * Calculator.CalculatorClient calc = new Calculator.CalculatorClient(transport);
  * Double result = calc.powerMethod(new BaseAndExponent(...));
  * }</pre>
@@ -33,8 +33,8 @@ import java.io.IOException;
  * <p>Internally delegates to {@link OpenAPIClient}, which performs
  * {@code x-zserio-request-part} request decomposition.
  */
-public final class ZswagClient implements ServiceClientInterface {
-    private static final Logger logger = LoggerFactory.getLogger(ZswagClient.class);
+public final class OAClient implements ServiceClientInterface {
+    private static final Logger logger = LoggerFactory.getLogger(OAClient.class);
 
     private final OpenAPIClient delegate;
 
@@ -42,7 +42,7 @@ public final class ZswagClient implements ServiceClientInterface {
      * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}
      * and no adhoc config.
      */
-    public ZswagClient(@NotNull String openApiSpecUrl) throws IOException {
+    public OAClient(@NotNull String openApiSpecUrl) throws IOException {
         this(openApiSpecUrl, HttpSettingsLoader.loadFromEnvironment(), HttpConfig.empty());
     }
 
@@ -50,7 +50,7 @@ public final class ZswagClient implements ServiceClientInterface {
      * Creates a client with explicit persistent settings (typically loaded via
      * {@link HttpSettingsLoader}) and no adhoc config.
      */
-    public ZswagClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent) throws IOException {
+    public OAClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent) throws IOException {
         this(openApiSpecUrl, persistent, HttpConfig.empty());
     }
 
@@ -59,7 +59,7 @@ public final class ZswagClient implements ServiceClientInterface {
      * adhoc {@link HttpConfig}. Mirrors the C++/Python pattern of passing
      * {@code httpcl::Config}/{@code HTTPConfig} into {@code OAClient}.
      */
-    public ZswagClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc)
+    public OAClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc)
             throws IOException {
         IKeychain keychain = new Keychain();
         JvmHttpClient http = new JvmHttpClient(persistent, keychain);
@@ -67,7 +67,7 @@ public final class ZswagClient implements ServiceClientInterface {
     }
 
     /** Lower-level constructor — for tests / advanced use. */
-    public ZswagClient(@NotNull OpenAPIClient delegate) {
+    public OAClient(@NotNull OpenAPIClient delegate) {
         this.delegate = delegate;
     }
 
@@ -87,12 +87,12 @@ public final class ZswagClient implements ServiceClientInterface {
                              @Nullable java.lang.Object context) throws ZserioError {
         Writer typed = requestData.getZserioObject();
         if (typed == null) {
-            throw new ZserioError("ZswagClient.callMethod: requestData.getZserioObject() returned null");
+            throw new ZserioError("OAClient.callMethod: requestData.getZserioObject() returned null");
         }
         try {
             return delegate.callMethod(methodName, typed);
         } catch (HttpException e) {
-            ZserioError err = new ZserioError("ZswagClient: " + methodName + " failed: " + e.getMessage(), e);
+            ZserioError err = new ZserioError("OAClient: " + methodName + " failed: " + e.getMessage(), e);
             throw err;
         }
     }

@@ -4,7 +4,7 @@ JVM port of the zswag OpenAPI client. Built on the JDK 11 `HttpClient`; no JNI. 
 
 ## Role in the project
 
-- Implements zserio's `zserio.runtime.service.ServiceClientInterface` via `ZswagClient`, so a zserio-Java-generated `XClient` accepts an instance as its transport — the same idiom as Python's `services.MyService.Client(OAClient(url))` and C++'s `MyService::Client(openApiClient)`.
+- Implements zserio's `zserio.runtime.service.ServiceClientInterface` via `OAClient`, so a zserio-Java-generated `XClient` accepts an instance as its transport — the same idiom as Python's `services.MyService.Client(OAClient(url))` and C++'s `MyService::Client(openApiClient)`.
 - Performs full request decomposition driven by the OpenAPI spec's `x-zserio-request-part` extension (logic in `jzswag-shared`).
 - Handles all authentication schemes: HTTP Basic, HTTP Bearer, API key (header/query/cookie), OAuth2 client credentials with both `rfc6749-client-secret-basic` and `rfc5849-oauth1-signature` token-endpoint methods.
 - Loads the same `HTTP_SETTINGS_FILE` YAML format as the C++ and Python clients, with URL-scoped persistent settings.
@@ -18,7 +18,7 @@ For the OpenAPI feature support matrix (Java vs C++ vs Python), see [the interop
 
 ## JVM-specific contents
 
-- `ZswagClient` — public entry point; implements `ServiceClientInterface`. Constructs a `JvmHttpClient` + `Keychain` and delegates to the shared `OpenAPIClient`.
+- `OAClient` — public entry point; implements `ServiceClientInterface`. Constructs a `JvmHttpClient` + `Keychain` and delegates to the shared `OpenAPIClient`.
 - `JvmHttpClient` — JDK 11 `HttpClient` wrapper; merges persistent + adhoc config per request; applies SSL/proxy/basic-auth/cookies.
 - `Keychain` — `IKeychain` impl that shells out to platform tools: Linux `secret-tool`, macOS `security`. Windows lookup is not yet implemented.
 - `JzswagLogging` — wires `HTTP_LOG_LEVEL` env var to the logback root logger via reflection.

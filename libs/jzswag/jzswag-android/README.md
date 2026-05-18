@@ -4,7 +4,7 @@ Android port of the zswag client. Built on OkHttp + the platform Keystore. Pulls
 
 ## Role in the project
 
-- Implements zserio's `zserio.runtime.service.ServiceClientInterface` via `ZswagClient`, so a zserio-Java-generated `XClient` accepts an instance as its transport — same idiom as the JVM port and Python's `services.MyService.Client(OAClient(url))`.
+- Implements zserio's `zserio.runtime.service.ServiceClientInterface` via `OAClient`, so a zserio-Java-generated `XClient` accepts an instance as its transport — same idiom as the JVM port and Python's `services.MyService.Client(OAClient(url))`.
 - Performs the same `x-zserio-request-part` decomposition the JVM client does (logic lives in `jzswag-shared`).
 - Handles the same authentication schemes: HTTP Basic, HTTP Bearer, API key (header/query/cookie), OAuth2 client credentials with both token-endpoint auth methods.
 - Loads the same `HTTP_SETTINGS_FILE` YAML format as the C++/Python/JVM clients.
@@ -12,7 +12,7 @@ Android port of the zswag client. Built on OkHttp + the platform Keystore. Pulls
 
 ## Public API
 
-- `ZswagClient(Context, String url[, HttpSettings persistent[, HttpConfig adhoc]])` — main entry point. The `Context` parameter is the only public-API difference from the JVM port; needed so `AndroidKeychain` can reach `SharedPreferences`.
+- `OAClient(Context, String url[, HttpSettings persistent[, HttpConfig adhoc]])` — main entry point. The `Context` parameter is the only public-API difference from the JVM port; needed so `AndroidKeychain` can reach `SharedPreferences`.
 - `AndroidHttpClient` — `IHttpClient` implementation on top of OkHttp.
 - `AndroidKeychain` — `IKeychain` implementation on top of the Android Keystore + AES-GCM-encrypted SharedPreferences. Apps store credentials via `AndroidKeychain.store(service, user, secret)`; zswag itself only ever loads.
 - `AndroidLogging.init()` — symmetric to the JVM `JzswagLogging.init()`. On Android, log filtering is logcat-driven (`setprop log.tag.<TAG>`); the call is a near-noop.

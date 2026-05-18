@@ -19,7 +19,7 @@ Integration tests for the Java zswag client. Validates the full dispatch flow ag
 | 9 | `concat(Strings)` | base64-encoded string array; HTTP Bearer auth. |
 | 10 | `name(EnumWrapper)` | enum unwrap to numeric via `ZserioEnum.getGenericValue()`; global default `HeaderAuth` security. |
 
-The test client is structured as the **canonical Java port idiom**: each test constructs a `ZswagClient` (which implements `zserio.runtime.service.ServiceClientInterface`), wraps it in the zserio-generated `Calculator.CalculatorClient`, and invokes the typed method directly. There is no manual request decomposition — every parameter is resolved via `x-zserio-request-part`.
+The test client is structured as the **canonical Java port idiom**: each test constructs a `OAClient` (which implements `zserio.runtime.service.ServiceClientInterface`), wraps it in the zserio-generated `Calculator.CalculatorClient`, and invokes the typed method directly. There is no manual request decomposition — every parameter is resolved via `x-zserio-request-part`.
 
 ## Running the test
 

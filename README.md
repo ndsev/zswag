@@ -32,8 +32,8 @@ flowchart TB
       direction LR
       py["<b>Python</b><br/>OAClient<br/>zswag wheel"]:::py
       cpp["<b>C++</b><br/>OAClient<br/>zswagcl"]:::cpp
-      jvm["<b>Java JVM</b><br/>ZswagClient<br/>jzswag-jvm"]:::java
-      andr["<b>Java Android</b><br/>ZswagClient<br/>jzswag-android"]:::java
+      jvm["<b>Java JVM</b><br/>OAClient<br/>jzswag-jvm"]:::java
+      andr["<b>Java Android</b><br/>OAClient<br/>jzswag-android"]:::java
     end
 
     subgraph server[" &nbsp;Server&nbsp; "]
@@ -161,9 +161,9 @@ dependencies {
 ```
 
 ```java
-import io.github.ndsev.zswag.jvm.ZswagClient;
+import io.github.ndsev.zswag.jvm.OAClient;
 
-ZswagClient transport = new ZswagClient("http://localhost:5000/openapi.json");
+OAClient transport = new OAClient("http://localhost:5000/openapi.json");
 MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
 Response r = client.myApiMethod(new Request(1));
 ```
@@ -178,9 +178,9 @@ dependencies {
 ```
 
 ```java
-import io.github.ndsev.zswag.android.ZswagClient;
+import io.github.ndsev.zswag.android.OAClient;
 
-ZswagClient transport = new ZswagClient(context, "http://localhost:5000/openapi.json");
+OAClient transport = new OAClient(context, "http://localhost:5000/openapi.json");
 MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
 Response r = client.myApiMethod(new Request(1));
 ```

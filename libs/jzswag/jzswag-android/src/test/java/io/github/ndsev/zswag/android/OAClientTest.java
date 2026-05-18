@@ -15,17 +15,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link ZswagClient} that don't require an Android Context
+ * Unit tests for {@link OAClient} that don't require an Android Context
  * (uses the lower-level OpenAPIClient-delegate constructor). The
  * convenience constructors that take a Context are exercised by
  * instrumentation tests on a real device, which are out of this PR's scope.
  */
-public class ZswagClientTest {
+public class OAClientTest {
 
     @Test
     public void getOpenAPIClientReturnsUnderlyingDelegate() {
         OpenAPIClient delegate = mock(OpenAPIClient.class);
-        ZswagClient zsw = new ZswagClient(delegate);
+        OAClient zsw = new OAClient(delegate);
         assertThat(zsw.getOpenAPIClient()).isSameAs(delegate);
     }
 
@@ -34,7 +34,7 @@ public class ZswagClientTest {
     public void callMethodDelegatesToOpenAPIClient() throws Exception {
         OpenAPIClient delegate = mock(OpenAPIClient.class);
         when(delegate.callMethod(any(), any())).thenReturn("response".getBytes());
-        ZswagClient zsw = new ZswagClient(delegate);
+        OAClient zsw = new OAClient(delegate);
 
         Writer fakeWriter = mock(Writer.class);
         ServiceData<Writer> data = mock(ServiceData.class);
@@ -49,7 +49,7 @@ public class ZswagClientTest {
     @SuppressWarnings("unchecked")
     public void callMethodThrowsZserioErrorWhenZserioObjectMissing() {
         OpenAPIClient delegate = mock(OpenAPIClient.class);
-        ZswagClient zsw = new ZswagClient(delegate);
+        OAClient zsw = new OAClient(delegate);
         ServiceData<Writer> data = mock(ServiceData.class);
         when(data.getZserioObject()).thenReturn(null);
         assertThatThrownBy(() -> zsw.callMethod("m", data, null))
@@ -62,7 +62,7 @@ public class ZswagClientTest {
     public void callMethodWrapsHttpExceptionAsZserioError() throws Exception {
         OpenAPIClient delegate = mock(OpenAPIClient.class);
         when(delegate.callMethod(any(), any())).thenThrow(new HttpException("upstream-failed"));
-        ZswagClient zsw = new ZswagClient(delegate);
+        OAClient zsw = new OAClient(delegate);
         Writer fakeWriter = mock(Writer.class);
         ServiceData<Writer> data = mock(ServiceData.class);
         when(data.getZserioObject()).thenReturn(fakeWriter);

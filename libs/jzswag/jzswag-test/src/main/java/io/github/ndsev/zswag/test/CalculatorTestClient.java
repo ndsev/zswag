@@ -16,7 +16,7 @@ import calculator.Strings;
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpSettings;
 import io.github.ndsev.zswag.jvm.JvmHttpClient;
-import io.github.ndsev.zswag.jvm.ZswagClient;
+import io.github.ndsev.zswag.jvm.OAClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
  * server. Mirrors the Python {@code libs/zswag/test/calc/client.py} flow.
  *
  * <p>This is the canonical "Java port" usage: each test constructs a
- * {@link ZswagClient}, wraps it in the zserio-generated
+ * {@link OAClient}, wraps it in the zserio-generated
  * {@link Calculator.CalculatorClient}, and invokes the typed method directly.
  * No manual request decomposition — every parameter is resolved from the
  * zserio request object via {@code x-zserio-request-part}.
@@ -171,7 +171,7 @@ public class CalculatorTestClient {
 
     private Calculator.CalculatorClient newCalcClient(java.lang.String openApiUrl, HttpConfig adhoc) throws Exception {
         // No persistent settings file in this test; adhoc carries the auth/headers per call.
-        ZswagClient transport = new ZswagClient(openApiUrl, HttpSettings.empty(), adhoc);
+        OAClient transport = new OAClient(openApiUrl, HttpSettings.empty(), adhoc);
         return new Calculator.CalculatorClient(transport);
     }
 

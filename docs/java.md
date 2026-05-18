@@ -8,8 +8,8 @@ The Java port of the zswag client ships in two flavours: **JVM** (`jzswag-jvm`, 
 |---|---|
 | `jzswag-api` | Platform-agnostic contracts: `HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `SecurityScheme`, `IHttpClient`, `IKeychain`. No third-party dependencies. |
 | `jzswag-shared` | Portable core: `OpenAPIClient` (request decomposition + dispatch), `OpenAPIParser`, `ParameterEncoder`, `OAuth2Handler`, `OAuth1Signature` (RFC 5849 HMAC-SHA256 token-endpoint auth), `HttpSettingsLoader`. Used by both platform modules. |
-| `jzswag-jvm` | JVM platform module on top of the JDK 11 `HttpClient`. Provides `ZswagClient`, `JvmHttpClient`, `Keychain` (Linux `secret-tool` / macOS `security`). |
-| `jzswag-android` | Android platform module on top of OkHttp. Provides `ZswagClient`, `AndroidHttpClient`, `AndroidKeychain` (Android Keystore + AES-GCM-encrypted SharedPreferences). |
+| `jzswag-jvm` | JVM platform module on top of the JDK 11 `HttpClient`. Provides `OAClient`, `JvmHttpClient`, `Keychain` (Linux `secret-tool` / macOS `security`). |
+| `jzswag-android` | Android platform module on top of OkHttp. Provides `OAClient`, `AndroidHttpClient`, `AndroidKeychain` (Android Keystore + AES-GCM-encrypted SharedPreferences). |
 | `jzswag-test` | Cross-stack integration tests (Java client ↔ Python Calculator server). |
 
 ## Requirements
@@ -38,7 +38,7 @@ dependencies {
 }
 ```
 
-The platform module pulls in `jzswag-shared` and `jzswag-api` transitively. Both platforms expose the same `ZswagClient` API; on Android the constructor takes a `Context` so that `AndroidKeychain` can reach `SharedPreferences`.
+The platform module pulls in `jzswag-shared` and `jzswag-api` transitively. Both platforms expose the same `OAClient` API; on Android the constructor takes a `Context` so that `AndroidKeychain` can reach `SharedPreferences`.
 
 (Until artifacts are published to Maven Central, depend on the source modules.)
 
@@ -61,10 +61,10 @@ Run zserio-Java codegen on `services.zs`, then:
 
 ```java
 // JVM
-import io.github.ndsev.zswag.jvm.ZswagClient;
+import io.github.ndsev.zswag.jvm.OAClient;
 import services.MyService;
 
-ZswagClient transport = new ZswagClient("http://localhost:5000/openapi.json");
+OAClient transport = new OAClient("http://localhost:5000/openapi.json");
 MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
 
 Response r = client.myApiMethod(new Request(42));
@@ -72,16 +72,16 @@ Response r = client.myApiMethod(new Request(42));
 
 ```java
 // Android — same idiom, plus a Context for AndroidKeychain
-import io.github.ndsev.zswag.android.ZswagClient;
+import io.github.ndsev.zswag.android.OAClient;
 import services.MyService;
 
-ZswagClient transport = new ZswagClient(context, "http://localhost:5000/openapi.json");
+OAClient transport = new OAClient(context, "http://localhost:5000/openapi.json");
 MyService.MyServiceClient client = new MyService.MyServiceClient(transport);
 
 Response r = client.myApiMethod(new Request(42));
 ```
 
-`ZswagClient` implements `zserio.runtime.service.ServiceClientInterface`. The zserio-generated `XClient` constructor (in this case `MyServiceClient`) accepts that interface, so the wiring is symmetric with Python's `MyService.Client(OAClient(url))` and C++'s `MyService::Client(openApiClient)`.
+`OAClient` implements `zserio.runtime.service.ServiceClientInterface`. The zserio-generated `XClient` constructor (in this case `MyServiceClient`) accepts that interface, so the wiring is symmetric with Python's `MyService.Client(OAClient(url))` and C++'s `MyService::Client(openApiClient)`.
 
 ## Configuration model
 
@@ -116,14 +116,14 @@ http-settings:
 Settings are loaded automatically on `JvmHttpClient` construction:
 
 ```java
-ZswagClient transport = new ZswagClient(specUrl);  // reads HTTP_SETTINGS_FILE
+OAClient transport = new OAClient(specUrl);  // reads HTTP_SETTINGS_FILE
 ```
 
 To pass an explicit settings registry:
 
 ```java
 HttpSettings settings = HttpSettingsLoader.loadFromFile(Paths.get("custom.yaml"));
-ZswagClient transport = new ZswagClient(specUrl, settings);
+OAClient transport = new OAClient(specUrl, settings);
 ```
 
 To layer a per-instance adhoc config on top:
@@ -132,7 +132,7 @@ To layer a per-instance adhoc config on top:
 HttpConfig adhoc = HttpConfig.builder()
     .header("X-Request-Id", UUID.randomUUID().toString())
     .build();
-ZswagClient transport = new ZswagClient(specUrl, settings, adhoc);
+OAClient transport = new OAClient(specUrl, settings, adhoc);
 ```
 
 ## Authentication
@@ -185,7 +185,7 @@ Keychain lookups happen lazily when the request is dispatched. Failures (tool mi
 
 ## How request decomposition works
 
-zswag's defining feature is the `x-zserio-request-part` extension: each OpenAPI parameter declares which field of the zserio request it carries (e.g. `base.value`, or `*` for the whole serialized blob). On dispatch, `ZswagClient`:
+zswag's defining feature is the `x-zserio-request-part` extension: each OpenAPI parameter declares which field of the zserio request it carries (e.g. `base.value`, or `*` for the whole serialized blob). On dispatch, `OAClient`:
 
 1. Looks up the OpenAPI operation by `methodName`.
 2. For each declared parameter, resolves its `x-zserio-request-part` path against the typed zserio request via JavaBean getter reflection (`getBase().getValue()`). zserio enums are unwrapped to their numeric value via `ZserioEnum.getGenericValue()`.

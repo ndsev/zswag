@@ -98,7 +98,7 @@ compileJava.dependsOn generateZserio
 
 // Calculator.java is now compiled — the test uses zserio-generated CalculatorClient
 // (it implements the same shape as Python's services.MyService.Client) through
-// ZswagClient, our ServiceClientInterface adapter.
+// OAClient, our ServiceClientInterface adapter.
 
 // Clean generated sources
 clean {

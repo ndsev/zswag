@@ -19,7 +19,7 @@ import zserio.runtime.service.ServiceData;
 import java.io.IOException;
 
 /**
- * Android counterpart of the JVM {@code ZswagClient}: implements zserio's
+ * Android counterpart of the JVM {@code OAClient}: implements zserio's
  * {@link ServiceClientInterface} so any zserio-Java-generated {@code XClient}
  * accepts an instance as its transport.
  *
@@ -29,13 +29,13 @@ import java.io.IOException;
  *
  * <p>Usage:
  * <pre>{@code
- * ZswagClient transport = new ZswagClient(context, "https://api.example.com/openapi.json");
+ * OAClient transport = new OAClient(context, "https://api.example.com/openapi.json");
  * Calculator.CalculatorClient calc = new Calculator.CalculatorClient(transport);
  * Double result = calc.powerMethod(new BaseAndExponent(...));
  * }</pre>
  */
-public final class ZswagClient implements ServiceClientInterface {
-    private static final Logger logger = LoggerFactory.getLogger(ZswagClient.class);
+public final class OAClient implements ServiceClientInterface {
+    private static final Logger logger = LoggerFactory.getLogger(OAClient.class);
 
     private final OpenAPIClient delegate;
 
@@ -43,7 +43,7 @@ public final class ZswagClient implements ServiceClientInterface {
      * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}
      * and no adhoc config.
      */
-    public ZswagClient(@NotNull Context context, @NotNull String openApiSpecUrl) throws IOException {
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl) throws IOException {
         this(context, openApiSpecUrl, HttpSettingsLoader.loadFromEnvironment(), HttpConfig.empty());
     }
 
@@ -51,7 +51,7 @@ public final class ZswagClient implements ServiceClientInterface {
      * Creates a client with explicit persistent settings (typically loaded via
      * {@link HttpSettingsLoader}) and no adhoc config.
      */
-    public ZswagClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
                        @NotNull HttpSettings persistent) throws IOException {
         this(context, openApiSpecUrl, persistent, HttpConfig.empty());
     }
@@ -60,7 +60,7 @@ public final class ZswagClient implements ServiceClientInterface {
      * Creates a client with explicit persistent settings AND a per-instance
      * adhoc {@link HttpConfig}.
      */
-    public ZswagClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
                        @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc) throws IOException {
         AndroidLogging.init();
         IKeychain keychain = new AndroidKeychain(context);
@@ -69,7 +69,7 @@ public final class ZswagClient implements ServiceClientInterface {
     }
 
     /** Lower-level constructor — for tests / advanced use. */
-    public ZswagClient(@NotNull OpenAPIClient delegate) {
+    public OAClient(@NotNull OpenAPIClient delegate) {
         this.delegate = delegate;
     }
 
@@ -85,12 +85,12 @@ public final class ZswagClient implements ServiceClientInterface {
                              @Nullable java.lang.Object zserioContext) throws ZserioError {
         Writer typed = requestData.getZserioObject();
         if (typed == null) {
-            throw new ZserioError("ZswagClient.callMethod: requestData.getZserioObject() returned null");
+            throw new ZserioError("OAClient.callMethod: requestData.getZserioObject() returned null");
         }
         try {
             return delegate.callMethod(methodName, typed);
         } catch (HttpException e) {
-            throw new ZserioError("ZswagClient: " + methodName + " failed: " + e.getMessage(), e);
+            throw new ZserioError("OAClient: " + methodName + " failed: " + e.getMessage(), e);
         }
     }
 }
