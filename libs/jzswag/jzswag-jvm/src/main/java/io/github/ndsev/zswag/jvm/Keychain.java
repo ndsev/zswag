@@ -80,8 +80,26 @@ public final class Keychain implements IKeychain {
         return runReadStdout(pb, "security").trim();
     }
 
+    /**
+     * Windows credential manager support is not yet implemented for the Java JVM client.
+     * <p>
+     * The C++ httpcl library wraps the C-language {@code keychain} library which handles
+     * the Windows Data Protection API (DPAPI) under the hood; Python (via pyzswagcl)
+     * inherits that. A Java equivalent would either shell out to {@code cmdkey}/
+     * {@code vaultcmd} or call DPAPI through JNA — both are non-trivial and have been
+     * scheduled for a separate follow-up.
+     * <p>
+     * Workaround for Windows users today: put cleartext credentials in
+     * {@code http-settings.yaml} via {@code password:} (instead of {@code keychain:}),
+     * or pass them adhoc through {@code HttpConfig.basicAuth(user, password)}.
+     */
     private static String loadWindows(String service, String user) {
-        throw new KeychainException("keychain: Windows credential manager lookup is not yet implemented; use cleartext password");
+        throw new KeychainException(
+                "keychain: Windows credential manager lookup is not yet implemented in the Java JVM client. "
+                + "Workaround: use a cleartext 'password:' entry in http-settings.yaml, or "
+                + "configure credentials adhoc via HttpConfig.basicAuth(user, password). "
+                + "See README.md → Keychain integration for details. "
+                + "(The C++ and Python clients DO support Windows credential manager.)");
     }
 
     private static String runReadStdout(@NotNull ProcessBuilder pb, @NotNull String tool) throws IOException, InterruptedException {

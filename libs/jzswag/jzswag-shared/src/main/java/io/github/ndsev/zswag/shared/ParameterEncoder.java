@@ -48,6 +48,10 @@ public class ParameterEncoder {
         if (arrayElements != null) {
             return applyPathArrayStyle(param.getName(), arrayElements, param.getStyle(), param.isExplode());
         }
+        if (value instanceof Map) {
+            return applyPathMapStyle(param.getName(),
+                    (Map<?, ?>) value, param.getStyle(), param.isExplode(), param.getFormat());
+        }
         String formatted = formatScalarValue(value, param.getFormat());
         return applyPathScalarStyle(param.getName(), formatted, param.getStyle());
     }
@@ -63,6 +67,10 @@ public class ParameterEncoder {
             // simple style: comma-joined
             return String.join(",", arrayElements);
         }
+        if (value instanceof Map) {
+            // simple style on map: "k1,v1,k2,v2" (no explode in header per OpenAPI).
+            return String.join(",", flattenMapForJoin((Map<?, ?>) value, param.getFormat()));
+        }
         return formatScalarValue(value, param.getFormat());
     }
 
@@ -77,6 +85,11 @@ public class ParameterEncoder {
             // form style, comma-joined when not exploded; explode + cookie isn't well-defined.
             return String.join(",", arrayElements);
         }
+        if (value instanceof Map) {
+            // Cookie carrying a compound/map value: comma-joined "k1,v1,k2,v2" (matches the
+            // C++ openapi-parameter-helper encodeForCookie of a map).
+            return String.join(",", flattenMapForJoin((Map<?, ?>) value, param.getFormat()));
+        }
         return formatScalarValue(value, param.getFormat());
     }
 
@@ -85,6 +98,12 @@ public class ParameterEncoder {
      * {@code (name, value)} pairs. For {@code style: form, explode: true}
      * arrays this is one pair per element; for {@code explode: false} arrays
      * it's a single pair with comma-joined values; scalars are a single pair.
+     *
+     * <p>Map-shaped values (e.g. a zserio compound resolved through a future
+     * IReflectableView): explode=true emits one pair per map entry
+     * ({@code ?k1=v1&k2=v2}); explode=false emits a single comma-joined pair
+     * ({@code ?name=k1,v1,k2,v2}) — matches C++ {@code queryOrHeaderPairs} at
+     * openapi-parameter-helper.cpp:197-205.
      */
     @NotNull
     public static List<Map.Entry<String, String>> encodeForQuery(@NotNull OpenAPIParameter param, @NotNull Object value) {
@@ -100,9 +119,37 @@ public class ParameterEncoder {
             }
             return result;
         }
+        if (value instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) value;
+            if (param.isExplode()) {
+                // ?k1=v1&k2=v2 — each map entry becomes its own pair.
+                for (Map.Entry<?, ?> e : map.entrySet()) {
+                    result.add(new AbstractMap.SimpleImmutableEntry<>(
+                            String.valueOf(e.getKey()),
+                            formatScalarValue(e.getValue(), param.getFormat())));
+                }
+            } else {
+                // ?paramName=k1,v1,k2,v2 — flattened, single-pair form.
+                result.add(new AbstractMap.SimpleImmutableEntry<>(
+                        param.getName(),
+                        String.join(",", flattenMapForJoin(map, param.getFormat()))));
+            }
+            return result;
+        }
         String formatted = formatScalarValue(value, param.getFormat());
         result.add(new AbstractMap.SimpleImmutableEntry<>(param.getName(), formatted));
         return result;
+    }
+
+    /** Helper: flatten a Map's entries to ["k1","v1","k2","v2", ...] using the given format. */
+    @NotNull
+    private static List<String> flattenMapForJoin(@NotNull Map<?, ?> map, @NotNull ParameterFormat format) {
+        List<String> flat = new ArrayList<>(map.size() * 2);
+        for (Map.Entry<?, ?> e : map.entrySet()) {
+            flat.add(String.valueOf(e.getKey()));
+            flat.add(formatScalarValue(e.getValue(), format));
+        }
+        return flat;
     }
 
     /**
@@ -129,6 +176,60 @@ public class ParameterEncoder {
             case MATRIX: return ";" + name + "=" + value;
             default:     return value;
         }
+    }
+
+    /**
+     * Path-style application for map-shaped values. Matches C++
+     * {@code openapi-parameter-helper::pathStr} on a map (openapi-parameter-helper.cpp:140-160).
+     *
+     * <p>Style × explode behaviour:
+     * <ul>
+     *   <li>{@code simple} (any explode): {@code k1,v1,k2,v2} or
+     *       {@code k1=v1,k2=v2} when explode (per OpenAPI 3 spec).</li>
+     *   <li>{@code label}:  {@code .k1.v1.k2.v2} or {@code .k1=v1.k2=v2} (explode).</li>
+     *   <li>{@code matrix}: {@code ;name=k1,v1,k2,v2} or {@code ;k1=v1;k2=v2} (explode).</li>
+     * </ul>
+     */
+    @NotNull
+    private static String applyPathMapStyle(@NotNull String name, @NotNull Map<?, ?> map,
+                                            @NotNull ParameterStyle style, boolean explode,
+                                            @NotNull ParameterFormat format) {
+        if (map.isEmpty()) return "";
+        switch (style) {
+            case SIMPLE:
+                return joinMapEntries(map, explode ? "=" : ",", ",", format);
+            case LABEL:
+                return "." + joinMapEntries(map, explode ? "=" : ",", explode ? "." : ",", format);
+            case MATRIX:
+                if (explode) {
+                    StringBuilder sb = new StringBuilder();
+                    for (Map.Entry<?, ?> e : map.entrySet()) {
+                        sb.append(';').append(e.getKey()).append('=')
+                                .append(formatScalarValue(e.getValue(), format));
+                    }
+                    return sb.toString();
+                }
+                return ";" + name + "=" + String.join(",", flattenMapForJoin(map, format));
+            default:
+                return String.join(",", flattenMapForJoin(map, format));
+        }
+    }
+
+    /**
+     * Helper: render a map as a list of {@code key<kvSep>value} pairs joined with
+     * {@code entrySep}.
+     */
+    @NotNull
+    private static String joinMapEntries(@NotNull Map<?, ?> map, @NotNull String kvSep,
+                                         @NotNull String entrySep, @NotNull ParameterFormat format) {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<?, ?> e : map.entrySet()) {
+            if (!first) sb.append(entrySep);
+            sb.append(e.getKey()).append(kvSep).append(formatScalarValue(e.getValue(), format));
+            first = false;
+        }
+        return sb.toString();
     }
 
     @NotNull

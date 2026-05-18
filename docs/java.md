@@ -179,7 +179,7 @@ To store credentials in the OS keychain rather than cleartext:
 
 - **Linux**: store with `secret-tool store --label='zswag dev secret' package lib.openapi.zserio.client service my-service user my-user`, reference as `keychain: my-service`.
 - **macOS**: store with `security add-generic-password -s my-service -a my-user -w 'thepassword'`, reference as `keychain: my-service`.
-- **Windows**: not yet implemented; use cleartext `password:` for now.
+- **Windows**: keychain lookup is **not yet implemented** in the Java client (C++ / Python clients DO support it via the underlying `keychain` C library + DPAPI). Workaround: cleartext `password:` in `http-settings.yaml`, or `HttpConfig.basicAuth(user, password)` adhoc.
 
 Keychain lookups happen lazily when the request is dispatched. Failures (tool missing on PATH, no entry, timeout) raise `KeychainException` with a clear message.
 

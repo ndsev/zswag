@@ -331,11 +331,11 @@ export HTTP_LOG_LEVEL=trace   # adds request/response bodies, signatures
 
 Storing cleartext secrets in `http-settings.yaml` works but is discouraged. Use the `keychain:` field instead and pre-load the secret with the platform's native tool. The keychain "package" is `lib.openapi.zserio.client` (this is hardcoded across all zswag clients so secrets stored by one are visible to the others).
 
-| Platform | Tool | Example |
-|---|---|---|
-| Linux | [`secret-tool`](https://www.marian-dan.ro/blog/storing-secrets-using-secret-tool) | `secret-tool store --label='zswag dev' package lib.openapi.zserio.client service my-service user my-user` |
-| macOS | [`add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html) | `security add-generic-password -s my-service -a my-user -w 'thepassword'` |
-| Windows | [`cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/) | (Java client: not yet implemented — use cleartext for now.) |
+| Platform | Tool | C++ / Python | Java | Example |
+|---|---|---|---|---|
+| Linux | [`secret-tool`](https://www.marian-dan.ro/blog/storing-secrets-using-secret-tool) | ✓ | ✓ | `secret-tool store --label='zswag dev' package lib.openapi.zserio.client service my-service user my-user` |
+| macOS | [`add-generic-password`](https://www.netmeister.org/blog/keychain-passwords.html) | ✓ | ✓ | `security add-generic-password -s my-service -a my-user -w 'thepassword'` |
+| Windows | [`cmdkey`](https://www.scriptinglibrary.com/languages/powershell/how-to-manage-secrets-and-passwords-with-credentialmanager-and-powershell/) | ✓ | ❌ — Java keychain lookup on Windows throws `KeychainException`. Use cleartext `password:` in `http-settings.yaml`, or configure credentials adhoc via `HttpConfig.basicAuth(...)` instead. | `cmdkey /generic:lib.openapi.zserio.client /user:my-user /pass:thepassword` |
 
 ### Disabling persistent settings programmatically
 

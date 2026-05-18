@@ -6,7 +6,9 @@ import io.github.ndsev.zswag.api.ParameterLocation;
 import io.github.ndsev.zswag.api.ParameterStyle;
 import org.junit.jupiter.api.Test;
 
+import java.util.AbstractMap;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -165,5 +167,73 @@ class ParameterEncoderTest {
         // Multi-byte UTF-8 must be percent-encoded byte by byte.
         assertThat(ParameterEncoder.pathEncode("é")).isEqualTo("%C3%A9");
         assertThat(ParameterEncoder.pathEncode("日")).isEqualTo("%E6%97%A5");
+    }
+
+    // ------------------------------------------------------------------------
+    // Map-shaped parameter encoding (matches C++ openapi-parameter-helper).
+    // Currently no caller produces a Map (ZserioReflection only emits scalars and
+    // arrays) but the encoder is ready for a future IReflectableView equivalent.
+    // ------------------------------------------------------------------------
+
+    @Test
+    void mapValueQueryFormExplodeEmitsOnePairPerEntry() {
+        OpenAPIParameter p = OpenAPIParameter.builder("color", ParameterLocation.QUERY)
+                .style(ParameterStyle.FORM).explode(true)
+                .format(ParameterFormat.STRING).build();
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("R", 100);
+        map.put("G", 200);
+        map.put("B", 150);
+        List<Map.Entry<String, String>> pairs = ParameterEncoder.encodeForQuery(p, map);
+        assertThat(pairs).containsExactly(
+                new AbstractMap.SimpleImmutableEntry<>("R", "100"),
+                new AbstractMap.SimpleImmutableEntry<>("G", "200"),
+                new AbstractMap.SimpleImmutableEntry<>("B", "150"));
+    }
+
+    @Test
+    void mapValueQueryFormNoExplodeProducesSinglePair() {
+        OpenAPIParameter p = OpenAPIParameter.builder("color", ParameterLocation.QUERY)
+                .style(ParameterStyle.FORM).explode(false)
+                .format(ParameterFormat.STRING).build();
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("R", "ff");
+        map.put("G", "00");
+        List<Map.Entry<String, String>> pairs = ParameterEncoder.encodeForQuery(p, map);
+        assertThat(pairs).containsExactly(
+                new AbstractMap.SimpleImmutableEntry<>("color", "R,ff,G,00"));
+    }
+
+    @Test
+    void mapValuePathMatrixExplodeEmitsSemicolonPerEntry() {
+        OpenAPIParameter p = OpenAPIParameter.builder("color", ParameterLocation.PATH)
+                .style(ParameterStyle.MATRIX).explode(true)
+                .format(ParameterFormat.STRING).build();
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("R", 1);
+        map.put("G", 2);
+        assertThat(ParameterEncoder.encodeForPath(p, map)).isEqualTo(";R=1;G=2");
+    }
+
+    @Test
+    void mapValuePathLabelExplodeUsesDotKvSep() {
+        OpenAPIParameter p = OpenAPIParameter.builder("color", ParameterLocation.PATH)
+                .style(ParameterStyle.LABEL).explode(true)
+                .format(ParameterFormat.STRING).build();
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("R", 1);
+        map.put("G", 2);
+        assertThat(ParameterEncoder.encodeForPath(p, map)).isEqualTo(".R=1.G=2");
+    }
+
+    @Test
+    void mapValueHeaderSimpleStyleIsCommaJoined() {
+        OpenAPIParameter p = OpenAPIParameter.builder("X-Color", ParameterLocation.HEADER)
+                .style(ParameterStyle.SIMPLE)
+                .format(ParameterFormat.STRING).build();
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("R", 1);
+        map.put("G", 2);
+        assertThat(ParameterEncoder.encodeForHeader(p, map)).isEqualTo("R,1,G,2");
     }
 }
