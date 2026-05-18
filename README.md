@@ -492,18 +492,30 @@ Compound (struct-typed) `x-zserio-request-part` is unsupported across all compon
 
 ### Server URL base path
 
-Each client takes the URL base path from `servers[0]`:
+Each client takes the URL base path from `servers[0]`. Per OpenAPI 3.0+ (clarified in 3.2.0 §4.5.2.1), three URL forms are supported, all resolved against the spec URL via RFC 3986 §5.3 reference resolution:
 
 ```yaml
 servers:
-- http://unused-host-information/path/to/my/api
+  # 1. Absolute — used as-is
+  - url: https://api.example.com/v1
+
+  # 2. Server-relative path — host+scheme from the spec URL, given path
+  - url: /v1
+
+  # 3. Document-relative — resolved against the spec's directory:
+  - url: .         # spec at https://x/foo/openapi.json -> https://x/foo/
+  - url: ./v2      # -> https://x/foo/v2
+  - url: ../v2     # -> https://x/v2
+  - url: v2        # -> https://x/foo/v2 (same as ./v2)
 ```
 
-The host/port comes from the request, but the path prefix is taken from this entry.
+An absent or empty `servers` array defaults to `[{ "url": "/" }]` (server-relative to the spec's origin root).
 
 | Feature | C++ Client | Python Client | Java Client | OAServer | zswag.gen |
 |---|---|---|---|---|---|
-| `servers` | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (absolute URL) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (server-relative `/path`) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (document-relative `.`, `./v2`, `../v2`) | ✔️ | ✔️ | ✔️ | n/a | n/a |
 
 ### Authentication schemes
 

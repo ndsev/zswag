@@ -1858,3 +1858,110 @@ paths:
         );
     }
 }
+
+TEST_CASE("Relative server URLs are resolved against the spec URL", "[oaclient][server-resolution]") {
+    // Minimal OpenAPI spec with a single GET / operation, parameterised servers field.
+    auto makeSpec = [](std::string const& serversBlock) {
+        return std::string(R"(
+openapi: "3.0.0"
+info: { title: t, version: "1.0" }
+)") + serversBlock + R"(
+paths:
+  /ping:
+    get:
+      operationId: ping
+      responses: { '200': { description: ok } }
+)";
+    };
+
+    auto mockSpecFetch = [&](std::string const& specUrl, std::string const& specBody) {
+        httpcl::MockHttpClient client;
+        client.getFun = [specBody](std::string_view uri) {
+            return httpcl::IHttpClient::Result{200, specBody};
+        };
+        return fetchOpenAPIConfig(specUrl, client);
+    };
+
+    SECTION("Absolute server URL — unchanged") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec("servers: [ { url: 'https://other.example.com/api' } ]"));
+        REQUIRE(cfg.servers.size() == 1);
+        REQUIRE(cfg.servers[0].scheme == "https");
+        REQUIRE(cfg.servers[0].host == "other.example.com");
+        REQUIRE(cfg.servers[0].path == "/api");
+    }
+
+    SECTION("Server-relative path '/v2' inherits spec's scheme+host") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec("servers: [ { url: '/v2' } ]"));
+        REQUIRE(cfg.servers[0].scheme == "https");
+        REQUIRE(cfg.servers[0].host == "api.example.com");
+        REQUIRE(cfg.servers[0].path == "/v2");
+    }
+
+    SECTION("Document-relative '.' resolves to the spec's directory") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec("servers: [ { url: '.' } ]"));
+        REQUIRE(cfg.servers[0].scheme == "https");
+        REQUIRE(cfg.servers[0].host == "api.example.com");
+        REQUIRE(cfg.servers[0].path == "/v1/");
+    }
+
+    SECTION("Document-relative './v2' appends to the spec's directory") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec("servers: [ { url: './v2' } ]"));
+        REQUIRE(cfg.servers[0].path == "/v1/v2");
+    }
+
+    SECTION("Document-relative '../v2' goes one directory up") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec("servers: [ { url: '../v2' } ]"));
+        REQUIRE(cfg.servers[0].path == "/v2");
+    }
+
+    SECTION("Document-relative bare 'v2' is equivalent to './v2'") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec("servers: [ { url: 'v2' } ]"));
+        REQUIRE(cfg.servers[0].path == "/v1/v2");
+    }
+
+    SECTION("Empty servers array defaults to '/' resolved against spec's origin") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec("servers: []"));
+        REQUIRE(cfg.servers[0].scheme == "https");
+        REQUIRE(cfg.servers[0].host == "api.example.com");
+        REQUIRE(cfg.servers[0].path == "/");
+    }
+
+    SECTION("Spec URL with port — port carries into the resolved server URL") {
+        auto cfg = mockSpecFetch(
+            "http://localhost:8080/api/openapi.json",
+            makeSpec("servers: [ { url: '.' } ]"));
+        REQUIRE(cfg.servers[0].host == "localhost");
+        REQUIRE(cfg.servers[0].port == 8080);
+        REQUIRE(cfg.servers[0].path == "/api/");
+    }
+
+    SECTION("Multiple servers — each resolved independently") {
+        auto cfg = mockSpecFetch(
+            "https://api.example.com/v1/openapi.json",
+            makeSpec(R"(servers:
+  - url: 'https://other.example.com/api'
+  - url: '/v2'
+  - url: '.'
+  - url: '../v3'
+)"));
+        REQUIRE(cfg.servers.size() == 4);
+        REQUIRE(cfg.servers[0].build() == "https://other.example.com/api");
+        REQUIRE(cfg.servers[1].build() == "https://api.example.com/v2");
+        REQUIRE(cfg.servers[2].build() == "https://api.example.com/v1/");
+        REQUIRE(cfg.servers[3].build() == "https://api.example.com/v3");
+    }
+}
