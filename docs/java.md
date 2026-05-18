@@ -227,7 +227,7 @@ Highlights:
 - All `x-zserio-request-part` forms: whole-blob (`*`), scalar, array. Compound `x-zserio-request-part` is unsupported by all clients.
 - All formats: `string`, `byte`, `base64`, `base64url`, `hex`, `binary`.
 - All array styles: `simple`, `label`, `matrix`, `form` × `explode: true|false`.
-- Server URL base path resolution (single `servers[0]`).
+- Server URL base path resolution; multi-server selection via the `serverIndex` constructor parameter (matches C++ `OAClient(..., uint32_t serverIndex)` and Python `OAClient(..., server_index=N)`).
 - All security schemes: HTTP Basic, HTTP Bearer, API key (cookie/header/query), OAuth2 client credentials with both `rfc6749-client-secret-basic` and `rfc5849-oauth1-signature` token-endpoint auth. OpenID Connect is not supported (unsupported across all zswag clients).
 
 ## Running the integration test

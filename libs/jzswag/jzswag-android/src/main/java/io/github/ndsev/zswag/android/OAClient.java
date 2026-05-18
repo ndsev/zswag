@@ -62,10 +62,25 @@ public final class OAClient implements ServiceClientInterface {
      */
     public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
                        @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc) throws IOException {
+        this(context, openApiSpecUrl, persistent, adhoc, 0);
+    }
+
+    /**
+     * Creates a client targeting a specific entry of the spec's {@code servers[]}
+     * array. Mirrors C++ {@code OAClient(..., uint32_t serverIndex)} and Python
+     * {@code OAClient(..., server_index=N)} — see issue #113.
+     *
+     * @param serverIndex index into the parsed {@code servers[]} array (default 0).
+     *                    {@link IOException} is thrown during construction if the
+     *                    index is out of bounds.
+     */
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+                       @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc,
+                       int serverIndex) throws IOException {
         AndroidLogging.init();
         IKeychain keychain = new AndroidKeychain(context);
         AndroidHttpClient http = new AndroidHttpClient(persistent, keychain);
-        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain);
+        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain, serverIndex);
     }
 
     /** Lower-level constructor — for tests / advanced use. */

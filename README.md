@@ -492,18 +492,36 @@ Compound (struct-typed) `x-zserio-request-part` is unsupported across all compon
 
 ### Server URL base path
 
-Each client takes the URL base path from `servers[0]`:
+Each client takes the URL base path from `servers[N]` (default `N = 0`):
 
 ```yaml
 servers:
 - http://unused-host-information/path/to/my/api
 ```
 
-The host/port comes from the request, but the path prefix is taken from this entry.
+The host/port comes from the request, but the path prefix is taken from this entry. To target a non-default server entry, pass `serverIndex` / `server_index`:
+
+```cpp
+// C++
+auto client = zswagcl::OAClient(config, std::move(httpClient), httpConfig, /*serverIndex=*/1);
+```
+
+```python
+# Python
+client = OAClient("http://host/openapi.json", server_index=1)
+```
+
+```java
+// Java (JVM)
+OAClient transport = new OAClient(url, persistent, adhoc, /*serverIndex=*/ 1);
+// Java (Android)
+OAClient transport = new OAClient(context, url, persistent, adhoc, 1);
+```
 
 | Feature | C++ Client | Python Client | Java Client | OAServer | zswag.gen |
 |---|---|---|---|---|---|
-| `servers` | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (URL pickup) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| Selecting `servers[N]` (multi-server) | ✔️ | ✔️ | ✔️ | n/a | n/a |
 
 ### Authentication schemes
 

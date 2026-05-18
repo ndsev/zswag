@@ -43,19 +43,46 @@ public class OpenApiClient implements IOpenApiClient {
     private final IKeychain keychain;
     private final OpenAPIParser parser;
     private final String baseUrl;
+    private final int serverIndex;
 
     public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
                          @NotNull IKeychain keychain) throws IOException {
-        this(specLocation, httpClient, HttpConfig.empty(), keychain);
+        this(specLocation, httpClient, HttpConfig.empty(), keychain, 0);
     }
 
     public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
                          @NotNull HttpConfig adhoc, @NotNull IKeychain keychain) throws IOException {
+        this(specLocation, httpClient, adhoc, keychain, 0);
+    }
+
+    /**
+     * @param serverIndex index into the spec's {@code servers[]} array (default 0).
+     *                    Matches C++ {@code OAClient(..., uint32_t serverIndex)} and
+     *                    Python {@code OAClient(..., server_index=N)}. Out-of-bounds
+     *                    values raise an {@link IOException} during construction.
+     */
+    public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                         @NotNull HttpConfig adhoc, @NotNull IKeychain keychain,
+                         int serverIndex) throws IOException {
+        if (serverIndex < 0) {
+            throw new IllegalArgumentException(
+                    "serverIndex must be >= 0, got " + serverIndex);
+        }
         this.specLocation = specLocation;
         this.httpClient = httpClient;
         this.adhoc = adhoc;
         this.keychain = keychain;
+        this.serverIndex = serverIndex;
         this.parser = parseSpec(specLocation, httpClient, adhoc, keychain);
+        // Validate the chosen index against the parsed spec's servers list.
+        // An empty servers list is treated as [{ "url": "/" }] per OpenAPI 3.0+ §4.7.5,
+        // so index 0 is always valid even with no declared servers.
+        int actualServerCount = Math.max(parser.getServers().size(), 1);
+        if (serverIndex >= actualServerCount) {
+            throw new IOException(String.format(
+                    "serverIndex %d is out of bounds (spec declares %d server(s))",
+                    serverIndex, actualServerCount));
+        }
         this.baseUrl = resolveBaseUrl();
     }
 
@@ -103,7 +130,7 @@ public class OpenApiClient implements IOpenApiClient {
     @NotNull
     private String resolveBaseUrl() {
         List<String> servers = parser.getServers();
-        String serverUrl = !servers.isEmpty() ? servers.get(0) : "";
+        String serverUrl = !servers.isEmpty() ? servers.get(serverIndex) : "";
         boolean isRelativeUrl = serverUrl.isEmpty() || serverUrl.startsWith("/");
 
         if (isRelativeUrl && specLocation.startsWith("http")) {
