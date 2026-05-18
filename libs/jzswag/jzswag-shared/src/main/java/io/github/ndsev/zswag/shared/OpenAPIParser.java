@@ -159,10 +159,13 @@ public class OpenAPIParser {
                     parseOAuth2Flows(name, (Map<String, Object>) schemeData.get("flows"), builder);
                     break;
                 case OPEN_ID_CONNECT:
-                    // Not supported by zswag clients; we still parse so the spec doesn't fail to load,
-                    // but applySecurityScheme will refuse to dispatch a request that requires it.
-                    logger.warn("Security scheme '{}' uses openIdConnect, which is not supported by zswag clients", name);
-                    break;
+                    // Match C++ openapi-parser.cpp: reject at parse time so a Java client and a
+                    // C++ client either both load or both refuse the same spec. A spec containing
+                    // an openIdConnect scheme that isn't actually used at any operation will be
+                    // rejected here too — same trade-off as C++.
+                    throw new IllegalArgumentException(
+                            "Security scheme '" + name + "' uses openIdConnect, which is not supported "
+                                    + "by zswag clients (use 'http' bearer or 'oauth2' clientCredentials instead)");
             }
 
             SecurityScheme scheme = builder.build();

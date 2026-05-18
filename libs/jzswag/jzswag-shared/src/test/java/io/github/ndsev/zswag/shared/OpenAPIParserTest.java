@@ -356,7 +356,9 @@ class OpenAPIParserTest {
     }
 
     @Test
-    void openIdConnectSchemeIsAcceptedButLogged(@TempDir Path dir) throws IOException {
+    void openIdConnectSchemeRejectedAtParseTime(@TempDir Path dir) throws IOException {
+        // Matches C++ openapi-parser.cpp: openIdConnect is rejected up-front so a Java
+        // client and a C++ client either both load or both refuse the same spec.
         Path p = writeSpec(dir, String.join("\n",
                 "openapi: '3.0.0'",
                 "info: {title: t, version: '1'}",
@@ -364,9 +366,10 @@ class OpenAPIParserTest {
                 "  securitySchemes:",
                 "    OIDC: {type: openIdConnect, openIdConnectUrl: 'https://x/.well-known'}",
                 "paths: {}"));
-        OpenAPIParser parser = new OpenAPIParser(p.toString());
-        SecurityScheme s = parser.getSecuritySchemes().get("OIDC");
-        assertThat(s.getType()).isEqualTo(SecuritySchemeType.OPEN_ID_CONNECT);
+        assertThatThrownBy(() -> new OpenAPIParser(p.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("openIdConnect")
+                .hasMessageContaining("not supported");
     }
 
     @Test

@@ -110,10 +110,14 @@ public class OpenApiClient implements IOpenApiClient {
             return new OpenAPIParser(specLocation);
         }
         if (oauth.tokenUrlOverride.isEmpty()) {
-            throw new IOException("OAuth2 useForSpecFetch=true requires oauth2.tokenUrl in http-settings "
-                    + "(the spec has not been fetched yet so its flows.clientCredentials.tokenUrl is "
-                    + "unknown). Either set oauth2.tokenUrl, or set useForSpecFetch=false if the spec "
-                    + "endpoint is publicly readable.");
+            // Match C++ acquireOAuth2TokenForSpecFetch (openapi-oauth.cpp:283-345): warn and
+            // continue unauthenticated rather than refusing to construct. If the spec endpoint
+            // actually requires the token, the 401 will surface from OpenAPIParser instead —
+            // letting the user see the real failure rather than failing at instantiation.
+            logger.warn("[OAuth2] useForSpecFetch=true but oauth2.tokenUrl is not set in http-settings; "
+                    + "fetching spec '{}' unauthenticated. Set oauth2.tokenUrl, or set useForSpecFetch=false "
+                    + "to suppress this warning if the spec endpoint is publicly readable.", specLocation);
+            return new OpenAPIParser(specLocation);
         }
         try {
             OAuth2Handler handler = new OAuth2Handler(httpClient, keychain);
@@ -123,7 +127,11 @@ public class OpenApiClient implements IOpenApiClient {
             return new OpenAPIParser(specLocation,
                     conn -> conn.setRequestProperty("Authorization", "Bearer " + token));
         } catch (HttpException e) {
-            throw new IOException("OAuth2 token mint for spec fetch failed: " + e.getMessage(), e);
+            // Mint failure: also warn-and-continue, matching C++ behaviour. The downstream
+            // OpenAPIParser request will surface the real auth failure as a 401 if needed.
+            logger.warn("[OAuth2] Pre-fetch token mint failed for spec '{}': {}. "
+                    + "Continuing without Authorization header.", specLocation, e.getMessage());
+            return new OpenAPIParser(specLocation);
         }
     }
 
@@ -388,7 +396,15 @@ public class OpenApiClient implements IOpenApiClient {
             case HTTP: {
                 String s = scheme.getScheme() == null ? "" : scheme.getScheme().toLowerCase();
                 if ("basic".equals(s)) {
-                    if (!effective.getAuth().isPresent()) {
+                    // Accept either basic-auth credentials in the merged config OR a
+                    // pre-set Authorization: Basic header (matches C++ HttpBasicHandler::satisfy
+                    // at openapi-security.cpp:22-37). Without this, a user who configures
+                    // their own static Authorization header gets a misleading "no basic-auth
+                    // configured" error.
+                    boolean hasBasicHeader = effective.getHeader("Authorization")
+                            .map(v -> v.toLowerCase().startsWith("basic "))
+                            .orElse(false);
+                    if (!effective.getAuth().isPresent() && !hasBasicHeader) {
                         throw new HttpException("HTTP Basic auth required but no basic-auth configured");
                     }
                 } else if ("bearer".equals(s)) {

@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -190,8 +189,9 @@ class OAuth2HandlerTest {
         if (minted == null) {
             throw new IllegalStateException("No cached token for key " + key);
         }
-        Field expiresAt = minted.getClass().getDeclaredField("expiresAt");
-        expiresAt.setAccessible(true);
-        expiresAt.set(minted, Instant.now().minusSeconds(60));
+        Field expiresAtNanos = minted.getClass().getDeclaredField("expiresAtNanos");
+        expiresAtNanos.setAccessible(true);
+        // Set a deadline 60s in the past on the monotonic clock.
+        expiresAtNanos.setLong(minted, System.nanoTime() - java.util.concurrent.TimeUnit.SECONDS.toNanos(60));
     }
 }

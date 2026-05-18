@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -90,7 +90,7 @@ public final class OAuth2Handler {
 
         // Fast path: cached and valid.
         MintedToken cached = CACHE.get(key);
-        if (cached != null && Instant.now().isBefore(cached.expiresAt)) {
+        if (cached != null && System.nanoTime() < cached.expiresAtNanos) {
             logger.debug("[OAuth2] Using cached token (still valid)");
             return cached.accessToken;
         }
@@ -100,7 +100,7 @@ public final class OAuth2Handler {
         try {
             // Recheck after acquiring lock.
             cached = CACHE.get(key);
-            if (cached != null && Instant.now().isBefore(cached.expiresAt)) {
+            if (cached != null && System.nanoTime() < cached.expiresAtNanos) {
                 return cached.accessToken;
             }
 
@@ -219,7 +219,10 @@ public final class OAuth2Handler {
         // token (expires_in < 30) doesn't go straight into the past and trigger an
         // infinite re-mint loop.
         long effectiveLifetime = Math.max(expiresIn - 30, 1);
-        minted.expiresAt = Instant.now().plusSeconds(effectiveLifetime);
+        // Use monotonic clock (matches C++ openapi-oauth.cpp:56 which uses std::chrono::steady_clock):
+        // wall-clock jumps from NTP slews or manual time changes must not retroactively expire
+        // valid tokens or extend the lifetime of an expired one.
+        minted.expiresAtNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(effectiveLifetime);
         if (json.has("refresh_token")) {
             minted.refreshToken = json.get("refresh_token").getAsString();
         } else if (GRANT_TYPE_REFRESH_TOKEN.equals(grantType) && !refreshToken.isEmpty()) {
@@ -293,6 +296,7 @@ public final class OAuth2Handler {
     private static final class MintedToken {
         String accessToken = "";
         String refreshToken = "";
-        Instant expiresAt = Instant.EPOCH;
+        /** Monotonic-clock deadline. Compare via {@code System.nanoTime() < expiresAtNanos}. */
+        long expiresAtNanos = 0L;
     }
 }
