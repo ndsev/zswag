@@ -133,4 +133,37 @@ class ParameterEncoderTest {
         // 'x y' must be url-encoded.
         assertThat(ParameterEncoder.buildQueryString(pairs)).isEqualTo("id=1&id=2&name=x+y");
     }
+
+    @Test
+    void pathEncodePreservesMatrixAndLabelDelimiters() {
+        // Critical for path styles 'matrix' (uses ';' and '=') and 'label' (uses '.').
+        // urlEncode would mangle these to %3B/%3D/%2E and break server-side parsing.
+        assertThat(ParameterEncoder.pathEncode(";id=42")).isEqualTo(";id=42");
+        assertThat(ParameterEncoder.pathEncode(".42")).isEqualTo(".42");
+        assertThat(ParameterEncoder.pathEncode(";a=1;b=2")).isEqualTo(";a=1;b=2");
+        assertThat(ParameterEncoder.pathEncode(".1.2.3")).isEqualTo(".1.2.3");
+    }
+
+    @Test
+    void pathEncodeKeepsUnreservedAndSubDelimsVerbatim() {
+        // RFC 3986 §3.3 pchar: unreserved / pct-encoded / sub-delims / ":" / "@"
+        String pchar = "abcXYZ0189-._~!$&'()*+,;=:@";
+        assertThat(ParameterEncoder.pathEncode(pchar)).isEqualTo(pchar);
+    }
+
+    @Test
+    void pathEncodeEscapesReservedAndSeparatorChars() {
+        // Reserved gen-delims plus the segment separator MUST be encoded inside a value.
+        assertThat(ParameterEncoder.pathEncode("a/b")).isEqualTo("a%2Fb");
+        assertThat(ParameterEncoder.pathEncode("a?b")).isEqualTo("a%3Fb");
+        assertThat(ParameterEncoder.pathEncode("a#b")).isEqualTo("a%23b");
+        assertThat(ParameterEncoder.pathEncode("a b")).isEqualTo("a%20b");  // space -> %20, not '+'
+    }
+
+    @Test
+    void pathEncodeIsUtf8Aware() {
+        // Multi-byte UTF-8 must be percent-encoded byte by byte.
+        assertThat(ParameterEncoder.pathEncode("é")).isEqualTo("%C3%A9");
+        assertThat(ParameterEncoder.pathEncode("日")).isEqualTo("%E6%97%A5");
+    }
 }

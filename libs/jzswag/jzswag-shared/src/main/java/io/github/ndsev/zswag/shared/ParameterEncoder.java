@@ -282,6 +282,60 @@ public class ParameterEncoder {
     }
 
     /**
+     * RFC 3986 path-component encoder.
+     *
+     * <p>Crucially differs from {@link #urlEncode} ({@code application/x-www-form-urlencoded}):
+     * the path encoder preserves the sub-delims ({@code !$&'()*+,;=}), the unreserved
+     * pchar bytes ({@code -._~}), and {@code :} and {@code @} — all of which are valid
+     * in a path segment per RFC 3986 §3.3. This matches the C++ httpcl
+     * {@code URIComponents::appendPath} behaviour and is required for the OpenAPI path
+     * styles {@code matrix} (uses {@code ;}, {@code =}) and {@code label} (uses {@code .}).
+     *
+     * <p>Without this distinction, a matrix-styled value like {@code ;id=42} would be
+     * mangled to {@code %3Bid%3D42}, and the server would not recognise it as matrix syntax.
+     */
+    @NotNull
+    public static String pathEncode(@NotNull String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        StringBuilder out = new StringBuilder(bytes.length);
+        for (byte raw : bytes) {
+            int b = raw & 0xff;
+            if (isUnreservedPChar(b)) {
+                out.append((char) b);
+            } else {
+                out.append('%');
+                out.append(HEX_DIGITS[(b >> 4) & 0xF]);
+                out.append(HEX_DIGITS[b & 0xF]);
+            }
+        }
+        return out.toString();
+    }
+
+    private static final char[] HEX_DIGITS = "0123456789ABCDEF".toCharArray();
+
+    /**
+     * True for bytes that are valid as-is in a path segment per RFC 3986 §3.3 (pchar):
+     * unreserved | sub-delims | ":" | "@". '/' is NOT included — segment separator must
+     * stay an escape candidate; callers handle the separator themselves.
+     */
+    private static boolean isUnreservedPChar(int b) {
+        // unreserved: ALPHA / DIGIT / "-" / "." / "_" / "~"
+        if ((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')) return true;
+        switch (b) {
+            // unreserved
+            case '-': case '.': case '_': case '~':
+            // sub-delims
+            case '!': case '$': case '&': case '\'': case '(': case ')':
+            case '*': case '+': case ',': case ';': case '=':
+            // pchar additions
+            case ':': case '@':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * Builds a query string from an ordered list of {@code (name, value)} pairs,
      * preserving order and duplicates so that {@code style: form, explode: true}
      * yields the expected {@code ?id=1&id=2&id=3}.

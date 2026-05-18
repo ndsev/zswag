@@ -244,8 +244,12 @@ public class OpenApiClient implements IOpenApiClient {
 
             switch (param.getLocation()) {
                 case PATH:
+                    // Use RFC 3986 path encoder (NOT URLEncoder which is form-urlencoded).
+                    // The form encoder would mangle matrix-style ';key=value' to '%3Bkey%3Dvalue'
+                    // and label-style '.value' to '%2Evalue', breaking the URL syntax the server
+                    // expects. See ParameterEncoder.pathEncode and RFC 3986 §3.3.
                     path = path.replace("{" + param.getName() + "}",
-                            ParameterEncoder.urlEncode(ParameterEncoder.encodeForPath(param, value)));
+                            ParameterEncoder.pathEncode(ParameterEncoder.encodeForPath(param, value)));
                     break;
                 case QUERY:
                     queryPairs.addAll(ParameterEncoder.encodeForQuery(param, value));
