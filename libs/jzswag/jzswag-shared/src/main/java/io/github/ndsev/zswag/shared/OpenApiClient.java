@@ -134,9 +134,21 @@ public class OpenApiClient implements IOpenApiClient {
     }
 
     /**
-     * Resolves the base URL for API requests by resolving the OpenAPI spec's
-     * {@code servers[serverIndex].url} against the spec location, per OpenAPI 3.0+
-     * (clarified in OpenAPI 3.2.0 §4.5.2.1).
+     * Instance-level wrapper: picks {@code servers[serverIndex].url} (or "/" if absent)
+     * and delegates to the static resolver. Kept package-private for testing.
+     */
+    @NotNull
+    private String resolveBaseUrl() {
+        List<String> servers = parser.getServers();
+        // Per OpenAPI 3.0+ §4.7.5, absent/empty `servers` implies `[{ "url": "/" }]`;
+        // the constructor guarantees serverIndex == 0 in that case.
+        String serverUrl = !servers.isEmpty() ? servers.get(serverIndex) : "/";
+        return resolveBaseUrl(specLocation, serverUrl);
+    }
+
+    /**
+     * Resolves an OpenAPI {@code servers[].url} against the spec location, per
+     * OpenAPI 3.0+ (clarified in OpenAPI 3.2.0 §4.5.2.1).
      *
      * <p>Supports the three permitted URL forms:
      * <ul>
@@ -148,19 +160,14 @@ public class OpenApiClient implements IOpenApiClient {
      *       which implements RFC 3986 §5.3.</li>
      * </ul>
      *
-     * <p>Works for HTTP(S) and local-file spec locations alike. An empty/absent
-     * {@code servers} array defaults to {@code "/"} per the spec.
+     * <p>Works for HTTP(S) and local-file spec locations alike. Package-private so
+     * tests can exercise each branch directly without spinning up an HTTP server.
      */
     @NotNull
-    private String resolveBaseUrl() {
-        List<String> servers = parser.getServers();
-        // Per OpenAPI 3.0+ §4.7.5, absent/empty `servers` implies `[{ "url": "/" }]`;
-        // the constructor guarantees serverIndex == 0 in that case.
-        String serverUrl = !servers.isEmpty() ? servers.get(serverIndex) : "/";
-
+    static String resolveBaseUrl(@NotNull String specLocation, @NotNull String serverUrl) {
         java.net.URI specBase;
         try {
-            specBase = specLocationAsUri();
+            specBase = specLocationAsUri(specLocation);
         } catch (java.net.URISyntaxException e) {
             logger.warn("Spec location '{}' is not a valid URI; returning server URL as-is: {}",
                     specLocation, e.getMessage());
@@ -199,7 +206,7 @@ public class OpenApiClient implements IOpenApiClient {
      * its parent directory.
      */
     @NotNull
-    private java.net.URI specLocationAsUri() throws java.net.URISyntaxException {
+    private static java.net.URI specLocationAsUri(@NotNull String specLocation) throws java.net.URISyntaxException {
         if (specLocation.startsWith("http://") || specLocation.startsWith("https://")
                 || specLocation.startsWith("file://")) {
             return new java.net.URI(specLocation);
