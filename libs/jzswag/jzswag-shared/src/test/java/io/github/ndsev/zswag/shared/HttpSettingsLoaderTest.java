@@ -3,11 +3,16 @@ package io.github.ndsev.zswag.shared;
 import io.github.ndsev.zswag.api.HttpConfig;
 import io.github.ndsev.zswag.api.HttpSettings;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -226,5 +231,62 @@ class HttpSettingsLoaderTest {
             map.put((String) kvs[i], kvs[i + 1]);
         }
         return map;
+    }
+
+    // ------------------------------------------------------------------------
+    // Write-back round-trip tests (HttpSettingsLoader.writeToFile)
+    // ------------------------------------------------------------------------
+
+    @Test
+    void writeToFileEmittedYamlCanBeReloadedToEquivalentSettings(@TempDir Path tmp) throws Exception {
+        HttpConfig.OAuth2 oauth = HttpConfig.OAuth2.builder()
+                .clientId("client-A")
+                .clientSecretKeychain("kc-A")
+                .tokenUrl("https://idp/token")
+                .scopes(Arrays.asList("api.read", "api.write"))
+                .build();
+        HttpConfig entry = HttpConfig.builder()
+                .scope("https://*.api.example.com/*", HttpSettings.compileScope("https://*.api.example.com/*"))
+                .header("X-Trace", "enabled")
+                .query("v", "2")
+                .basicAuth("alice", "secret")
+                .oauth2(oauth)
+                .build();
+        HttpSettings settings = new HttpSettings(Collections.singletonList(entry));
+
+        Path out = tmp.resolve("written.yaml");
+        HttpSettingsLoader.writeToFile(out, settings);
+        assertThat(Files.size(out)).isPositive();
+
+        HttpSettings reloaded = HttpSettingsLoader.loadFromFile(out);
+        assertThat(reloaded.getEntries()).hasSize(1);
+        HttpConfig r = reloaded.getEntries().get(0);
+        assertThat(r.getScope()).contains("https://*.api.example.com/*");
+        assertThat(r.getHeader("X-Trace")).contains("enabled");
+        assertThat(r.getQuery().get("v")).containsExactly("2");
+        assertThat(r.getAuth()).isPresent();
+        assertThat(r.getAuth().get().user).isEqualTo("alice");
+        assertThat(r.getOAuth2()).isPresent();
+        assertThat(r.getOAuth2().get().clientId).isEqualTo("client-A");
+        assertThat(r.getOAuth2().get().tokenUrlOverride).isEqualTo("https://idp/token");
+        assertThat(r.getOAuth2().get().scopesOverride).containsExactly("api.read", "api.write");
+    }
+
+    @Test
+    void writeToFileOmitsEmptyOptionalFields(@TempDir Path tmp) throws Exception {
+        // A minimal config with only headers should not emit empty basic-auth / proxy / oauth2
+        // blocks.
+        HttpConfig minimal = HttpConfig.builder()
+                .scope("*", HttpSettings.compileScope("*"))
+                .header("X-Foo", "bar")
+                .build();
+        Path out = tmp.resolve("minimal.yaml");
+        HttpSettingsLoader.writeToFile(out, new HttpSettings(Collections.singletonList(minimal)));
+        String written = Files.readString(out);
+        assertThat(written)
+                .contains("X-Foo")
+                .doesNotContain("basic-auth")
+                .doesNotContain("proxy")
+                .doesNotContain("oauth2");
     }
 }

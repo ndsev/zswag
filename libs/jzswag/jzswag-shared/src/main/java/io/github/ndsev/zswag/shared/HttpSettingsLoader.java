@@ -10,12 +10,14 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -340,6 +342,102 @@ public final class HttpSettingsLoader {
         }
 
         return b.build();
+    }
+
+    // ------------------------------------------------------------------------
+    // Write-back: serialize HttpSettings back to YAML.
+    //
+    // Mirrors C++ Settings::store (http-settings.cpp:484). Useful for tooling
+    // that updates credentials programmatically and re-writes the settings file.
+    // The HotReloader on the active HTTP client will pick the change up
+    // automatically on the next request.
+    // ------------------------------------------------------------------------
+
+    /**
+     * Writes a {@link HttpSettings} snapshot to a YAML file in the same schema this
+     * loader reads. Secrets are written verbatim; the caller is responsible for
+     * choosing whether to embed cleartext passwords or keychain references when
+     * building the {@link HttpConfig} entries.
+     *
+     * @param destination path to write to (will be created or overwritten)
+     * @param settings    snapshot to serialize
+     * @throws IOException on filesystem failure
+     */
+    public static void writeToFile(@NotNull Path destination, @NotNull HttpSettings settings) throws IOException {
+        try (BufferedWriter writer = Files.newBufferedWriter(destination)) {
+            org.yaml.snakeyaml.DumperOptions opts = new org.yaml.snakeyaml.DumperOptions();
+            opts.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+            opts.setIndent(2);
+            opts.setPrettyFlow(true);
+            new Yaml(opts).dump(settingsToYamlTree(settings), writer);
+        }
+    }
+
+    /** Convert HttpSettings → POJO tree (Maps/Lists/Strings) for SnakeYAML's dump(). */
+    @NotNull
+    private static Map<String, Object> settingsToYamlTree(@NotNull HttpSettings settings) {
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (HttpConfig config : settings.getEntries()) {
+            entries.add(configToYamlTree(config));
+        }
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("http-settings", entries);
+        return root;
+    }
+
+    @NotNull
+    private static Map<String, Object> configToYamlTree(@NotNull HttpConfig config) {
+        Map<String, Object> e = new LinkedHashMap<>();
+        // Scope: prefer the original scope glob, fall back to urlPattern if only that's set.
+        config.getScope().ifPresent(s -> e.put("scope", s));
+        if (!config.getScope().isPresent() && config.getUrlPattern().isPresent()) {
+            e.put("url", config.getUrlPattern().get().pattern());
+        }
+        config.getAuth().ifPresent(auth -> {
+            Map<String, Object> a = new LinkedHashMap<>();
+            a.put("user", auth.user);
+            if (!auth.password.isEmpty()) a.put("password", auth.password);
+            if (!auth.keychain.isEmpty()) a.put("keychain", auth.keychain);
+            e.put("basic-auth", a);
+        });
+        config.getProxy().ifPresent(p -> {
+            Map<String, Object> proxy = new LinkedHashMap<>();
+            proxy.put("host", p.host);
+            proxy.put("port", p.port);
+            if (!p.user.isEmpty()) proxy.put("user", p.user);
+            if (!p.password.isEmpty()) proxy.put("password", p.password);
+            if (!p.keychain.isEmpty()) proxy.put("keychain", p.keychain);
+            e.put("proxy", proxy);
+        });
+        if (!config.getCookies().isEmpty()) e.put("cookies", new LinkedHashMap<>(config.getCookies()));
+        if (!config.getHeaders().isEmpty()) {
+            // Flatten single-value headers; preserve list form for multi-valued.
+            Map<String, Object> headers = new LinkedHashMap<>();
+            for (Map.Entry<String, List<String>> h : config.getHeaders().entrySet()) {
+                headers.put(h.getKey(), h.getValue().size() == 1 ? h.getValue().get(0) : new ArrayList<>(h.getValue()));
+            }
+            e.put("headers", headers);
+        }
+        if (!config.getQuery().isEmpty()) {
+            Map<String, Object> query = new LinkedHashMap<>();
+            for (Map.Entry<String, List<String>> q : config.getQuery().entrySet()) {
+                query.put(q.getKey(), q.getValue().size() == 1 ? q.getValue().get(0) : new ArrayList<>(q.getValue()));
+            }
+            e.put("query", query);
+        }
+        config.getApiKey().ifPresent(k -> e.put("api-key", k));
+        config.getOAuth2().ifPresent(o -> {
+            Map<String, Object> oauth = new LinkedHashMap<>();
+            if (!o.clientId.isEmpty()) oauth.put("clientId", o.clientId);
+            if (!o.clientSecret.isEmpty()) oauth.put("clientSecret", o.clientSecret);
+            if (!o.clientSecretKeychain.isEmpty()) oauth.put("clientSecretKeychain", o.clientSecretKeychain);
+            if (!o.tokenUrlOverride.isEmpty()) oauth.put("tokenUrl", o.tokenUrlOverride);
+            if (!o.refreshUrlOverride.isEmpty()) oauth.put("refreshUrl", o.refreshUrlOverride);
+            if (!o.audience.isEmpty()) oauth.put("audience", o.audience);
+            if (!o.scopesOverride.isEmpty()) oauth.put("scope", new ArrayList<>(o.scopesOverride));
+            e.put("oauth2", oauth);
+        });
+        return e;
     }
 
     @Nullable
