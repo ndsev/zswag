@@ -4,7 +4,7 @@ Platform-agnostic core of the zswag Java client. Sits between `jzswag-api` (inte
 
 ## Contents
 
-- **`OpenAPIClient`** — the request-decomposition + dispatch core. Reads `x-zserio-request-part` from the parsed spec, encodes parameters via `ParameterEncoder`, applies security via `applySecurity()`, and hands the final `HttpRequest` off to the injected `IHttpClient`.
+- **`OpenApiClient`** — the request-decomposition + dispatch core. Reads `x-zserio-request-part` from the parsed spec, encodes parameters via `ParameterEncoder`, applies security via `applySecurity()`, and hands the final `HttpRequest` off to the injected `IHttpClient`.
 - **`OpenAPIParser`** — SnakeYAML-based OpenAPI 3.0 parser, with full support for the zswag extensions (`x-zserio-request-part`, `application/x-zserio-object`, OAuth2 `clientCredentials` flow). Rejects PATCH operations and non-`clientCredentials` OAuth2 flows up front.
 - **`ParameterEncoder`** — per-location encoding (`encodeForPath`, `encodeForQuery`, `encodeForHeader`, `encodeForCookie`) covering `simple`/`label`/`matrix`/`form` × `explode` × `string`/`byte`/`base64`/`base64url`/`hex`/`binary`.
 - **`OAuth2Handler`** — client-credentials flow with cached, refresh-token-aware token minting. Supports both `rfc6749-client-secret-basic` and `rfc5849-oauth1-signature` token-endpoint authentication. Takes an `IKeychain` so it can resolve a `clientSecretKeychain` reference on either platform.

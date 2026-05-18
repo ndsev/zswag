@@ -5,7 +5,7 @@ import io.github.ndsev.zswag.api.HttpException;
 import io.github.ndsev.zswag.api.HttpSettings;
 import io.github.ndsev.zswag.api.IKeychain;
 import io.github.ndsev.zswag.shared.HttpSettingsLoader;
-import io.github.ndsev.zswag.shared.OpenAPIClient;
+import io.github.ndsev.zswag.shared.OpenApiClient;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -30,13 +30,13 @@ import java.io.IOException;
  * Double result = calc.powerMethod(new BaseAndExponent(...));
  * }</pre>
  *
- * <p>Internally delegates to {@link OpenAPIClient}, which performs
+ * <p>Internally delegates to {@link OpenApiClient}, which performs
  * {@code x-zserio-request-part} request decomposition.
  */
 public final class OAClient implements ServiceClientInterface {
     private static final Logger logger = LoggerFactory.getLogger(OAClient.class);
 
-    private final OpenAPIClient delegate;
+    private final OpenApiClient delegate;
 
     /**
      * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}
@@ -63,17 +63,17 @@ public final class OAClient implements ServiceClientInterface {
             throws IOException {
         IKeychain keychain = new Keychain();
         JvmHttpClient http = new JvmHttpClient(persistent, keychain);
-        this.delegate = new OpenAPIClient(openApiSpecUrl, http, adhoc, keychain);
+        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain);
     }
 
     /** Lower-level constructor — for tests / advanced use. */
-    public OAClient(@NotNull OpenAPIClient delegate) {
+    public OAClient(@NotNull OpenApiClient delegate) {
         this.delegate = delegate;
     }
 
     /** Exposes the underlying OpenAPI client (read-only) for introspection. */
     @NotNull
-    public OpenAPIClient getOpenAPIClient() {
+    public OpenApiClient getOpenApiClient() {
         return delegate;
     }
 

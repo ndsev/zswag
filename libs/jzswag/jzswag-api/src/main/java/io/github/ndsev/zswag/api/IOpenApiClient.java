@@ -10,7 +10,7 @@ import java.util.Map;
  * Provides methods for calling OpenAPI endpoints with automatic parameter encoding
  * and authentication handling.
  */
-public interface IOpenAPIClient {
+public interface IOpenApiClient {
     /**
      * Calls an OpenAPI method with the given parameters.
      *

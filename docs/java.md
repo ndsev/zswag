@@ -7,7 +7,7 @@ The Java port of the zswag client ships in two flavours: **JVM** (`jzswag-jvm`, 
 | Module | Role |
 |---|---|
 | `jzswag-api` | Platform-agnostic contracts: `HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `SecurityScheme`, `IHttpClient`, `IKeychain`. No third-party dependencies. |
-| `jzswag-shared` | Portable core: `OpenAPIClient` (request decomposition + dispatch), `OpenAPIParser`, `ParameterEncoder`, `OAuth2Handler`, `OAuth1Signature` (RFC 5849 HMAC-SHA256 token-endpoint auth), `HttpSettingsLoader`. Used by both platform modules. |
+| `jzswag-shared` | Portable core: `OpenApiClient` (request decomposition + dispatch), `OpenAPIParser`, `ParameterEncoder`, `OAuth2Handler`, `OAuth1Signature` (RFC 5849 HMAC-SHA256 token-endpoint auth), `HttpSettingsLoader`. Used by both platform modules. |
 | `jzswag-jvm` | JVM platform module on top of the JDK 11 `HttpClient`. Provides `OAClient`, `JvmHttpClient`, `Keychain` (Linux `secret-tool` / macOS `security`). |
 | `jzswag-android` | Android platform module on top of OkHttp. Provides `OAClient`, `AndroidHttpClient`, `AndroidKeychain` (Android Keystore + AES-GCM-encrypted SharedPreferences). |
 | `jzswag-test` | Cross-stack integration tests (Java client ↔ Python Calculator server). |

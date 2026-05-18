@@ -18,12 +18,12 @@ For the OpenAPI feature support matrix (Java vs C++ vs Python), see [the interop
 
 ## JVM-specific contents
 
-- `OAClient` — public entry point; implements `ServiceClientInterface`. Constructs a `JvmHttpClient` + `Keychain` and delegates to the shared `OpenAPIClient`.
+- `OAClient` — public entry point; implements `ServiceClientInterface`. Constructs a `JvmHttpClient` + `Keychain` and delegates to the shared `OpenApiClient`.
 - `JvmHttpClient` — JDK 11 `HttpClient` wrapper; merges persistent + adhoc config per request; applies SSL/proxy/basic-auth/cookies.
 - `Keychain` — `IKeychain` impl that shells out to platform tools: Linux `secret-tool`, macOS `security`. Windows lookup is not yet implemented.
 - `JzswagLogging` — wires `HTTP_LOG_LEVEL` env var to the logback root logger via reflection.
 
-(All the cross-platform pieces — `OpenAPIClient`, `OpenAPIParser`, `ParameterEncoder`, `ZserioReflection`, `OAuth2Handler`, `OAuth1Signature`, `HttpSettingsLoader` — live in `jzswag-shared`.)
+(All the cross-platform pieces — `OpenApiClient`, `OpenAPIParser`, `ParameterEncoder`, `ZserioReflection`, `OAuth2Handler`, `OAuth1Signature`, `HttpSettingsLoader` — live in `jzswag-shared`.)
 
 ## Dependencies
 

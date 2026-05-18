@@ -31,8 +31,8 @@ import java.util.function.Function;
  *       endpoints or for testing.</li>
  * </ul>
  */
-public class OpenAPIClient implements IOpenAPIClient {
-    private static final Logger logger = LoggerFactory.getLogger(OpenAPIClient.class);
+public class OpenApiClient implements IOpenApiClient {
+    private static final Logger logger = LoggerFactory.getLogger(OpenApiClient.class);
 
     /** zswag MIME type for both request bodies and response Accept header. */
     public static final String ZSERIO_OBJECT_CONTENT_TYPE = "application/x-zserio-object";
@@ -44,12 +44,12 @@ public class OpenAPIClient implements IOpenAPIClient {
     private final OpenAPIParser parser;
     private final String baseUrl;
 
-    public OpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+    public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
                          @NotNull IKeychain keychain) throws IOException {
         this(specLocation, httpClient, HttpConfig.empty(), keychain);
     }
 
-    public OpenAPIClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+    public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
                          @NotNull HttpConfig adhoc, @NotNull IKeychain keychain) throws IOException {
         this.specLocation = specLocation;
         this.httpClient = httpClient;

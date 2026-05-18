@@ -25,9 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Integration tests for {@link OpenAPIClient#applySecurity} (private — exercised
+ * Integration tests for {@link OpenApiClient#applySecurity} (private — exercised
  * via {@code callMethod}). Earlier the dispatch core was reachable in tests
- * only via {@code mock(OpenAPIClient.class)}; these tests construct a real
+ * only via {@code mock(OpenApiClient.class)}; these tests construct a real
  * client against a synthetic OpenAPI spec and a stub {@link IHttpClient} that
  * captures the outgoing request, then assert what was applied.
  *
@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Bearer header), API-key in header, API-key in query, OR-of-AND alternatives
  * fallthrough.
  */
-class OpenAPIClientSecurityTest {
+class OpenApiClientSecurityTest {
 
     @TempDir
     Path tmp;
@@ -135,7 +135,7 @@ class OpenAPIClientSecurityTest {
                         // here, so the spec-fetch branch isn't hit (no HTTP).
                         .build())
                 .build();
-        OpenAPIClient client = new OpenAPIClient(spec.toString(), http, adhoc, noKeychain());
+        OpenApiClient client = new OpenApiClient(spec.toString(), http, adhoc, noKeychain());
 
         client.callMethod("oauth2Op", Collections.emptyMap(), null);
 
@@ -149,7 +149,7 @@ class OpenAPIClientSecurityTest {
         Path spec = writeSpec();
         CapturingHttpClient http = new CapturingHttpClient();
         HttpConfig adhoc = HttpConfig.builder().apiKey("secret-key-value").build();
-        OpenAPIClient client = new OpenAPIClient(spec.toString(), http, adhoc, noKeychain());
+        OpenApiClient client = new OpenApiClient(spec.toString(), http, adhoc, noKeychain());
 
         client.callMethod("apiKeyHeaderOp", Collections.emptyMap(), null);
 
@@ -164,7 +164,7 @@ class OpenAPIClientSecurityTest {
         Path spec = writeSpec();
         CapturingHttpClient http = new CapturingHttpClient();
         HttpConfig adhoc = HttpConfig.builder().apiKey("query-key-value").build();
-        OpenAPIClient client = new OpenAPIClient(spec.toString(), http, adhoc, noKeychain());
+        OpenApiClient client = new OpenApiClient(spec.toString(), http, adhoc, noKeychain());
 
         client.callMethod("apiKeyQueryOp", Collections.emptyMap(), null);
 
@@ -181,7 +181,7 @@ class OpenAPIClientSecurityTest {
         // Only API-key configured: BearerAuth requires Authorization header which we
         // don't provide → applySecurity falls through to the ApiKeyHeader alternative.
         HttpConfig adhoc = HttpConfig.builder().apiKey("api-key-fallback").build();
-        OpenAPIClient client = new OpenAPIClient(spec.toString(), http, adhoc, noKeychain());
+        OpenApiClient client = new OpenApiClient(spec.toString(), http, adhoc, noKeychain());
 
         client.callMethod("alternativeOp", Collections.emptyMap(), null);
 
@@ -199,7 +199,7 @@ class OpenAPIClientSecurityTest {
                 .bearerToken("user-supplied-token")
                 .apiKey("fallback-only-if-bearer-fails")
                 .build();
-        OpenAPIClient client = new OpenAPIClient(spec.toString(), http, adhoc, noKeychain());
+        OpenApiClient client = new OpenApiClient(spec.toString(), http, adhoc, noKeychain());
 
         client.callMethod("alternativeOp", Collections.emptyMap(), null);
 
@@ -224,7 +224,7 @@ class OpenAPIClientSecurityTest {
         // Use an http:// URL so the useForSpecFetch branch fires; the file doesn't have to
         // resolve — we expect to fail before the actual fetch.
         String httpSpecUrl = "http://example.test/spec.yaml";
-        assertThatThrownBy(() -> new OpenAPIClient(httpSpecUrl, http, adhoc, noKeychain()))
+        assertThatThrownBy(() -> new OpenApiClient(httpSpecUrl, http, adhoc, noKeychain()))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("oauth2.tokenUrl");
     }
@@ -235,7 +235,7 @@ class OpenAPIClientSecurityTest {
         CapturingHttpClient http = new CapturingHttpClient();
         // No apiKey, no bearer, no oauth2 — nothing satisfies /alternative.
         HttpConfig adhoc = HttpConfig.empty();
-        OpenAPIClient client = new OpenAPIClient(spec.toString(), http, adhoc, noKeychain());
+        OpenApiClient client = new OpenApiClient(spec.toString(), http, adhoc, noKeychain());
 
         assertThatThrownBy(() -> client.callMethod("alternativeOp", Collections.emptyMap(), null))
                 .isInstanceOf(HttpException.class)
