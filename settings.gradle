@@ -1,0 +1,16 @@
+// Foojay resolver lets Gradle auto-download the toolchain JDK declared in
+// build.gradle (Temurin 17). Without it, contributors need a matching JDK
+// already installed locally, defeating the point of toolchains.
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+rootProject.name = 'zswag'
+
+// Java modules — grouped under libs/jzswag/ so the libs/ root stays focused
+// on the C++/Python siblings (httpcl, zswagcl, zswag, pyzswagcl).
+include 'libs:jzswag:jzswag-api'
+include 'libs:jzswag:jzswag-shared'
+include 'libs:jzswag:jzswag-jvm'
+include 'libs:jzswag:jzswag-android'
+include 'libs:jzswag:jzswag-test'

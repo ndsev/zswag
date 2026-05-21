@@ -1,0 +1,121 @@
+// Android port of the zswag client.
+//
+// IMPORTANT: this module uses the plain `java-library` plugin instead of
+// `com.android.library`. Why?
+//
+//   The Android Gradle Plugin invokes `aapt2` even for resource-free library
+//   modules, and Google currently only ships x86_64 Linux aapt2 binaries.
+//   On aarch64 Linux build hosts the AGP build fails with
+//   "AAPT2 daemon startup failed" on `verifyReleaseResources` /
+//   `processReleaseUnitTestResources`. There is no community aarch64 build
+//   of aapt2 either.
+//
+//   Output of this module is therefore a JAR, not an AAR. The library code
+//   references `android.*` (from the `android-all` stub on the compileOnly
+//   classpath) and `androidx.security:security-crypto` is intentionally not
+//   used here — AAR dependencies need the AGP. AndroidKeychain therefore
+//   uses the raw Android Keystore APIs + AES manually rather than
+//   EncryptedSharedPreferences.
+//
+//   On an x86_64 build host the module can be flipped back to
+//   `com.android.library` to produce a proper AAR; no source changes are
+//   required.
+//
+// TESTING NOTE: AndroidHttpClient is a pure-Java class (only references
+// OkHttp + java.net + javax.net.ssl), so it has full unit-test coverage via
+// MockWebServer on plain JUnit + Mockito. AndroidKeychain, AndroidLogging,
+// and the Context-taking OAClient constructors touch `android.*` APIs
+// and need either Robolectric (which fails on aarch64 due to Conscrypt
+// lacking an aarch64-linux native) or an Android instrumentation test
+// running on a real device. Those are documented as gaps and tracked for
+// CI on x86_64 hosts.
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'jacoco'
+}
+
+jacoco {
+    toolVersion = '0.8.11'
+}
+
+description = 'zswag Java Android Client - OkHttp + Android Keystore. Pulls in jzswag-shared for the platform-agnostic core.'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+    finalizedBy jacocoTestReport
+}
+
+// slf4j-android references android.util.Log at class-load time. On a plain
+// JVM (where unit tests run) that class doesn't exist; if slf4j-android
+// happens to win the binding-discovery race we'd get NoClassDefFoundError.
+// Force logback-classic to be the only binding on the test classpath.
+configurations {
+    testRuntimeClasspath {
+        exclude group: 'uk.uuid.slf4j', module: 'slf4j-android'
+    }
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+dependencies {
+    // Shared core (transitively pulls in jzswag-api, zserio-runtime, SnakeYAML, Gson, slf4j-api)
+    api project(':libs:jzswag:jzswag-shared')
+
+    // OkHttp — Android-friendly HTTP client (replaces JDK 11 java.net.http on JVM)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // SLF4J binding for android.util.Log on real Android devices. Marked
+    // runtimeOnly so it doesn't appear on the test classpath (where the
+    // android.util.Log class isn't available — tests use logback-classic).
+    runtimeOnly 'uk.uuid.slf4j:slf4j-android:2.0.9-0'
+
+    // android.* compile-time stubs from Robolectric's prebuilt android.jar.
+    // At runtime, the consuming Android app provides the real android framework.
+    compileOnly 'org.robolectric:android-all:14-robolectric-10818077'
+    // Same stub on the test classpath (compile + runtime) for tests that mock
+    // Context / SharedPreferences. Mockito needs the class loadable at runtime;
+    // the stub's method bodies throw "Stub!" — fine since Mockito intercepts calls.
+    testImplementation 'org.robolectric:android-all:14-robolectric-10818077'
+
+    // Annotations
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+
+    // --- Test stack ---
+    // Plain JUnit 5 for the parts that don't need android.* runtime
+    // (AndroidHttpClient — pure-Java around OkHttp).
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.1'
+    testImplementation 'org.mockito:mockito-core:5.8.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
+    testImplementation 'org.assertj:assertj-core:3.24.2'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    testRuntimeOnly 'ch.qos.logback:logback-classic:1.4.14'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            artifactId = 'jzswag-android'
+        }
+    }
+}

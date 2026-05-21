@@ -1,0 +1,152 @@
+name: jzswag (Java)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        # Gradle 9.x requires JVM 17+ to run the daemon; the build still targets Java 11
+        # via sourceCompatibility/targetCompatibility in the per-module build.gradle files.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Build & test
+        run: ./gradlew :libs:jzswag:jzswag-api:test :libs:jzswag:jzswag-shared:test :libs:jzswag:jzswag-jvm:test :libs:jzswag:jzswag-android:test :libs:jzswag:jzswag-test:assemble --console=plain --stacktrace
+
+      - name: Upload JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.os }}
+          path: libs/jzswag/jzswag-*/build/test-results/test/*.xml
+          retention-days: 14
+
+      - name: Upload JaCoCo HTML reports
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-html
+          path: libs/jzswag/jzswag-*/build/reports/jacoco/test/html/
+          retention-days: 14
+
+  coverage:
+    # Single-OS coverage upload. Matches the C++ coverage.yml pattern (Codecov flag
+    # per language, separate name) so Java coverage is tracked independently of C++.
+    name: coverage
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        # Gradle 9.x requires JVM 17+ to run the daemon; the build still targets Java 11
+        # via sourceCompatibility/targetCompatibility in the per-module build.gradle files.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Run tests with coverage
+        run: |
+          ./gradlew \
+            :libs:jzswag:jzswag-api:test :libs:jzswag:jzswag-api:jacocoTestReport \
+            :libs:jzswag:jzswag-shared:test :libs:jzswag:jzswag-shared:jacocoTestReport \
+            :libs:jzswag:jzswag-jvm:test :libs:jzswag:jzswag-jvm:jacocoTestReport \
+            :libs:jzswag:jzswag-android:test :libs:jzswag:jzswag-android:jacocoTestReport \
+            --console=plain
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: libs/jzswag/jzswag-api/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag/jzswag-shared/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag/jzswag-android/build/reports/jacoco/test/jacocoTestReport.xml
+          flags: unittests-java
+          name: codecov-java
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Coverage PR comment (informational)
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.7.1
+        with:
+          paths: libs/jzswag/jzswag-api/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag/jzswag-shared/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag/jzswag-jvm/build/reports/jacoco/test/jacocoTestReport.xml,libs/jzswag/jzswag-android/build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: Java Coverage (api / shared / jvm / android)
+          # Threshold per the parity goal — every module ships with ≥60% line coverage
+          # on its own tests. Ratchet up as more tests land.
+          min-coverage-overall: 60
+          min-coverage-changed-files: 50
+          update-comment: true
+
+      # ----------------------------------------------------------------------
+      # Publish JaCoCo HTML reports to GitHub Pages (main pushes only).
+      # Coexists with /cpp/ + root index.html written by coverage.yml; both
+      # workflows use keep_files=true to avoid clobbering each other.
+      # ----------------------------------------------------------------------
+      - name: Stage Java reports for GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p site/java
+          for m in api shared jvm android; do
+            cp -r libs/jzswag/jzswag-$m/build/reports/jacoco/test/html site/java/$m
+          done
+          cat > site/java/index.html <<'EOF'
+          <!DOCTYPE html>
+          <title>jzswag JaCoCo coverage</title>
+          <style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5}</style>
+          <h1>jzswag JaCoCo coverage</h1>
+          <ul>
+            <li><a href="api/">jzswag-api</a></li>
+            <li><a href="shared/">jzswag-shared</a></li>
+            <li><a href="jvm/">jzswag-jvm</a></li>
+            <li><a href="android/">jzswag-android</a></li>
+          </ul>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          keep_files: true
