@@ -105,34 +105,32 @@ public class OpenApiClient implements IOpenApiClient {
         HttpConfig effective = httpClient.getPersistentSettings().forUrl(specLocation).mergedWith(adhoc);
         HttpConfig.OAuth2 oauth = effective.getOAuth2().orElse(null);
         boolean isHttpSpec = specLocation.startsWith("http://") || specLocation.startsWith("https://");
-        if (oauth == null || !oauth.useForSpecFetch || !isHttpSpec) {
-            // No OAuth2 configured, useForSpecFetch disabled, or spec is local — nothing to inject.
-            return new OpenAPIParser(specLocation);
+        // Build the extra-headers map used for the OAuth2 Bearer injection (useForSpecFetch).
+        // Empty for the no-OAuth2 / disabled / local-file cases.
+        java.util.Map<String, String> extraHeaders = java.util.Collections.emptyMap();
+        if (isHttpSpec && oauth != null && oauth.useForSpecFetch) {
+            if (oauth.tokenUrlOverride.isEmpty()) {
+                logger.warn("[OAuth2] useForSpecFetch=true but oauth2.tokenUrl is not set in http-settings; "
+                        + "fetching spec '{}' unauthenticated. Set oauth2.tokenUrl, or set useForSpecFetch=false "
+                        + "to suppress this warning if the spec endpoint is publicly readable.", specLocation);
+            } else {
+                try {
+                    OAuth2Handler handler = new OAuth2Handler(httpClient, keychain);
+                    String token = handler.getAccessToken(
+                            oauth, oauth.tokenUrlOverride, oauth.tokenUrlOverride, oauth.scopesOverride);
+                    logger.debug("[OAuth2] Pre-fetch token acquired for spec endpoint {}", specLocation);
+                    extraHeaders = java.util.Collections.singletonMap("Authorization", "Bearer " + token);
+                } catch (HttpException e) {
+                    logger.warn("[OAuth2] Pre-fetch token mint failed for spec '{}': {}. "
+                            + "Continuing without Authorization header.", specLocation, e.getMessage());
+                }
+            }
         }
-        if (oauth.tokenUrlOverride.isEmpty()) {
-            // Match C++ acquireOAuth2TokenForSpecFetch (openapi-oauth.cpp:283-345): warn and
-            // continue unauthenticated rather than refusing to construct. If the spec endpoint
-            // actually requires the token, the 401 will surface from OpenAPIParser instead —
-            // letting the user see the real failure rather than failing at instantiation.
-            logger.warn("[OAuth2] useForSpecFetch=true but oauth2.tokenUrl is not set in http-settings; "
-                    + "fetching spec '{}' unauthenticated. Set oauth2.tokenUrl, or set useForSpecFetch=false "
-                    + "to suppress this warning if the spec endpoint is publicly readable.", specLocation);
-            return new OpenAPIParser(specLocation);
-        }
-        try {
-            OAuth2Handler handler = new OAuth2Handler(httpClient, keychain);
-            String token = handler.getAccessToken(
-                    oauth, oauth.tokenUrlOverride, oauth.tokenUrlOverride, oauth.scopesOverride);
-            logger.debug("[OAuth2] Pre-fetch token acquired for spec endpoint {}", specLocation);
-            return new OpenAPIParser(specLocation,
-                    conn -> conn.setRequestProperty("Authorization", "Bearer " + token));
-        } catch (HttpException e) {
-            // Mint failure: also warn-and-continue, matching C++ behaviour. The downstream
-            // OpenAPIParser request will surface the real auth failure as a 401 if needed.
-            logger.warn("[OAuth2] Pre-fetch token mint failed for spec '{}': {}. "
-                    + "Continuing without Authorization header.", specLocation, e.getMessage());
-            return new OpenAPIParser(specLocation);
-        }
+        // Route the spec fetch through the configured IHttpClient so HTTP_SSL_STRICT, proxy,
+        // basic-auth, HTTP_TIMEOUT, and persistent headers/cookies/query all apply — matches
+        // C++ fetchOpenAPIConfig (openapi-parser.cpp:499). Local-file specs go through the
+        // filesystem directly (the IHttpClient path is skipped internally).
+        return new OpenAPIParser(specLocation, httpClient, adhoc, extraHeaders);
     }
 
     @NotNull

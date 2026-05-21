@@ -290,6 +290,13 @@ class JvmHttpClientTest {
         HttpRequest req = HttpRequest.builder().method("GET").url(server.url("/p").toString()).build();
         HttpResponse resp = newClient().execute(req, HttpConfig.empty());
         assertThat(new String(resp.getBody(), StandardCharsets.UTF_8)).isEqualTo(payload);
+        // After decompression the returned headers must NOT advertise gzip any more —
+        // they describe the body the caller actually sees.
+        assertThat(resp.getHeaders())
+                .doesNotContainKey("Content-Encoding")
+                .doesNotContainKey("content-encoding")
+                .doesNotContainKey("Content-Length")
+                .doesNotContainKey("content-length");
     }
 
     @Test

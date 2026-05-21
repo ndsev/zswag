@@ -209,8 +209,8 @@ Java 11+ source/target. The integration test depends on `pip install zswag` for 
 |---|---|
 | `HTTP_SETTINGS_FILE` | Path to YAML settings file (see [HTTP Settings File](#http-settings-file) below). Empty/unset → no persistent config. |
 | `HTTP_LOG_LEVEL` | Verbosity (`debug`, `trace`). Useful for OAuth2 troubleshooting. |
-| `HTTP_LOG_FILE` | Logfile path with rotation (Python/C++); not yet wired in Java. |
-| `HTTP_LOG_FILE_MAXSIZE` | Rotation size in bytes; default 1 GB (Python/C++ only). |
+| `HTTP_LOG_FILE` | Logfile path with rotation (3-file window: `FILE`, `FILE-1`, `FILE-2`). Supported by all clients (C++/Python via spdlog, Java via logback `RollingFileAppender`). |
+| `HTTP_LOG_FILE_MAXSIZE` | Rotation size in bytes; default 1 GB. Supported by all clients. |
 | `HTTP_TIMEOUT` | Request timeout (connect + transfer) in seconds. Default 60. |
 | `HTTP_SSL_STRICT` | Set to any non-empty value (e.g. `1`) to enable strict SSL certificate validation. Unset or empty disables. Note: this is "any-non-empty enables," not a boolean — `HTTP_SSL_STRICT=0` also enables. |
 

@@ -49,6 +49,13 @@ public class JvmHttpClient implements IHttpClient {
     private final IKeychain keychain;
     private final HttpClient strictClient;
     private final HttpClient permissiveClient;
+    /**
+     * The env-derived default timeout, captured at construction. Applied to per-request
+     * dispatches when the merged {@link HttpConfig} did not explicitly set a timeout —
+     * matching C++ where the same {@code HTTP_TIMEOUT} value drives both connect and
+     * per-request behaviour.
+     */
+    private final Duration defaultRequestTimeout;
     private final java.util.concurrent.ConcurrentMap<String, HttpClient> proxyClientCache =
             new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -76,6 +83,7 @@ public class JvmHttpClient implements IHttpClient {
         this.settingsReloader = reloader;
         this.keychain = keychain;
         Duration timeout = readTimeoutFromEnv();
+        this.defaultRequestTimeout = timeout;
         this.strictClient = buildJdkClient(timeout, true);
         this.permissiveClient = buildJdkClient(timeout, false);
     }
@@ -84,6 +92,7 @@ public class JvmHttpClient implements IHttpClient {
     JvmHttpClient(@NotNull HttpSettings persistentSettings, @NotNull Duration timeout) {
         this.settingsReloader = HttpSettingsLoader.HotReloader.of(null, persistentSettings);
         this.keychain = new Keychain();
+        this.defaultRequestTimeout = timeout;
         this.strictClient = buildJdkClient(timeout, true);
         this.permissiveClient = buildJdkClient(timeout, false);
     }
@@ -166,9 +175,14 @@ public class JvmHttpClient implements IHttpClient {
             String url = applyQueryParams(request.getUrl(), effective.getQuery());
             logger.debug("Executing {} request to {}", request.getMethod(), url);
 
+            // Per-request timeout: prefer an explicit caller value; otherwise fall back to the
+            // env-derived default (HTTP_TIMEOUT) captured at construction. Matches C++ where
+            // a single HTTP_TIMEOUT value drives both connect and per-request behaviour.
+            Duration explicitTimeout = effective.getTimeoutOrNull();
+            Duration requestTimeout = explicitTimeout != null ? explicitTimeout : defaultRequestTimeout;
             HttpRequest.Builder rb = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(effective.getTimeout());
+                    .timeout(requestTimeout);
 
             // Per-request headers from the OpenAPI dispatch layer take precedence: any
             // header set here (e.g., OAuth2 Bearer minted by applySecurity) suppresses
@@ -246,10 +260,12 @@ public class JvmHttpClient implements IHttpClient {
             // otherwise the caller sees garbled bytes. Match the C++/Android behaviour transparently.
             byte[] body = response.body();
             String contentEncoding = response.headers().firstValue("Content-Encoding").orElse(null);
+            boolean decompressed = false;
             if (body != null && contentEncoding != null
                     && "gzip".equalsIgnoreCase(contentEncoding.trim())) {
                 try {
                     body = decompressGzip(body);
+                    decompressed = true;
                 } catch (IOException e) {
                     logger.warn("Failed to decompress gzip response from {}: {}", url, e.getMessage());
                     // Fall through with the original (compressed) bytes — caller will see the
@@ -257,10 +273,20 @@ public class JvmHttpClient implements IHttpClient {
                 }
             }
 
+            // After successful decompression, the original Content-Encoding/Length no longer
+            // describe the returned body. Strip them so downstream callers inspecting headers
+            // don't get a stale view (and so they don't try to decompress a second time).
+            Map<String, String> respHeaders = convertHeaders(response.headers().map());
+            if (decompressed) {
+                respHeaders.remove("Content-Encoding");
+                respHeaders.remove("content-encoding");
+                respHeaders.remove("Content-Length");
+                respHeaders.remove("content-length");
+            }
             return new io.github.ndsev.zswag.api.HttpResponse(
                     response.statusCode(),
                     null,
-                    convertHeaders(response.headers().map()),
+                    respHeaders,
                     body);
 
         } catch (IOException e) {

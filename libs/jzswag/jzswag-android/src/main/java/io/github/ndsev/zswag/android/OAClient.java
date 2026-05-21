@@ -40,11 +40,28 @@ public final class OAClient implements ServiceClientInterface {
     private final OpenApiClient delegate;
 
     /**
-     * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}
-     * and no adhoc config.
+     * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}.
+     * Subsequent mtime changes to the settings file are picked up on the next request
+     * (matches the C++/JVM behaviour). Use the
+     * {@link #OAClient(Context, String, HttpSettings, HttpConfig)} form instead if you want
+     * to pin a specific snapshot.
      */
     public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl) throws IOException {
-        this(context, openApiSpecUrl, HttpSettingsLoader.loadFromEnvironment(), HttpConfig.empty());
+        this(context, openApiSpecUrl, HttpConfig.empty(), 0);
+    }
+
+    /**
+     * Env-driven constructor with an explicit {@code serverIndex}. Persistent
+     * settings come from {@code HTTP_SETTINGS_FILE} via a {@link HttpSettingsLoader.HotReloader}
+     * so file changes are picked up automatically.
+     */
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+                       @NotNull HttpConfig adhoc, int serverIndex) throws IOException {
+        AndroidLogging.init();
+        IKeychain keychain = new AndroidKeychain(context);
+        // Package-private ctor: env-driven HotReloader so the source path is preserved.
+        AndroidHttpClient http = new AndroidHttpClient(HttpSettingsLoader.HotReloader.fromEnvironment(), keychain);
+        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain, serverIndex);
     }
 
     /**

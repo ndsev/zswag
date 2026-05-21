@@ -64,10 +64,38 @@ public class OpenAPIParser {
      * Parses a spec where the caller has already added auth headers (e.g.
      * an OAuth2 bearer token for {@code useForSpecFetch}) via
      * {@code headerInjector}.
+     *
+     * <p><b>Note:</b> this constructor uses a raw {@code URLConnection} for HTTP(S)
+     * spec URLs and therefore does NOT honour {@code HTTP_SSL_STRICT}, proxy
+     * settings, {@code HTTP_TIMEOUT}, basic-auth, or persistent headers/cookies/query
+     * from {@code http-settings.yaml}. Prefer
+     * {@link #OpenAPIParser(String, IHttpClient, HttpConfig, java.util.Map)} for
+     * full parity with the C++ spec-fetch path.
      */
     public OpenAPIParser(@NotNull String specLocation,
                          @NotNull java.util.function.Consumer<URLConnection> headerInjector) throws IOException {
         this(loadSpec(specLocation, headerInjector));
+    }
+
+    /**
+     * Parses a spec fetched via the configured {@link IHttpClient}, so the spec-fetch
+     * request respects {@code HTTP_SSL_STRICT}, proxy, basic-auth, {@code HTTP_TIMEOUT},
+     * and any persistent {@code headers:}/{@code cookies:}/{@code query:} from
+     * {@code http-settings.yaml} — matching the C++ {@code fetchOpenAPIConfig} flow.
+     *
+     * @param specLocation  HTTP(S) URL of the spec, or a local file path
+     * @param httpClient    transport used when the location is HTTP(S); ignored for files
+     * @param adhoc         per-call HTTP config (e.g. pre-minted OAuth2 Bearer header
+     *                      — pass {@link HttpConfig#empty()} if no extra config is needed)
+     * @param extraHeaders  additional headers to add on top of the merged config
+     *                      (typically empty; reserved for special-casing the OAuth2
+     *                      {@code useForSpecFetch} token injection)
+     */
+    public OpenAPIParser(@NotNull String specLocation,
+                         @NotNull IHttpClient httpClient,
+                         @NotNull HttpConfig adhoc,
+                         @NotNull java.util.Map<String, String> extraHeaders) throws IOException {
+        this(loadSpecViaHttpClient(specLocation, httpClient, adhoc, extraHeaders));
     }
 
     private OpenAPIParser(@NotNull Map<String, Object> spec) {
@@ -89,15 +117,65 @@ public class OpenAPIParser {
             input = Files.newInputStream(Paths.get(location));
         }
         try (input) {
-            LoaderOptions options = new LoaderOptions();
-            options.setAllowDuplicateKeys(false);
-            Yaml yaml = new Yaml(new SafeConstructor(options));
-            Map<String, Object> loaded = yaml.load(input);
-            if (loaded == null) {
-                throw new IOException("Failed to load OpenAPI spec - empty or invalid YAML");
-            }
-            return loaded;
+            return parseYaml(input);
         }
+    }
+
+    /**
+     * Fetches the spec through the supplied {@link IHttpClient} so SSL/proxy/timeout/
+     * persistent-settings all apply (matches C++ {@code fetchOpenAPIConfig}). Falls
+     * back to the local-file path when the location isn't an HTTP URL.
+     */
+    @NotNull
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> loadSpecViaHttpClient(@NotNull String location,
+                                                             @NotNull IHttpClient httpClient,
+                                                             @NotNull HttpConfig adhoc,
+                                                             @NotNull java.util.Map<String, String> extraHeaders)
+            throws IOException {
+        logger.info("Loading OpenAPI spec from: {} (via {})", location, httpClient.getClass().getSimpleName());
+        if (location.startsWith("http://") || location.startsWith("https://")) {
+            // Build a GET request; the IHttpClient layer applies persistent settings + adhoc
+            // + env vars (HTTP_SSL_STRICT, HTTP_TIMEOUT) and handles proxy/basic-auth.
+            HttpRequest.Builder rb = HttpRequest.builder().method("GET").url(location);
+            for (java.util.Map.Entry<String, String> h : extraHeaders.entrySet()) {
+                rb.header(h.getKey(), h.getValue());
+            }
+            HttpResponse response;
+            try {
+                response = httpClient.execute(rb.build(), adhoc);
+            } catch (HttpException e) {
+                throw new IOException("Spec fetch failed for '" + location + "': " + e.getMessage(), e);
+            }
+            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+                throw new IOException("Spec fetch failed for '" + location + "': HTTP "
+                        + response.getStatusCode());
+            }
+            byte[] body = response.getBody();
+            if (body == null || body.length == 0) {
+                throw new IOException("Spec fetch returned an empty body for '" + location + "'");
+            }
+            try (java.io.ByteArrayInputStream stream = new java.io.ByteArrayInputStream(body)) {
+                return parseYaml(stream);
+            }
+        }
+        // Non-HTTP location: read directly from the filesystem.
+        try (InputStream input = Files.newInputStream(Paths.get(location))) {
+            return parseYaml(input);
+        }
+    }
+
+    @NotNull
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> parseYaml(@NotNull InputStream input) throws IOException {
+        LoaderOptions options = new LoaderOptions();
+        options.setAllowDuplicateKeys(false);
+        Yaml yaml = new Yaml(new SafeConstructor(options));
+        Map<String, Object> loaded = yaml.load(input);
+        if (loaded == null) {
+            throw new IOException("Failed to load OpenAPI spec - empty or invalid YAML");
+        }
+        return loaded;
     }
 
     @SuppressWarnings("unchecked")

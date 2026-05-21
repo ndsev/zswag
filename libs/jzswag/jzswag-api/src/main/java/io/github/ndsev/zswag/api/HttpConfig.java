@@ -66,6 +66,14 @@ public final class HttpConfig {
     @NotNull public Map<String, List<String>> getQuery() { return query; }
     @NotNull public Map<String, String> getCookies() { return cookies; }
     @NotNull public Duration getTimeout() { return timeout != null ? timeout : defaultTimeout(); }
+
+    /**
+     * Returns the raw timeout field — {@code null} means "no opinion" (the effective
+     * value is determined by the transport's env-derived default). Used by transports
+     * (e.g. {@code JvmHttpClient}) to distinguish "caller explicitly set 60s" from
+     * "caller didn't touch it" so {@code HTTP_TIMEOUT} can override the latter.
+     */
+    @Nullable public Duration getTimeoutOrNull() { return timeout; }
     /**
      * Per-request SSL strictness override. Defaults to {@code true} meaning
      * "no opinion" — the effective SSL behavior is determined by the

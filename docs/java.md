@@ -200,11 +200,12 @@ zserio Java field naming matters here: a `.zs` field `enum_value` becomes `getEn
 
 | Variable | Effect |
 |---|---|
-| `HTTP_SETTINGS_FILE` | Path to YAML settings file. Empty/unset → no persistent config. |
+| `HTTP_SETTINGS_FILE` | Path to YAML settings file. Empty/unset → no persistent config. Hot-reloaded on mtime change. |
 | `HTTP_TIMEOUT` | Request connection+transfer timeout in seconds. Default `60`. |
-| `HTTP_SSL_STRICT` | `0`/`false` disables certificate verification. Default `1`. |
+| `HTTP_SSL_STRICT` | Any non-empty value enables strict SSL certificate validation (matches C++/Python). Unset or empty disables. Surprising consequence: `HTTP_SSL_STRICT=0` enables (any non-empty does). |
 | `HTTP_LOG_LEVEL` | `debug` / `trace` for OAuth2 flow logging. Maps to logback root level. |
-| `HTTP_LOG_FILE` / `HTTP_LOG_FILE_MAXSIZE` | Not yet wired in Java — configure logback directly via `logback.xml` for now. |
+| `HTTP_LOG_FILE` | Logfile path. The Java client attaches a logback `RollingFileAppender` to the root logger with a 3-file window (`FILE`, `FILE-1`, `FILE-2`), matching C++. |
+| `HTTP_LOG_FILE_MAXSIZE` | Rotation size in bytes (default 1 GB, matches C++). |
 
 ## Error handling
 

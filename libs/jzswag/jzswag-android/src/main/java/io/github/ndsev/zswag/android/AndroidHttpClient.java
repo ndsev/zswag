@@ -187,10 +187,12 @@ public class AndroidHttpClient implements IHttpClient {
         // Honour the merged HttpConfig's per-request timeout. JvmHttpClient applies this
         // via HttpRequest.Builder#timeout; on OkHttp we derive a client from the pool so
         // the connection cache is shared but callTimeout reflects the per-call value.
-        Duration callTimeout = effective.getTimeout();
-        if (!callTimeout.equals(readTimeoutFromEnv())) {
+        // Only override when the caller explicitly set a timeout — otherwise the base
+        // client's HTTP_TIMEOUT-derived value already applies (matches JvmHttpClient).
+        Duration explicitTimeout = effective.getTimeoutOrNull();
+        if (explicitTimeout != null) {
             client = client.newBuilder()
-                    .callTimeout(callTimeout.getSeconds(), TimeUnit.SECONDS)
+                    .callTimeout(explicitTimeout.getSeconds(), TimeUnit.SECONDS)
                     .build();
         }
 

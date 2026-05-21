@@ -212,6 +212,35 @@ class OpenApiClientSecurityTest {
     }
 
     @Test
+    void specFetchRoutesThroughConfiguredIHttpClient() throws Exception {
+        // Verifies that an HTTP(S) spec URL is fetched via the configured IHttpClient
+        // (so HTTP_SSL_STRICT, proxy, basic-auth, HTTP_TIMEOUT, and persistent headers
+        // all apply to the spec fetch). Previously OpenAPIParser used raw URLConnection,
+        // bypassing every one of those — matches C++ fetchOpenAPIConfig now.
+        Path spec = writeSpec();
+        String specContent = java.nio.file.Files.readString(spec);
+
+        // Counting stub that serves the spec body on a specific URL and counts hits.
+        java.util.concurrent.atomic.AtomicInteger fetchCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        IHttpClient countingHttp = (request, adhoc) -> {
+            String url = request.getUrl();
+            if (url.endsWith("/openapi.yaml")) {
+                fetchCount.incrementAndGet();
+                return new HttpResponse(200, null, new LinkedHashMap<>(),
+                        specContent.getBytes(StandardCharsets.UTF_8));
+            }
+            // Other requests would go to the spec's path operations; not exercised here.
+            return new HttpResponse(200, null, new LinkedHashMap<>(), new byte[0]);
+        };
+
+        // Use an http:// URL so the IHttpClient branch fires.
+        OpenApiClient client = new OpenApiClient(
+                "http://api.example.test/openapi.yaml", countingHttp, HttpConfig.empty(), noKeychain());
+        assertThat(client).isNotNull();
+        assertThat(fetchCount.get()).as("spec fetch must go through IHttpClient").isEqualTo(1);
+    }
+
+    @Test
     void useForSpecFetchWithoutTokenUrlFallsThroughToUnauthFetch() throws Exception {
         // When useForSpecFetch=true but oauth2.tokenUrl is unset, match C++ behaviour
         // (openapi-oauth.cpp:283-345): log a warning and continue unauthenticated.
