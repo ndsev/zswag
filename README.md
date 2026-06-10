@@ -73,7 +73,7 @@ Here are some brief descriptions of the main components:
 
 Simply run `pip install zswag`. **Note: This only works with ...**
 
-* 64-bit Python 3.10-3.13, `pip --version` >= 19.3
+* 64-bit Python 3.10-3.14, `pip --version` >= 19.3
 * Supported platforms: Linux (x86_64), macOS (x86_64 and arm64), Windows (x64)
 
 **Notes:**
@@ -244,7 +244,7 @@ Note: This requires `python3-dev` package (Ubuntu/Debian) or equivalent on your 
 The project uses GitHub Actions for automated building and deployment:
 
 - **Platforms**: Linux (x86_64), macOS (Intel x86_64 and Apple Silicon arm64), Windows (x64)
-- **Python versions**: 3.10, 3.11, 3.12, 3.13
+- **Python versions**: 3.10, 3.11, 3.12, 3.13, 3.14
 - **Triggers**: Pull requests, pushes to main branch, and version tags
 
 ### Release Process

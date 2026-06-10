@@ -2,14 +2,14 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
     inputs:
       ref:
         description: Branch, tag, or commit to build a snapshot from
-        default: master
+        default: main
         required: true
       release_notes:
         description: Optional notes for this snapshot release
@@ -46,7 +46,7 @@ jobs:
     needs: [determine-version]
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         arch: ["x86_64", "aarch64"]
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-${{ matrix.arch }}:2025.1
@@ -103,7 +103,7 @@ jobs:
       matrix:
         # macos-14: Apple Silicon runners (arm64)
         os: [macos-14, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         exclude:
           # Python 3.10 doesn't have ARM64 builds for macOS
           - os: macos-14
@@ -180,7 +180,7 @@ jobs:
     if: |
       success() && 
       github.event_name == 'push' && 
-      (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -222,7 +222,7 @@ jobs:
         run: |
           # For main branch, upload to TestPyPI first (optional)
           # For tags, upload to PyPI
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
             echo "Uploading development version to PyPI..."
           else
             echo "Uploading release version to PyPI..."
