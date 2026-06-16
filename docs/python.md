@@ -12,7 +12,7 @@ The Python module `zswag` provides:
 pip install zswag
 ```
 
-Wheels are published for 64-bit Python 3.10–3.13 on Linux (x86_64), macOS (x86_64 / arm64), and Windows (x64). On Windows make sure the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe) is installed.
+Wheels are published for 64-bit Python 3.10-3.14 on Linux (x86_64), macOS (x86_64 / arm64), and Windows (x64). On Windows make sure the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe) is installed.
 
 ## Client usage
 

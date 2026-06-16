@@ -1,3 +1,30 @@
+import ast
+
+# Connexion 2.14 depends on Werkzeug 2.2, which still constructs and reads the
+# old literal AST node classes removed in Python 3.14.
+if not hasattr(ast, "Str"):
+    class _CompatStr(ast.Constant):
+        def __init__(self, s="", **kwargs):
+            super().__init__(value=s, **kwargs)
+            self.s = s
+
+    ast.Str = _CompatStr
+
+if not hasattr(ast, "Num"):
+    class _CompatNum(ast.Constant):
+        def __init__(self, n=0, **kwargs):
+            super().__init__(value=n, **kwargs)
+            self.n = n
+
+    ast.Num = _CompatNum
+
+if not hasattr(ast, "NameConstant"):
+    class _CompatNameConstant(ast.Constant):
+        def __init__(self, value=None, **kwargs):
+            super().__init__(value=value, **kwargs)
+
+    ast.NameConstant = _CompatNameConstant
+
 import connexion
 import os
 import inspect

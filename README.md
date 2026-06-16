@@ -131,7 +131,7 @@ In your `CMakeLists.txt`:
 ```cmake
 FetchContent_Declare(zswag
     GIT_REPOSITORY https://github.com/ndsev/zswag.git
-    GIT_TAG v1.11.1)
+    GIT_TAG v1.13.0)
 FetchContent_MakeAvailable(zswag)
 
 add_zserio_library(myapp-zserio-cpp
@@ -191,7 +191,7 @@ The only difference is the `Context` parameter on the constructor — needed so 
 
 ### Python users
 
-Wheels are published for 64-bit Python 3.10–3.13 on Linux (x86_64), macOS (x86_64 / arm64), and Windows (x64). On Windows install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
+Wheels are published for 64-bit Python 3.10-3.14 on Linux (x86_64), macOS (x86_64 / arm64), and Windows (x64). On Windows install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
 
 ### C++ users
 
