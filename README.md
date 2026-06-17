@@ -131,7 +131,7 @@ In your `CMakeLists.txt`:
 ```cmake
 FetchContent_Declare(zswag
     GIT_REPOSITORY https://github.com/ndsev/zswag.git
-    GIT_TAG v1.13.0)
+    GIT_TAG v1.14.0)
 FetchContent_MakeAvailable(zswag)
 
 add_zserio_library(myapp-zserio-cpp
@@ -492,14 +492,27 @@ Compound (struct-typed) `x-zserio-request-part` is unsupported across all compon
 
 ### Server URL base path
 
-Each client takes the URL base path from `servers[N]` (default `N = 0`):
+Each client takes the URL base path from `servers[N]` (default `N = 0`). Per OpenAPI 3.0+ (clarified in [3.2.0 §4.5.2.1](https://spec.openapis.org/oas/v3.2.0.html#examples-of-api-base-url-determination)), three URL forms are supported, all resolved against the spec URL via RFC 3986 §5.3 reference resolution:
 
 ```yaml
 servers:
-- http://unused-host-information/path/to/my/api
+  # 1. Absolute - used as-is
+  - url: https://api.example.com/v1
+
+  # 2. Server-relative path - host+scheme from the spec URL, given path
+  - url: /v1
+
+  # 3. Document-relative - resolved against the spec's directory:
+  - url: .         # spec at https://x/foo/openapi.json -> https://x/foo/
+  - url: ./v2      # -> https://x/foo/v2
+  - url: ../v2     # -> https://x/v2
+  - url: v2        # -> https://x/foo/v2 (same as ./v2)
 ```
 
-The host/port comes from the request, but the path prefix is taken from this entry. To target a non-default server entry, pass `serverIndex` / `server_index`:
+An absent or empty `servers` array defaults to `[{ "url": "/" }]`
+(server-relative to the spec's origin root).
+
+To target a non-default server entry, pass `serverIndex` / `server_index`:
 
 ```cpp
 // C++
@@ -520,7 +533,9 @@ OAClient transport = new OAClient(context, url, persistent, adhoc, 1);
 
 | Feature | C++ Client | Python Client | Java Client | OAServer | zswag.gen |
 |---|---|---|---|---|---|
-| `servers` (URL pickup) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (absolute URL) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (server-relative `/path`) | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (document-relative `.`, `./v2`, `../v2`) | ✔️ | ✔️ | ✔️ | n/a | n/a |
 | Selecting `servers[N]` (multi-server) | ✔️ | ✔️ | ✔️ | n/a | n/a |
 
 ### Authentication schemes

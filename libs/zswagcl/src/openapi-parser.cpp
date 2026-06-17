@@ -443,12 +443,28 @@ static void parseServer(const YAMLScope& serverNode,
 {
     if (auto urlNode = serverNode["url"]) {
         auto urlStr = urlNode.as<std::string>();
-        if (urlStr.empty()) {
-            // Ignore empty URLs.
+        if (urlStr.empty())
+            return;
+
+        // OpenAPI 3.0+ allows three URL forms in `servers[].url` (per
+        // OpenAPI 3.2.0 §4.5.2.1):
+        //
+        //   1. Absolute:           https://api.example.com/v1
+        //   2. Server-relative:    /v1
+        //   3. Document-relative:  .   ./v2   ../v2   v2
+        //
+        // Forms 1 and 2 can be parsed immediately. Form 3 needs the spec
+        // URL as the resolution base, which we don't have here — defer to
+        // fetchOpenAPIConfig() by stashing the raw reference into `path`
+        // (scheme/host left empty signals "resolve me").
+        if (urlStr.find("://") != std::string::npos) {
+            config.servers.emplace_back(httpcl::URIComponents::fromStrRfc3986(urlStr));
         } else if (urlStr.front() == '/') {
             config.servers.emplace_back(httpcl::URIComponents::fromStrPath(urlStr));
         } else {
-            config.servers.emplace_back(httpcl::URIComponents::fromStrRfc3986(urlStr));
+            httpcl::URIComponents deferred;
+            deferred.path = urlStr;  // raw document-relative reference
+            config.servers.emplace_back(std::move(deferred));
         }
     }
 }
@@ -538,15 +554,28 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
 
         httpcl::log().debug("{} Parsing OpenAPI spec", debugContext);
         auto config = parseOpenAPIConfig(ss);
-        // Add a default server and add missing server uri parts.
-        if (config.servers.empty())
-            config.servers.emplace_back();
+        // Per OpenAPI 3.0+ §4.7.5, an absent or empty `servers` array implies
+        // `[{ "url": "/" }]` (server-relative to the spec's origin root).
+        if (config.servers.empty()) {
+            httpcl::URIComponents implicit;
+            implicit.path = "/";
+            config.servers.emplace_back(std::move(implicit));
+        }
+        // Resolve relative server URLs against the spec URL.
+        // parseServer leaves scheme/host empty when the URL is server-relative
+        // (path-only) or document-relative; URIComponents::resolveReference
+        // implements RFC 3986 §5.3 reference resolution.
         for (auto& server : config.servers) {
-            if (server.scheme.empty())
-                server.scheme = uriParts.scheme;
-            if (server.host.empty()) {
-                server.host = uriParts.host;
-                server.port = uriParts.port;
+            if (server.scheme.empty() || server.host.empty()) {
+                try {
+                    auto rawRef = server.path;
+                    server = httpcl::URIComponents::resolveReference(rawRef, uriParts);
+                }
+                catch (httpcl::URIError const& e) {
+                    throw httpcl::logRuntimeError(stx::format(
+                        "Cannot resolve relative server URL '{}' against spec URL '{}': {}",
+                        server.path, url, e.what()));
+                }
             }
         }
         httpcl::log().debug("{} Parsed spec has {} methods.", debugContext, config.methodPath.size());

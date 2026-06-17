@@ -22,9 +22,9 @@ Three top-level workflows:
 ## Release process
 
 1. Update the version in `CMakeLists.txt` (and the matching version in root `build.gradle`).
-2. Tag the commit: `git tag v{version}` (e.g. `v1.13.0`), then `git push origin v{version}`.
+2. Tag the commit: `git tag v{version}` (e.g. `v1.14.0`), then `git push origin v{version}`.
 3. CI validates that the tag version matches the CMake version and deploys wheels to PyPI.
 
 ## Development snapshots
 
-Pushes to `main` create development releases -- version format `{base_version}.dev{commit_count}` (e.g. `1.13.0.dev3`) -- automatically deployed to PyPI for testing. No tag required.
+Pushes to `main` create development releases -- version format `{base_version}.dev{commit_count}` (e.g. `1.14.0.dev3`) -- automatically deployed to PyPI for testing. No tag required.

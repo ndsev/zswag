@@ -72,7 +72,7 @@ project(myapp)
 if (NOT TARGET zswag)
     FetchContent_Declare(zswag
         GIT_REPOSITORY "https://github.com/ndsev/zswag.git"
-        GIT_TAG        "v1.13.0"
+        GIT_TAG        "v1.14.0"
         GIT_SHALLOW    ON)
     FetchContent_MakeAvailable(zswag)
 endif()

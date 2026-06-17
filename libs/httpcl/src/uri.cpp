@@ -254,6 +254,116 @@ URIComponents URIComponents::fromStrPath(std::string const& pathAndQueryString) 
     return result;
 }
 
+/**
+ * Remove dot segments from a path, per RFC 3986 §5.2.4.
+ *
+ * The input must be a path string starting with '/' (or empty). Standard
+ * algorithm: walk the input segment-by-segment, push to the output buffer
+ * unless the segment is "." (drop) or ".." (pop the previous output segment).
+ */
+static std::string removeDotSegments(std::string const& path)
+{
+    if (path.empty())
+        return path;
+
+    std::string out;
+    std::string in = path;
+
+    while (!in.empty()) {
+        if (in.rfind("../", 0) == 0) {
+            // Leading "../" outside an absolute path — drop it.
+            in.erase(0, 3);
+        } else if (in.rfind("./", 0) == 0) {
+            in.erase(0, 2);
+        } else if (in.rfind("/./", 0) == 0) {
+            in.replace(0, 3, "/");
+        } else if (in == "/.") {
+            in = "/";
+        } else if (in.rfind("/../", 0) == 0) {
+            in.replace(0, 4, "/");
+            auto lastSlash = out.find_last_of('/');
+            out.erase(lastSlash == std::string::npos ? 0 : lastSlash);
+        } else if (in == "/..") {
+            in = "/";
+            auto lastSlash = out.find_last_of('/');
+            out.erase(lastSlash == std::string::npos ? 0 : lastSlash);
+        } else if (in == "." || in == "..") {
+            // Bare dot at end — drop entirely.
+            in.clear();
+        } else {
+            // Move the first segment (up to but not including the next '/'
+            // after position 0) from in to out.
+            auto end = in.find('/', in.front() == '/' ? 1 : 0);
+            if (end == std::string::npos) {
+                out += in;
+                in.clear();
+            } else {
+                out.append(in, 0, end);
+                in.erase(0, end);
+            }
+        }
+    }
+    return out;
+}
+
+URIComponents URIComponents::resolveReference(std::string const& reference,
+                                              URIComponents const& base)
+{
+    if (reference.empty())
+        return base;
+
+    // RFC 3986 §5.3 step 1: a reference with its own scheme is absolute.
+    // Detect via "<alpha>(<alpha>|<digit>|+|-|.)*:" (the parser will validate).
+    auto colonIdx = reference.find(':');
+    if (colonIdx != std::string::npos && colonIdx > 0) {
+        bool looksLikeScheme = std::isalpha(static_cast<unsigned char>(reference.front()));
+        for (size_t i = 1; i < colonIdx && looksLikeScheme; ++i) {
+            auto c = static_cast<unsigned char>(reference[i]);
+            if (!std::isalnum(c) && c != '+' && c != '-' && c != '.')
+                looksLikeScheme = false;
+        }
+        if (looksLikeScheme)
+            return fromStrRfc3986(reference);
+    }
+
+    if (base.scheme.empty() || base.host.empty()) {
+        throw logRuntimeError<URIError>(stx::format(
+            "[URIComponents::resolveReference] Cannot resolve relative reference '{}' "
+            "against base URI lacking scheme/host", reference));
+    }
+
+    URIComponents result;
+    result.scheme = base.scheme;
+    result.host = base.host;
+    result.port = base.port;
+
+    // Split reference into path + query (OpenAPI server URLs don't carry fragments).
+    std::string refPath;
+    std::string refQuery;
+    if (auto qIdx = reference.find('?'); qIdx != std::string::npos) {
+        refPath = reference.substr(0, qIdx);
+        refQuery = reference.substr(qIdx + 1);
+    } else {
+        refPath = reference;
+    }
+
+    if (!refPath.empty() && refPath.front() == '/') {
+        // Server-relative — replace base path entirely (RFC 3986 §5.2.2 case 3).
+        result.path = removeDotSegments(refPath);
+    } else {
+        // Document-relative — merge base directory with the reference per §5.2.3.
+        std::string baseDir = base.path;
+        auto lastSlash = baseDir.find_last_of('/');
+        baseDir = (lastSlash != std::string::npos)
+            ? baseDir.substr(0, lastSlash + 1)
+            : std::string("/");
+        result.path = removeDotSegments(baseDir + refPath);
+    }
+
+    result.query = refQuery;
+    return result;
+}
+
 URIComponents::URIComponents(
     std::string scheme,
     std::string host,
