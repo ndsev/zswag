@@ -1169,21 +1169,36 @@ instead of a field with a scalar value. **This is currently not supported.**
 OpenAPI allows for a `servers` field in the spec that lists URL path prefixes
 under which the specified API may be reached. The OpenAPI clients
 looks into this list to determine a URL base path from
-the first entry in this list. A sample entry might look as follows:
+the first entry in this list. Per OpenAPI 3.0+ (clarified in
+[3.2.0 §4.5.2.1](https://spec.openapis.org/oas/v3.2.0.html#examples-of-api-base-url-determination)),
+three URL forms are supported, all resolved against the spec URL via
+RFC 3986 §5.3 reference resolution:
 
-```
+```yaml
 servers:
-- http://unused-host-information/path/to/my/api
-``` 
+  # 1. Absolute — used as-is
+  - url: https://api.example.com/v1
 
-The OpenAPI client will then call methods with your specified host
-and port, but prefix the `/path/to/my/api` string. 
+  # 2. Server-relative path — host+scheme from the spec URL, given path
+  - url: /v1
+
+  # 3. Document-relative — resolved against the spec's directory:
+  - url: .         # spec at https://x/foo/openapi.json -> https://x/foo/
+  - url: ./v2      # -> https://x/foo/v2
+  - url: ../v2     # -> https://x/v2
+  - url: v2        # -> https://x/foo/v2 (same as ./v2)
+```
+
+An absent or empty `servers` array defaults to `[{ "url": "/" }]`
+(server-relative to the spec's origin root).
 
 #### Component Support
 
 | Feature            | C++ Client | Python Client | OAServer | zswag.gen |
 | ------------------ | ---------- | ------------- | -------- | --------- |
-| `servers`  | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (absolute URL)  | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (server-relative `/path`)  | ✔️ | ✔️ | ✔️ | ✔️ |
+| `servers` (document-relative `.`, `./v2`, `../v2`)  | ✔️ | ✔️ | n/a | n/a |
 
 ### Authentication Schemes
 
