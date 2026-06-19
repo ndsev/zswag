@@ -54,7 +54,7 @@ flowchart TB
 
     subgraph extlibs[" &nbsp;External libraries&nbsp; "]
       direction LR
-      cpphttplib["cpp-httplib"]:::ext
+      libcurl["libcurl + nghttp2"]:::ext
       keychain["keychain"]:::ext
       flask["Flask /<br/>Connexion"]:::ext
       okhttp["OkHttp /<br/>Android Keystore"]:::ext
@@ -68,7 +68,7 @@ flowchart TB
     py ==> zswagcl
     cpp ==> zswagcl
     zswagcl ==> httpcl
-    httpcl --> cpphttplib
+    httpcl --> libcurl
     httpcl --> keychain
 
     jvm ==> jshared
@@ -88,7 +88,7 @@ flowchart TB
 | Component | Language | Role |
 |---|---|---|
 | `zswagcl` | C++ | Core OpenAPI client (`OAClient`, `OpenApiClient`, `OpenApiConfig`); reused by the Python client via pybind11. |
-| `httpcl` | C++ | HTTP wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib); request configuration; OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain). |
+| `httpcl` | C++ | HTTP wrapper around [libcurl](https://curl.se/libcurl/) with HTTP/2 support; request configuration; OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain). |
 | `zswag` | Python | Python `OAClient`, the Flask/Connexion-based `OAServer`, and the `zswag.gen` OpenAPI generator. |
 | `pyzswagcl` | Python | pybind11 bindings exposing `zswagcl` to Python. Bundled inside the `zswag` wheel; not installed separately. |
 | `jzswag-api` | Java | Platform-agnostic contracts (`HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `IHttpClient`, `IKeychain`, …). No third-party deps. |
@@ -144,7 +144,7 @@ target_link_libraries(myapp myapp-zserio-cpp zswagcl)
 ```
 
 ```cpp
-auto httpClient = std::make_unique<httpcl::HttpLibHttpClient>();
+auto httpClient = std::make_unique<httpcl::CurlHttpClient>();
 auto config = zswagcl::fetchOpenAPIConfig("http://localhost:5000/openapi.json", *httpClient);
 auto transport = zswagcl::OAClient(config, std::move(httpClient));
 auto client = MyService::Client(transport);
@@ -221,7 +221,7 @@ Java 11+ source/target. The integration test depends on `pip install zswag` for 
 
 <!-- --8<-- [start:settings] -->
 
-The Python (`OAClient` / `HttpLibHttpClient`), C++, and Java clients all read a YAML file pointed to by the `HTTP_SETTINGS_FILE` environment variable. The format is identical across all three clients — the same file works for all of them.
+The Python (`OAClient` / `CurlHttpClient`), C++, and Java clients all read a YAML file pointed to by the `HTTP_SETTINGS_FILE` environment variable. The format is identical across all three clients — the same file works for all of them.
 
 If `HTTP_SETTINGS_FILE` is unset or empty, no persistent settings are applied.
 

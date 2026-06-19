@@ -87,6 +87,17 @@ struct URIComponents
      * Helper function for URL encoding a string.
      */
     static std::string encode(std::string str);
+
+    /**
+     * Encode a single URI component. Unlike encode(), this only leaves RFC 3986
+     * unreserved characters untouched and is suitable for form-body values.
+     */
+    static std::string encodeComponent(std::string str);
+
+    /**
+     * Decode percent-encoded octets in a URI component.
+     */
+    static std::string decodeComponent(std::string str);
 };
 
 }

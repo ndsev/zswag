@@ -91,7 +91,7 @@ PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
         httpConfig.apiKey = std::move(apiKey);
     if (bearer)
         httpConfig.headers.insert({"Authorization", stx::format("Bearer {}", *bearer)});
-    auto httpClient = std::make_unique<HttpLibHttpClient>();
+    auto httpClient = std::make_unique<CurlHttpClient>();
     OpenAPIConfig openApiConfig = [&](){
         if (isLocalFile) {
             std::ifstream fs(openApiUrl);

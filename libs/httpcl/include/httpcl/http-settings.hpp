@@ -1,6 +1,5 @@
 #pragma once
 
-#include <httplib.h>
 #include <optional>
 #include <map>
 #include <vector>
@@ -8,6 +7,8 @@
 #include <shared_mutex>
 #include <atomic>
 #include <deque>
+#include <chrono>
+#include <regex>
 
 #include "yaml-cpp/yaml.h"
 
@@ -100,12 +101,6 @@ struct Config
      * Merge this configuration with another.
      */
     Config& operator |= (Config const& other);
-
-    /**
-     * Apply this configuration to an httplib client.
-     * May read keychain passwords which can block and require user interaction.
-     */
-    void apply(httplib::Client& cl) const;
 
     /**
      * Convert this configuration to a YAML string, which may

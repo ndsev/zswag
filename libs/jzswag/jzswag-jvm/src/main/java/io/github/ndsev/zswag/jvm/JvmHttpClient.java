@@ -36,7 +36,7 @@ import java.util.TreeSet;
  *
  * <p>On every request the client merges its persistent {@link HttpSettings}
  * (URL-scope-matched) with the adhoc {@link HttpConfig} passed by the caller,
- * matching the C++ {@code HttpLibHttpClient} flow. Headers, cookies, query
+ * matching the C++ {@code CurlHttpClient} flow. Headers, cookies, query
  * parameters, basic-auth and proxy from the merged config are applied to the
  * underlying request.
  */
@@ -119,7 +119,7 @@ public class JvmHttpClient implements IHttpClient {
     }
 
     private static boolean envSslStrict() {
-        // Match C++ httpcl::HttpLibHttpClient (libs/httpcl/src/http-client.cpp:57-58):
+        // Match C++ httpcl::CurlHttpClient (libs/httpcl/src/http-client.cpp:57-58):
         // any non-empty value enables strict; unset or empty disables. The Python
         // client inherits this via pyzswagcl. Keep the semantics aligned across all
         // three clients so a shared http-settings + env-var setup behaves identically.
@@ -255,7 +255,7 @@ public class JvmHttpClient implements IHttpClient {
             HttpResponse<byte[]> response = jdk.send(rb.build(), HttpResponse.BodyHandlers.ofByteArray());
             logger.debug("Received response with status code: {}", response.statusCode());
 
-            // JDK HttpClient does NOT auto-decompress gzip responses (cpp-httplib and OkHttp do).
+            // JDK HttpClient does NOT auto-decompress gzip responses (libcurl and OkHttp do).
             // If the server returns Content-Encoding: gzip we have to decompress here ourselves;
             // otherwise the caller sees garbled bytes. Match the C++/Android behaviour transparently.
             byte[] body = response.body();
@@ -328,7 +328,7 @@ public class JvmHttpClient implements IHttpClient {
 
     /**
      * Decompresses a gzip-encoded byte buffer. Used to transparently handle
-     * Content-Encoding: gzip responses, since the JDK HttpClient (unlike cpp-httplib
+     * Content-Encoding: gzip responses, since the JDK HttpClient (unlike libcurl
      * and OkHttp) does not auto-decompress.
      */
     @NotNull

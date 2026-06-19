@@ -7,7 +7,6 @@
 #include "yaml-cpp/yaml.h"
 #include "stx/format.h"
 #include "httpcl/log.hpp"
-#include <httplib.h>
 #include <future>
 
 #include <sstream>

@@ -558,47 +558,6 @@ Config& Settings::getOrCreateConfigScope(std::string_view const& scope)
     return *config;
 }
 
-void Config::apply(httplib::Client &cl) const
-{
-    // Headers
-    httplib::Headers httpLibHeaders{headers.begin(), headers.end()};
-
-    // Cookies
-    std::string cookieHeaderValue;
-    for (const auto& cookie : cookies) {
-        if (!cookieHeaderValue.empty())
-            cookieHeaderValue += "; ";
-        cookieHeaderValue += cookie.first + "=" + cookie.second;
-    }
-    if (!cookieHeaderValue.empty())
-        httpLibHeaders.insert({"Cookie", cookieHeaderValue});
-
-    // Basic Authentication
-    if (auth) {
-        auto password = auth->password;
-        if (!auth->keychain.empty()) {
-            password = secret::load(auth->keychain, auth->user);
-        }
-        httpLibHeaders.insert(
-            httplib::make_basic_authentication_header(auth->user, password));
-    }
-
-    // Proxy Settings
-    if (proxy) {
-        cl.set_proxy(proxy->host, proxy->port);
-
-        auto password = proxy->password;
-        if (!proxy->keychain.empty())
-            password = secret::load(proxy->keychain, proxy->user);
-
-        if (!proxy->user.empty())
-            cl.set_proxy_basic_auth(
-                proxy->user, password);
-    }
-
-    cl.set_default_headers(httpLibHeaders);
-}
-
 std::string Config::toYaml() const {
     return YAML::Dump(configToNode(*this));
 }

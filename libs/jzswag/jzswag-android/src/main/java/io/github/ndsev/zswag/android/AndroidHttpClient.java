@@ -131,7 +131,7 @@ public class AndroidHttpClient implements IHttpClient {
     }
 
     private static boolean envSslStrict() {
-        // Match C++ httpcl::HttpLibHttpClient (libs/httpcl/src/http-client.cpp:57-58):
+        // Match C++ httpcl::CurlHttpClient (libs/httpcl/src/http-client.cpp:57-58):
         // any non-empty value enables strict; unset or empty disables. Aligned with
         // JvmHttpClient and the Python client (pyzswagcl) for cross-client parity.
         String env = System.getenv("HTTP_SSL_STRICT");

@@ -142,7 +142,7 @@ PYBIND11_MODULE(pyzswagcl, m)
     }, py::return_value_policy::move, "path"_a);
 
     m.def("fetch_openapi_config", [](std::string const& url){
-        HttpLibHttpClient httpClient;
+        CurlHttpClient httpClient;
         return fetchOpenAPIConfig(url, httpClient);
     }, py::return_value_policy::move, "url"_a);
 

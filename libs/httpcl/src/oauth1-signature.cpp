@@ -4,7 +4,6 @@
 #include <openssl/hmac.h>
 #include <openssl/buffer.h>
 #include <openssl/rand.h>
-#include <httplib.h>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>

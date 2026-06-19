@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <stdexcept>
+#include <ctime>
 
 #include "http-settings.hpp"
 #include "uri.hpp"
@@ -58,10 +59,11 @@ public:
                          const Config& config) = 0;
 };
 
-class HttpLibHttpClient : public IHttpClient
+class CurlHttpClient : public IHttpClient
 {
 public:
-    HttpLibHttpClient();
+    CurlHttpClient();
+    ~CurlHttpClient() override;
 
     Result get(const std::string& uri,
                const Config& config) override;
@@ -78,8 +80,16 @@ public:
                  const OptionalBodyAndContentType& body,
                  const Config& config) override;
 private:
-    time_t timeoutSecs_ = 60.;
+    struct Impl;
+
+    Result request(const char* method,
+                   const std::string& uri,
+                   const OptionalBodyAndContentType& body,
+                   const Config& config);
+
+    time_t timeoutSecs_ = 60;
     bool sslCertStrict_ = false;
+    std::unique_ptr<Impl> impl_;
 };
 
 class MockHttpClient : public IHttpClient

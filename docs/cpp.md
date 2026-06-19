@@ -1,6 +1,6 @@
 # C++ Client
 
-The C++ client talks to any zserio service exposed via OpenAPI/REST. The relevant types live in `libs/zswagcl/` (high-level `OAClient`, `OpenApiClient`, `OpenApiConfig`) and `libs/httpcl/` (HTTP wrapper around [cpp-httplib](https://github.com/yhirose/cpp-httplib) plus OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain)).
+The C++ client talks to any zserio service exposed via OpenAPI/REST. The relevant types live in `libs/zswagcl/` (high-level `OAClient`, `OpenApiClient`, `OpenApiConfig`) and `libs/httpcl/` (HTTP wrapper around [libcurl](https://curl.se/libcurl/) with HTTP/2 support plus OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain)).
 
 ## Requirements
 
@@ -56,7 +56,7 @@ cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
 cmake --build .
 ```
 
-Override individual deps with `-DFETCHCONTENT_SOURCE_DIR_<NAME>=/path/to/local`. Available names: `ZLIB`, `SPDLOG`, `YAML_CPP`, `STX`, `SPEEDYJ`, `HTTPLIB`, `OPENSSL`, `PYBIND11`, `PYTHON_CMAKE_WHEEL`, `ZSERIO_CMAKE_HELPER`, `KEYCHAIN`, `CATCH2`.
+Override individual deps with `-DFETCHCONTENT_SOURCE_DIR_<NAME>=/path/to/local`. Available names: `ZLIB`, `SPDLOG`, `YAML_CPP`, `STX`, `CURL`, `NGHTTP2`, `OPENSSL`, `PYBIND11`, `PYTHON_CMAKE_WHEEL`, `ZSERIO_CMAKE_HELPER`, `KEYCHAIN`, `CATCH2`.
 
 ## Integrating into your project
 
@@ -76,9 +76,6 @@ if (NOT TARGET zswag)
         GIT_SHALLOW    ON)
     FetchContent_MakeAvailable(zswag)
 endif()
-
-find_package(OpenSSL CONFIG REQUIRED)
-target_link_libraries(httplib INTERFACE OpenSSL::SSL)
 
 # zswag provides this helper to build a zserio C++ reflection library:
 add_zserio_library(${PROJECT_NAME}-zserio-cpp
@@ -110,7 +107,7 @@ int main(int argc, char* argv[])
     auto openApiUrl = "http://localhost:5000/openapi.json";
 
     // HTTP client to be used by OAClient
-    auto httpClient = std::make_unique<HttpLibHttpClient>();
+    auto httpClient = std::make_unique<CurlHttpClient>();
 
     // Fetch OpenAPI configuration
     auto openApiConfig = fetchOpenAPIConfig(openApiUrl, *httpClient);
@@ -175,7 +172,7 @@ sudo ln -s /usr/bin/gcov-13 /usr/bin/gcov
 
 ## Persistent HTTP settings
 
-See [HTTP Settings File in README.md](../README.md#http-settings-file). `HttpLibHttpClient` auto-loads `HTTP_SETTINGS_FILE` on construction and applies it per-request based on URL scope matching.
+See [HTTP Settings File in README.md](../README.md#http-settings-file). `CurlHttpClient` auto-loads `HTTP_SETTINGS_FILE` on construction and applies it per-request based on URL scope matching. `CurlHttpClient` remains as a compatibility alias for older call sites.
 
 ## OpenAPI feature support
 

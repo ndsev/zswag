@@ -24,10 +24,11 @@ target_link_libraries(httpcl
     stx
   PUBLIC
     spdlog::spdlog
-    httplib::httplib
+    CURL::libcurl
     yaml-cpp::yaml-cpp
     OpenSSL::SSL
     OpenSSL::Crypto
+    ZLIB::ZLIB
   )
 
 # Ensure httpcl depends on OpenSSL build to establish correct build order
@@ -51,9 +52,6 @@ if (ZSWAG_KEYCHAIN_SUPPORT)
   target_link_libraries(httpcl PUBLIC keychain)
 endif()
 
-# httplib's load_system_certs uses Security.framework on Apple platforms.
-# Without this PUBLIC link, downstream test executables fail at link time
-# with undefined SecCertificateCopyData / SecTrustCopyAnchorCertificates.
 if(APPLE)
   target_link_libraries(httpcl PUBLIC "-framework Security" "-framework CoreFoundation")
 endif()

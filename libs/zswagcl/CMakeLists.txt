@@ -26,7 +26,6 @@ target_link_libraries(zswagcl
   PUBLIC
     stx
     httpcl
-    httplib::httplib
     yaml-cpp::yaml-cpp
     ZserioCppRuntime)
 

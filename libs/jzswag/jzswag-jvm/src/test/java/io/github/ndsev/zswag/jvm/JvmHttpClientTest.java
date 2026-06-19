@@ -275,7 +275,7 @@ class JvmHttpClientTest {
 
     @Test
     void gzipResponseIsAutoDecompressed() throws Exception {
-        // JDK HttpClient does NOT auto-decompress gzip (unlike cpp-httplib and OkHttp);
+        // JDK HttpClient does NOT auto-decompress gzip (unlike libcurl and OkHttp);
         // JvmHttpClient compensates by inspecting Content-Encoding and decoding the body.
         // Without this, the calling zserio deserialization would see garbled bytes.
         String payload = "{\"answer\":42}";
