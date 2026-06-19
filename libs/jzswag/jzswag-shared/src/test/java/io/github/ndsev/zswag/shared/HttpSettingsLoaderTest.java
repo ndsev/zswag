@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -136,6 +136,40 @@ class HttpSettingsLoaderTest {
         Map<String, Object> entry = entry("*", "api-key", "my-token");
         HttpSettings s = HttpSettingsLoader.parseRoot(asHttpSettings(entry));
         assertThat(s.getEntries().get(0).getApiKey()).contains("my-token");
+    }
+
+    @Test
+    void environmentReferencesExpandInSettingsValues() {
+        String path = System.getenv("PATH");
+        assertThat(path).isNotNull();
+
+        Map<String, Object> entry = entry("*",
+                "basic-auth", entry(null, "user", "alice", "password", "$env.PATH"));
+        HttpSettings s = HttpSettingsLoader.parseRoot(asHttpSettings(entry));
+
+        assertThat(s.getEntries().get(0).getAuth().get().password).isEqualTo(path);
+    }
+
+    @Test
+    void unresolvedEnvironmentReferencesFailClearly() {
+        Map<String, Object> entry = entry("*",
+                "api-key", "$env.ZSWAG_TEST_HTTP_MISSING_DO_NOT_SET");
+
+        assertThatThrownBy(() -> HttpSettingsLoader.parseRoot(asHttpSettings(entry)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("referenced by HTTP settings is not set");
+    }
+
+    @Test
+    void environmentReferenceExpansionSupportsInlineValues() {
+        Function<String, String> env = name -> {
+            if ("USER".equals(name)) return "alice";
+            if ("SECRET".equals(name)) return "secret";
+            return null;
+        };
+
+        assertThat(HttpSettingsLoader.expandEnvReferences("user=$env.USER; token=$env.SECRET", env))
+                .isEqualTo("user=alice; token=secret");
     }
 
     @Test

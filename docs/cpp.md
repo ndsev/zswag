@@ -172,7 +172,7 @@ sudo ln -s /usr/bin/gcov-13 /usr/bin/gcov
 
 ## Persistent HTTP settings
 
-See [HTTP Settings File in README.md](../README.md#http-settings-file). `CurlHttpClient` auto-loads `HTTP_SETTINGS_FILE` on construction and applies it per-request based on URL scope matching. `CurlHttpClient` remains as a compatibility alias for older call sites.
+See [HTTP Settings File in README.md](../README.md#http-settings-file). `CurlHttpClient` auto-loads `HTTP_SETTINGS_FILE` on construction and applies it per-request based on URL scope matching.
 
 ## OpenAPI feature support
 

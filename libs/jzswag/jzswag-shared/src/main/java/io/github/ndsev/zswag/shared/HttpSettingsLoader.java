@@ -20,6 +20,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Loads {@link HttpSettings} from a YAML file matching the C++/Python schema
@@ -46,6 +49,8 @@ import java.util.Map;
  */
 public final class HttpSettingsLoader {
     private static final Logger logger = LoggerFactory.getLogger(HttpSettingsLoader.class);
+    private static final Pattern ENV_REFERENCE_PATTERN = Pattern.compile("\\$env\\.([A-Za-z_][A-Za-z0-9_]*)");
+    private static final Pattern INVALID_ENV_REFERENCE_PATTERN = Pattern.compile("\\$env\\.(?![A-Za-z_][A-Za-z0-9_]*)");
 
     public static final String ENV_SETTINGS_FILE = "HTTP_SETTINGS_FILE";
 
@@ -217,31 +222,31 @@ public final class HttpSettingsLoader {
         HttpConfig.Builder b = HttpConfig.builder();
 
         if (entry.containsKey("url")) {
-            String url = String.valueOf(entry.get("url"));
-            b.scope(null, java.util.regex.Pattern.compile(url));
+            String url = expandEnvReferences(String.valueOf(entry.get("url")));
+            b.scope(null, Pattern.compile(url));
         } else {
-            String scope = entry.containsKey("scope") ? String.valueOf(entry.get("scope")) : "*";
+            String scope = entry.containsKey("scope") ? expandEnvReferences(String.valueOf(entry.get("scope"))) : "*";
             b.scope(scope, HttpSettings.compileScope(scope));
         }
 
         Object cookies = entry.get("cookies");
         if (cookies instanceof Map) {
             for (Map.Entry<?, ?> e : ((Map<?, ?>) cookies).entrySet()) {
-                b.cookie(String.valueOf(e.getKey()), String.valueOf(e.getValue()));
+                b.cookie(String.valueOf(e.getKey()), expandEnvReferences(String.valueOf(e.getValue())));
             }
         }
 
         Object headers = entry.get("headers");
         if (headers instanceof Map) {
             for (Map.Entry<?, ?> e : ((Map<?, ?>) headers).entrySet()) {
-                b.addHeader(String.valueOf(e.getKey()), String.valueOf(e.getValue()));
+                b.addHeader(String.valueOf(e.getKey()), expandEnvReferences(String.valueOf(e.getValue())));
             }
         }
 
         Object query = entry.get("query");
         if (query instanceof Map) {
             for (Map.Entry<?, ?> e : ((Map<?, ?>) query).entrySet()) {
-                b.addQuery(String.valueOf(e.getKey()), String.valueOf(e.getValue()));
+                b.addQuery(String.valueOf(e.getKey()), expandEnvReferences(String.valueOf(e.getValue())));
             }
         }
 
@@ -285,8 +290,8 @@ public final class HttpSettingsLoader {
         }
 
         Object apiKey = entry.get("api-key");
-        if (apiKey instanceof String) {
-            b.apiKey((String) apiKey);
+        if (apiKey != null) {
+            b.apiKey(expandEnvReferences(String.valueOf(apiKey)));
         }
 
         Object oauth2 = entry.get("oauth2");
@@ -309,7 +314,7 @@ public final class HttpSettingsLoader {
         Object scope = node.get("scope");
         if (scope instanceof List) {
             List<String> scopes = new ArrayList<>();
-            for (Object s : (List<?>) scope) scopes.add(String.valueOf(s));
+            for (Object s : (List<?>) scope) scopes.add(expandEnvReferences(String.valueOf(s)));
             b.scopes(scopes);
         }
 
@@ -443,7 +448,7 @@ public final class HttpSettingsLoader {
     @Nullable
     private static String optString(@NotNull Map<String, Object> map, @NotNull String key) {
         Object v = map.get(key);
-        return v == null ? null : String.valueOf(v);
+        return v == null ? null : expandEnvReferences(String.valueOf(v));
     }
 
     @Nullable
@@ -451,10 +456,36 @@ public final class HttpSettingsLoader {
         Object v = map.get(key);
         if (v == null) return null;
         if (v instanceof Number) return ((Number) v).intValue();
+        String expanded = expandEnvReferences(String.valueOf(v));
         try {
-            return Integer.parseInt(String.valueOf(v));
+            return Integer.parseInt(expanded);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("'" + key + "' must be an integer, got: " + v);
+            throw new IllegalArgumentException("'" + key + "' must be an integer, got: " + expanded);
         }
+    }
+
+    static String expandEnvReferences(@NotNull String value) {
+        return expandEnvReferences(value, System::getenv);
+    }
+
+    static String expandEnvReferences(@NotNull String value, @NotNull Function<String, String> getenv) {
+        if (INVALID_ENV_REFERENCE_PATTERN.matcher(value).find()) {
+            throw new IllegalArgumentException(
+                    "Invalid environment variable reference in HTTP settings: expected '$env.NAME'.");
+        }
+
+        Matcher matcher = ENV_REFERENCE_PATTERN.matcher(value);
+        StringBuffer result = new StringBuffer();
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            String envValue = getenv.apply(name);
+            if (envValue == null) {
+                throw new IllegalArgumentException(
+                        "Environment variable '" + name + "' referenced by HTTP settings is not set.");
+            }
+            matcher.appendReplacement(result, Matcher.quoteReplacement(envValue));
+        }
+        matcher.appendTail(result);
+        return result.toString();
     }
 }

@@ -267,6 +267,22 @@ A multi-scope file simply has multiple list entries; for a given request URL, **
 
 For `proxy` configs, `user` is optional; if `user` is set, then `password` or `keychain` is required.
 
+### Environment variable references
+
+String values in `http-settings.yaml` may reference process environment variables as `$env.NAME`. This is intended for container secrets where keychain setup is too cumbersome. References are expanded when the settings file is parsed; if a referenced variable is not set, parsing fails with an explicit error.
+
+```yaml
+http-settings:
+  - scope: https://api.example.com/*
+    basic-auth:
+      user: service-user
+      password: $env.API_PASSWORD
+    headers:
+      Authorization: Bearer $env.API_TOKEN
+```
+
+Map keys are structural and are not expanded.
+
 ### Scope matching
 
 `scope:` is a shell-style glob with `*` as the only wildcard, matched against the full request URL after request building. Examples:

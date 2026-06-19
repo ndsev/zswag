@@ -2,6 +2,126 @@
 
 #include "httpcl/http-settings.hpp"
 
+#include <cstdlib>
+#include <optional>
+#include <string>
+
+namespace {
+
+void setTestEnv(std::string const& name, std::string const& value)
+{
+#ifdef _WIN32
+    _putenv_s(name.c_str(), value.c_str());
+#else
+    setenv(name.c_str(), value.c_str(), 1);
+#endif
+}
+
+void unsetTestEnv(std::string const& name)
+{
+#ifdef _WIN32
+    _putenv_s(name.c_str(), "");
+#else
+    unsetenv(name.c_str());
+#endif
+}
+
+class ScopedEnv
+{
+public:
+    ScopedEnv(std::string name, std::string value)
+        : name_(std::move(name))
+    {
+        if (auto const* oldValue = std::getenv(name_.c_str()))
+            oldValue_ = oldValue;
+        setTestEnv(name_, value);
+    }
+
+    ~ScopedEnv()
+    {
+        if (oldValue_)
+            setTestEnv(name_, *oldValue_);
+        else
+            unsetTestEnv(name_);
+    }
+
+private:
+    std::string name_;
+    std::optional<std::string> oldValue_;
+};
+
+}
+
+TEST_CASE("HTTP settings expand $env references", "[http-settings][env]") {
+    ScopedEnv user("ZSWAG_TEST_HTTP_USER", "alice");
+    ScopedEnv password("ZSWAG_TEST_HTTP_PASSWORD", "secret");
+    ScopedEnv host("ZSWAG_TEST_HTTP_HOST", "api.example.com");
+    ScopedEnv port("ZSWAG_TEST_HTTP_PORT", "3128");
+    ScopedEnv nonce("ZSWAG_TEST_HTTP_NONCE", "24");
+
+    std::string yaml = R"(
+scope: https://$env.ZSWAG_TEST_HTTP_HOST/*
+basic-auth:
+  user: $env.ZSWAG_TEST_HTTP_USER
+  password: prefix-$env.ZSWAG_TEST_HTTP_PASSWORD
+proxy:
+  host: proxy.$env.ZSWAG_TEST_HTTP_HOST
+  port: $env.ZSWAG_TEST_HTTP_PORT
+  user: proxy-$env.ZSWAG_TEST_HTTP_USER
+  password: $env.ZSWAG_TEST_HTTP_PASSWORD
+headers:
+  X-Token: Bearer $env.ZSWAG_TEST_HTTP_PASSWORD
+query:
+  token: $env.ZSWAG_TEST_HTTP_PASSWORD
+cookies:
+  session: $env.ZSWAG_TEST_HTTP_PASSWORD
+api-key: key-$env.ZSWAG_TEST_HTTP_PASSWORD
+oauth2:
+  clientId: client-$env.ZSWAG_TEST_HTTP_USER
+  clientSecret: $env.ZSWAG_TEST_HTTP_PASSWORD
+  tokenUrl: https://issuer.$env.ZSWAG_TEST_HTTP_HOST/token
+  audience: aud-$env.ZSWAG_TEST_HTTP_USER
+  scope:
+    - read-$env.ZSWAG_TEST_HTTP_USER
+  tokenEndpointAuth:
+    method: rfc5849-oauth1-signature
+    nonceLength: $env.ZSWAG_TEST_HTTP_NONCE
+)";
+
+    httpcl::Config cfg(yaml);
+
+    REQUIRE(cfg.scope == "https://api.example.com/*");
+    REQUIRE(cfg.auth.has_value());
+    REQUIRE(cfg.auth->user == "alice");
+    REQUIRE(cfg.auth->password == "prefix-secret");
+    REQUIRE(cfg.proxy.has_value());
+    REQUIRE(cfg.proxy->host == "proxy.api.example.com");
+    REQUIRE(cfg.proxy->port == 3128);
+    REQUIRE(cfg.proxy->user == "proxy-alice");
+    REQUIRE(cfg.proxy->password == "secret");
+    REQUIRE(cfg.headers.find("X-Token")->second == "Bearer secret");
+    REQUIRE(cfg.query.find("token")->second == "secret");
+    REQUIRE(cfg.cookies["session"] == "secret");
+    REQUIRE(cfg.apiKey == "key-secret");
+    REQUIRE(cfg.oauth2.has_value());
+    REQUIRE(cfg.oauth2->clientId == "client-alice");
+    REQUIRE(cfg.oauth2->clientSecret == "secret");
+    REQUIRE(cfg.oauth2->tokenUrlOverride == "https://issuer.api.example.com/token");
+    REQUIRE(cfg.oauth2->audience == "aud-alice");
+    REQUIRE(cfg.oauth2->scopesOverride == std::vector<std::string>{"read-alice"});
+    REQUIRE(cfg.oauth2->tokenEndpointAuth.has_value());
+    REQUIRE(cfg.oauth2->tokenEndpointAuth->nonceLength == 24);
+}
+
+TEST_CASE("HTTP settings reject unresolved $env references", "[http-settings][env]") {
+    unsetTestEnv("ZSWAG_TEST_HTTP_MISSING");
+
+    REQUIRE_THROWS_WITH(
+        httpcl::Config("api-key: $env.ZSWAG_TEST_HTTP_MISSING"),
+        Catch::Matchers::ContainsSubstring("referenced by HTTP settings is not set")
+    );
+}
+
 TEST_CASE("OAuth2 tokenEndpointAuth configuration", "[http-settings][oauth2]") {
 
     SECTION("Default to Rfc6749_ClientSecretBasic when tokenEndpointAuth omitted") {
