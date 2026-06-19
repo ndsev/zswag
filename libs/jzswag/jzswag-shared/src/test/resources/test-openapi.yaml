@@ -1,0 +1,96 @@
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0.0"
+servers:
+  - url: https://api.example.com/v1
+  - url: https://backup.example.com/v1
+paths:
+  /users/{userId}:
+    get:
+      operationId: getUser
+      summary: Get user by ID
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: string
+        - name: X-Request-ID
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+      security:
+        - BearerAuth: []
+  /items:
+    get:
+      operationId: listItems
+      parameters:
+        - name: ids
+          in: query
+          required: false
+          explode: true
+          schema:
+            type: array
+            format: hex
+            items:
+              type: string
+      responses:
+        '200':
+          description: Success
+      security:
+        - ApiKeyAuth: []
+    post:
+      operationId: createItem
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+      security:
+        - BasicAuth: []
+  /public:
+    get:
+      operationId: publicEndpoint
+      responses:
+        '200':
+          description: Success
+      security: []
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+    BasicAuth:
+      type: http
+      scheme: basic
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    QueryKeyAuth:
+      type: apiKey
+      in: query
+      name: api_key
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+    OAuth2Auth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example.com/token
+          scopes:
+            read: Read access
+            write: Write access
+security:
+  - BearerAuth: []
