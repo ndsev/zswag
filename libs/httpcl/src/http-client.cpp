@@ -162,6 +162,7 @@ void configureEasyHandle(Transfer& transfer)
     curl_easy_setopt(transfer.easy, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(transfer.easy, CURLOPT_ACCEPT_ENCODING, "");
     curl_easy_setopt(transfer.easy, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+    curl_easy_setopt(transfer.easy, CURLOPT_PIPEWAIT, 1L);
     curl_easy_setopt(transfer.easy, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(transfer.easy, CURLOPT_CONNECTTIMEOUT, static_cast<long>(transfer.timeoutSecs));
     curl_easy_setopt(transfer.easy, CURLOPT_TIMEOUT, static_cast<long>(transfer.timeoutSecs));

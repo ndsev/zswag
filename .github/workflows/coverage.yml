@@ -21,13 +21,13 @@ jobs:
 
       - name: Install coverage tools
         run: |
-          pip install gcovr
+          pip install gcovr "h2>=4.1,<5"
           gcovr --version
 
       - name: Configure with coverage enabled
         run: |
           python3 -m venv venv && . ./venv/bin/activate
-          pip install -U setuptools wheel pip
+          pip install -U setuptools wheel pip "h2>=4.1,<5"
           mkdir build && cd build
           cmake -DCMAKE_BUILD_TYPE=Debug \
                 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
