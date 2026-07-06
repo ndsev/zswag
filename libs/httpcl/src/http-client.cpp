@@ -291,19 +291,20 @@ struct CurlHttpClient::Impl {
             active.erase(iter);
 
             long responseCode = 0;
+            const auto resultCode = message->data.result;
             curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &responseCode);
             curl_multi_remove_handle(multi, easy);
             curl_easy_cleanup(easy);
             transfer->easy = nullptr;
 
-            if (message->data.result == CURLE_OK) {
+            if (resultCode == CURLE_OK) {
                 transfer->result.set_value({
                     static_cast<int>(responseCode),
                     std::move(transfer->response)});
             } else {
                 const auto* error = transfer->errorBuffer[0]
                     ? transfer->errorBuffer
-                    : curl_easy_strerror(message->data.result);
+                    : curl_easy_strerror(resultCode);
                 transfer->result.set_value({0, error});
             }
         }
