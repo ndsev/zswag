@@ -3,6 +3,8 @@
 #include <iostream>
 #include <cstring>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 
 #include "httpcl/log.hpp"
 #include "stx/format.h"
@@ -472,6 +474,55 @@ std::string URIComponents::encode(std::string str)
     }
 
     return str;
+}
+
+std::string URIComponents::encodeComponent(std::string str)
+{
+    static const auto alpha =
+        "0123456789"
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "-._~";
+
+    for (std::string::size_type i = 0;;) {
+        i = str.find_first_not_of(alpha, i);
+        if (i == std::string::npos)
+            break;
+
+        const auto codepoint = static_cast<unsigned char>(str[i]);
+        char hex[3 + 1] = {};
+
+        auto len = snprintf(hex, sizeof(hex), "%%%02X",
+                            codepoint);
+        if (len > 0) {
+            str.replace(i, 1, hex);
+            i += strlen(hex);
+        } else {
+            ++i;
+        }
+    }
+
+    return str;
+}
+
+std::string URIComponents::decodeComponent(std::string str)
+{
+    std::string result;
+    result.reserve(str.size());
+
+    for (std::string::size_type i = 0; i < str.size();) {
+        if (str[i] == '%' && i + 2 < str.size() &&
+            std::isxdigit(static_cast<unsigned char>(str[i + 1])) &&
+            std::isxdigit(static_cast<unsigned char>(str[i + 2]))) {
+            const char hex[3] = {str[i + 1], str[i + 2], '\0'};
+            result.push_back(static_cast<char>(std::strtol(hex, nullptr, 16)));
+            i += 3;
+            continue;
+        }
+        result.push_back(str[i++]);
+    }
+
+    return result;
 }
 
 }

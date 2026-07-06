@@ -68,7 +68,7 @@ jobs:
           # The manylinux image still ships auditwheel 6.4.0, which falsely
           # rejects this wheel as having too-recent symbols. Use a newer
           # auditwheel from the venv for the repair step.
-          pip install -U setuptools wheel pip delocate auditwheel
+          pip install -U setuptools wheel pip delocate auditwheel "h2>=4.1,<5"
           mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
       - name: Build
         working-directory: build
@@ -126,7 +126,7 @@ jobs:
       working-directory: build
       run: |
         export MACOSX_DEPLOYMENT_TARGET=11.0  # ARM64 requires macOS 11.0+
-        python -m pip install delocate
+        python -m pip install delocate "h2>=4.1,<5"
         cmake -DPython3_ROOT_DIR=$pythonLocation \
               -DPython3_FIND_FRAMEWORK=LAST \
               -DCMAKE_BUILD_TYPE=Release \
@@ -149,7 +149,7 @@ jobs:
         # Verify NASM installation
         nasm -v
         # Install delvewheel for bundling DLLs into wheel
-        pip install delvewheel
+        pip install delvewheel "h2>=4.1,<5"
         echo "cmake -DPython3_ROOT_DIR=$env:pythonLocation"
         cmake "-DPython3_ROOT_DIR=$env:pythonLocation" -DPython3_FIND_REGISTRY=LAST -DCMAKE_BUILD_TYPE=Release -DZSWAG_ENABLE_TESTING=ON -DZSWAG_VERSION="${{ needs.determine-version.outputs.version }}" ..
         cmake --build . --config Release

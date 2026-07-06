@@ -4,6 +4,7 @@
 
 #include "base64.hpp"
 #include "httpcl/oauth1-signature.hpp"
+#include "httpcl/uri.hpp"
 
 #include <stx/string.h>
 #include "yaml-cpp/yaml.h"
@@ -129,9 +130,7 @@ static std::map<std::string, std::string> parseBodyParams(const std::string& bod
         if (eq != std::string::npos) {
             std::string key = pair.substr(0, eq);
             std::string value = pair.substr(eq + 1);
-            // Keep OAuth form-body parsing on public cpp-httplib helpers so
-            // dependency upgrades no longer rely on `httplib::detail`.
-            value = httplib::decode_uri_component(value);
+            value = httpcl::URIComponents::decodeComponent(value);
             params[key] = value;
         }
 
@@ -216,12 +215,12 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requ
 
     if (grantType == GRANT_TYPE_CLIENT_CREDENTIALS) {
         if (!resolvedScopes.empty())
-            body += "&scope=" + httplib::encode_uri_component(stx::join(resolvedScopes.begin(), resolvedScopes.end(), " "));
+            body += "&scope=" + httpcl::URIComponents::encodeComponent(stx::join(resolvedScopes.begin(), resolvedScopes.end(), " "));
         if (!oauthConfig.audience.empty())
-            body += "&audience=" + httplib::encode_uri_component(oauthConfig.audience);
+            body += "&audience=" + httpcl::URIComponents::encodeComponent(oauthConfig.audience);
     }
     else if (grantType == GRANT_TYPE_REFRESH_TOKEN) {
-        body += "&refresh_token=" + httplib::encode_uri_component(refreshToken);
+        body += "&refresh_token=" + httpcl::URIComponents::encodeComponent(refreshToken);
     }
 
     // Add client authentication (Basic or OAuth1 signature)
@@ -230,7 +229,7 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requ
 
     // Add client_id for public clients (no secret)
     if (secret.empty()) {
-        body += "&client_id=" + httplib::encode_uri_component(oauthConfig.clientId);
+        body += "&client_id=" + httpcl::URIComponents::encodeComponent(oauthConfig.clientId);
     }
 
     httpcl::log().debug("[OAuth2] Requesting token: grant_type={}, url={}", grantType, resolvedTokenUrl);

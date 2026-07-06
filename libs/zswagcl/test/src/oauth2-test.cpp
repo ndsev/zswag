@@ -8,7 +8,7 @@
 #include "zswagcl/oaclient.hpp"
 #include "zswagcl/private/openapi-oauth.hpp"
 #include "httpcl/http-client.hpp"
-#include "httplib.h"
+#include "httpcl/uri.hpp"
 #include "yaml-cpp/yaml.h"
 #include "service_client_test/Request.h"
 
@@ -171,7 +171,7 @@ private:
             if (pos != std::string::npos) {
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
-                value = httplib::decode_uri_component(value);
+                value = httpcl::URIComponents::decodeComponent(value);
                 params[key] = value;
             }
         }

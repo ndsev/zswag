@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import zserio
@@ -27,7 +30,39 @@ def prepare_generated_api() -> Path:
     return calc_dir
 
 
+def wait_for_openapi(host: str, port: str, timeout_seconds: float = 60.0) -> int:
+    """Wait until the calculator server is reachable before running clients.
+
+    The wheel test launches the server as a background process. On slower
+    Windows runners the fixed delay in the test harness is not always enough,
+    so the integration test needs an explicit readiness probe.
+    """
+    url = f"http://{host}:{port}/openapi.json"
+    deadline = time.monotonic() + timeout_seconds
+    last_error: Exception | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=1.0) as response:
+                if response.status == 200:
+                    print(f"Calculator server is ready at {url}")
+                    return 0
+        except (OSError, urllib.error.URLError) as error:
+            last_error = error
+
+        time.sleep(0.25)
+
+    print(f"Timed out waiting for calculator server at {url}: {last_error}", file=sys.stderr)
+    return 1
+
+
 def main() -> int:
+    mode = sys.argv[1] if len(sys.argv) > 1 else ""
+    host, port = sys.argv[2].split(":") if len(sys.argv) > 2 and ":" in sys.argv[2] else ("localhost", "5000")
+
+    if mode == "wait":
+        return wait_for_openapi(host, port)
+
     calc_dir = prepare_generated_api()
     if str(calc_dir) not in sys.path:
         sys.path.insert(0, str(calc_dir))
@@ -35,9 +70,6 @@ def main() -> int:
     import calculator.api as calculator
     import client as calc_client
     import server as calc_server
-
-    mode = sys.argv[1] if len(sys.argv) > 1 else ""
-    host, port = sys.argv[2].split(":") if len(sys.argv) > 2 and ":" in sys.argv[2] else ("localhost", "5000")
 
     if mode == "client":
         calc_client.run(host, port)
@@ -57,7 +89,7 @@ def main() -> int:
         print(calc_dir)
         return 0
 
-    print("Usage: python run_calc.py {server|client|path} [host:port]")
+    print("Usage: python run_calc.py {server|client|wait|path} [host:port]")
     return 1
 
 

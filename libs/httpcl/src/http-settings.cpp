@@ -12,6 +12,8 @@
 #include <fstream>
 #include <filesystem>
 #include <sstream>
+#include <stdexcept>
+#include <string_view>
 #include <spdlog/spdlog.h>
 
 using namespace httpcl;
@@ -19,6 +21,88 @@ using namespace std::string_literals;
 
 static const std::chrono::minutes KEYCHAIN_TIMEOUT{1};
 static const char* KEYCHAIN_PACKAGE = "lib.openapi.zserio.client";
+
+namespace {
+
+bool isEnvNameStart(char c)
+{
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+}
+
+bool isEnvNameChar(char c)
+{
+    return isEnvNameStart(c) || (c >= '0' && c <= '9');
+}
+
+std::string expandEnvReferences(std::string const& value)
+{
+    static constexpr std::string_view kPrefix = "$env.";
+
+    std::string result;
+    result.reserve(value.size());
+
+    size_t cursor = 0;
+    while (cursor < value.size()) {
+        auto refBegin = value.find(kPrefix, cursor);
+        if (refBegin == std::string::npos) {
+            result.append(value, cursor, std::string::npos);
+            break;
+        }
+
+        result.append(value, cursor, refBegin - cursor);
+
+        auto nameBegin = refBegin + kPrefix.size();
+        if (nameBegin >= value.size() || !isEnvNameStart(value[nameBegin])) {
+            throw std::runtime_error("Invalid environment variable reference in HTTP settings: expected '$env.NAME'.");
+        }
+
+        auto nameEnd = nameBegin + 1;
+        while (nameEnd < value.size() && isEnvNameChar(value[nameEnd]))
+            ++nameEnd;
+
+        auto name = value.substr(nameBegin, nameEnd - nameBegin);
+        auto envValue = std::getenv(name.c_str());
+        if (!envValue) {
+            throw std::runtime_error("Environment variable '" + name + "' referenced by HTTP settings is not set.");
+        }
+
+        result += envValue;
+        cursor = nameEnd;
+    }
+
+    return result;
+}
+
+std::string yamlString(YAML::Node const& node)
+{
+    return expandEnvReferences(node.as<std::string>());
+}
+
+int yamlInt(YAML::Node const& node, std::string const& fieldName)
+{
+    auto expanded = yamlString(node);
+    size_t parsedChars = 0;
+    try {
+        auto result = std::stoi(expanded, &parsedChars);
+        if (parsedChars != expanded.size())
+            throw std::invalid_argument("trailing characters");
+        return result;
+    }
+    catch (std::exception const&) {
+        throw std::runtime_error("'" + fieldName + "' must be an integer, got: " + expanded);
+    }
+}
+
+std::map<std::string, std::string> yamlStringMap(YAML::Node const& node)
+{
+    std::map<std::string, std::string> result;
+    for (auto const& entry : node) {
+        result.emplace(entry.first.as<std::string>(), yamlString(entry.second));
+    }
+    return result;
+}
+
+}
 
 namespace YAML
 {
@@ -50,12 +134,12 @@ struct convert<Config::BasicAuthentication>
         if (!user)
             return false;
 
-        a.user = user.as<std::string>();
+        a.user = yamlString(user);
 
         if (password)
-            a.password = password.as<std::string>();
+            a.password = yamlString(password);
         else if (keychain)
-            a.keychain = keychain.as<std::string>();
+            a.keychain = yamlString(keychain);
         else
             return false;
 
@@ -91,20 +175,20 @@ struct convert<Config::Proxy>
         if (!host || !port)
             return false;
 
-        a.host = host.as<std::string>();
-        a.port = port.as<int>();
+        a.host = yamlString(host);
+        a.port = yamlInt(port, "proxy.port");
 
         const auto& user = node["user"];
         const auto& password = node["password"];
         const auto& keychain = node["keychain"];
 
         if (user) {
-            a.user = user.as<std::string>();
+            a.user = yamlString(user);
 
             if (password)
-                a.password = password.as<std::string>();
+                a.password = yamlString(password);
             else if (keychain)
-                a.keychain = keychain.as<std::string>();
+                a.keychain = yamlString(keychain);
             else
                 return false;
         }
@@ -231,11 +315,11 @@ Config configFromNode(YAML::Node const& node)
     Config conf;
 
     if (auto entryParam = node["url"]) {
-        conf.urlPattern = conf.urlPatternString = entryParam.as<std::string>();
+        conf.urlPattern = conf.urlPatternString = yamlString(entryParam);
     }
     else {
         if (auto entryParamScope = node["scope"])
-            conf.scope = entryParamScope.as<std::string>();
+            conf.scope = yamlString(entryParamScope);
         else
             conf.scope = "*";
         conf.urlPatternString = convertToRegex(*conf.scope);
@@ -243,15 +327,15 @@ Config configFromNode(YAML::Node const& node)
     }
 
     if (auto cookies = node["cookies"])
-        conf.cookies = cookies.as<std::map<std::string, std::string>>();
+        conf.cookies = yamlStringMap(cookies);
 
     if (auto headers = node["headers"]) {
-        auto headersMap = headers.as<std::map<std::string, std::string>>();
+        auto headersMap = yamlStringMap(headers);
         conf.headers.insert(headersMap.begin(), headersMap.end());
     }
 
     if (auto query = node["query"]) {
-        auto queryMap = query.as<std::map<std::string, std::string>>();
+        auto queryMap = yamlStringMap(query);
         conf.query.insert(queryMap.begin(), queryMap.end());
     }
 
@@ -262,31 +346,31 @@ Config configFromNode(YAML::Node const& node)
         conf.proxy = proxy.as<Config::Proxy>();
 
     if (auto apiKey = node["api-key"])
-        conf.apiKey = apiKey.as<std::string>();
+        conf.apiKey = yamlString(apiKey);
 
     if (auto oauth2Node = node["oauth2"]) {
         Config::OAuth2 oauth2;
         if (auto v = oauth2Node["clientId"])
-            oauth2.clientId = v.as<std::string>();
+            oauth2.clientId = yamlString(v);
         if (auto v = oauth2Node["clientSecret"])
-            oauth2.clientSecret = v.as<std::string>();
+            oauth2.clientSecret = yamlString(v);
         if (auto v = oauth2Node["clientSecretKeychain"])
-            oauth2.clientSecretKeychain = v.as<std::string>();
+            oauth2.clientSecretKeychain = yamlString(v);
         if (auto v = oauth2Node["tokenUrl"])
-            oauth2.tokenUrlOverride = v.as<std::string>();
+            oauth2.tokenUrlOverride = yamlString(v);
         if (auto v = oauth2Node["refreshUrl"])
-            oauth2.refreshUrlOverride = v.as<std::string>();
+            oauth2.refreshUrlOverride = yamlString(v);
         if (auto v = oauth2Node["audience"])
-            oauth2.audience = v.as<std::string>();
+            oauth2.audience = yamlString(v);
         if (auto v = oauth2Node["scope"]) {
             for (auto const& scope : v)
-                oauth2.scopesOverride.emplace_back(scope.as<std::string>());
+                oauth2.scopesOverride.emplace_back(yamlString(scope));
         }
         if (auto authNode = oauth2Node["tokenEndpointAuth"]) {
             Config::OAuth2::TokenEndpointAuth auth;
 
             if (auto methodNode = authNode["method"]) {
-                std::string method = methodNode.as<std::string>();
+                std::string method = yamlString(methodNode);
                 if (method == "rfc5849-oauth1-signature") {
                     auth.method = Config::OAuth2::TokenEndpointAuthMethod::Rfc5849_Oauth1Signature;
                 } else if (method == "rfc6749-client-secret-basic") {
@@ -297,7 +381,7 @@ Config configFromNode(YAML::Node const& node)
             }
 
             if (auto nonceLengthNode = authNode["nonceLength"]) {
-                auth.nonceLength = nonceLengthNode.as<int>();
+                auth.nonceLength = yamlInt(nonceLengthNode, "tokenEndpointAuth.nonceLength");
                 if (auth.nonceLength < 8 || auth.nonceLength > 64) {
                     throw std::runtime_error("tokenEndpointAuth.nonceLength must be between 8 and 64");
                 }
@@ -316,6 +400,21 @@ Config configFromNode(YAML::Node const& node)
 
     return conf;
 }
+
+std::runtime_error keychainLoadError(
+    std::string const& service,
+    std::string const& user,
+    std::string const& detail)
+{
+    auto location = "service='" + service + "', user='" + user + "', package='" + KEYCHAIN_PACKAGE + "'";
+    if (detail == "Element not found" || detail.find("not found") != std::string::npos) {
+        return std::runtime_error(
+            "Keychain password not found for " + location
+            + ". Store the password first or update the 'keychain' reference in HTTP settings.");
+    }
+
+    return std::runtime_error("Keychain password lookup failed for " + location + ": " + detail);
+}
 }
 
 std::string secret::load(
@@ -333,7 +432,7 @@ std::string secret::load(
                 error);
 
         if (error)
-            throw std::runtime_error(error.message);
+            throw keychainLoadError(service, user, error.message);
         return password;
     });
 
@@ -556,47 +655,6 @@ Config& Settings::getOrCreateConfigScope(std::string_view const& scope)
         config = &settings.emplace_back(formatted_scope);
     }
     return *config;
-}
-
-void Config::apply(httplib::Client &cl) const
-{
-    // Headers
-    httplib::Headers httpLibHeaders{headers.begin(), headers.end()};
-
-    // Cookies
-    std::string cookieHeaderValue;
-    for (const auto& cookie : cookies) {
-        if (!cookieHeaderValue.empty())
-            cookieHeaderValue += "; ";
-        cookieHeaderValue += cookie.first + "=" + cookie.second;
-    }
-    if (!cookieHeaderValue.empty())
-        httpLibHeaders.insert({"Cookie", cookieHeaderValue});
-
-    // Basic Authentication
-    if (auth) {
-        auto password = auth->password;
-        if (!auth->keychain.empty()) {
-            password = secret::load(auth->keychain, auth->user);
-        }
-        httpLibHeaders.insert(
-            httplib::make_basic_authentication_header(auth->user, password));
-    }
-
-    // Proxy Settings
-    if (proxy) {
-        cl.set_proxy(proxy->host, proxy->port);
-
-        auto password = proxy->password;
-        if (!proxy->keychain.empty())
-            password = secret::load(proxy->keychain, proxy->user);
-
-        if (!proxy->user.empty())
-            cl.set_proxy_basic_auth(
-                proxy->user, password);
-    }
-
-    cl.set_default_headers(httpLibHeaders);
 }
 
 std::string Config::toYaml() const {

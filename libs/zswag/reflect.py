@@ -1,3 +1,11 @@
+"""Reflection helpers shared by zswag's Python server and generator.
+
+The functions in this module translate between OpenAPI parameter values and
+zserio Python request objects. They rely on zserio's generated type information
+(``type_info()``) to inspect fields, instantiate request objects, and serialize
+the final request blob consumed by generated zserio service code.
+"""
+
 import inspect
 import base64
 import zserio
@@ -15,6 +23,14 @@ TYPE_INFO_CACHE = {}
 
 
 class NotInstantiableReason(RuntimeError):
+    """Explains why a zserio type cannot be synthesized from flat parameters.
+
+    Some request objects cannot be created generically because they require
+    constructor parameters or contain arrays of compound objects. The OpenAPI
+    generator uses this exception to tell users to expose the request as a blob
+    instead of flattening it into scalar parameters.
+    """
+
     def __init__(self, member_name: str, member_type: str, method_name: str = ""):
         super(NotInstantiableReason, self).__init__("\n" + inspect.cleandoc(f"""
         WARNING: Generating method `{method_name or 'unknown'}`:
@@ -52,6 +68,12 @@ C_STRUCT_LITERAL_PER_TYPE_AND_SIZE: Dict[Tuple[Any, int], str] = {
 # Recursive setattr function, adopted from SO:
 #  https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-subobjects-chained-properties
 def rsetattr(obj, attr, val):
+    """Set a possibly dotted attribute path on an object.
+
+    ``attr`` may be a simple attribute name or a dotted path such as
+    ``"outer.inner.value"``. Intermediate objects are resolved with
+    :func:`rgetattr`; only the final segment is assigned.
+    """
     pre, _, post = attr.rpartition('.')
     return setattr(rgetattr(obj, pre) if pre else obj, post, val)
 
@@ -59,6 +81,12 @@ def rsetattr(obj, attr, val):
 # Recursive getattr function, adopted from SO:
 #  https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-subobjects-chained-properties
 def rgetattr(obj, attr):
+    """Resolve a possibly dotted attribute path on an object.
+
+    A descriptive ``RuntimeError`` is raised when any path segment is missing.
+    This makes malformed OpenAPI parameter mappings easier to diagnose than a
+    plain ``AttributeError`` on an intermediate generated zserio object.
+    """
     def _getattr(obj, attr):
         if not hasattr(obj, attr):
             raise RuntimeError(
@@ -70,6 +98,13 @@ def rgetattr(obj, attr):
 
 # Get the request type for a zserio service method.
 def service_method_request_type(service_instance: Any, method_name: str) -> Any:
+    """Return the generated request class for a zserio service method.
+
+    zserio's generated Python service implementation methods are type annotated.
+    This helper looks up the private ``_<method>_impl`` function, reads its
+    ``request`` annotation, and returns the request class used by the OpenAPI
+    generator/server path.
+    """
     zserio_impl_function = getattr(service_instance, f"_{to_snake(method_name)}_impl")
     result = get_type_hints(zserio_impl_function)["request"]
     assert inspect.isclass(result)
@@ -78,6 +113,7 @@ def service_method_request_type(service_instance: Any, method_name: str) -> Any:
 
 # Adopted from zserio PythonSymbolConverter
 def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"))):
+    """Convert a zserio-style camelCase/PascalCase identifier to snake_case."""
     for p in patterns:
         s = p.sub(r"\1_\2", s)
     return s.lower()
@@ -86,12 +122,19 @@ def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"
 # Returns true if t is atomic (not a compound struct),
 # false otherwise.
 def is_scalar(t: TypeInfo):
+    """Return whether zserio type info represents a scalar or enum value."""
     return t.py_type in SCALAR_T or issubclass(t.py_type, Enum)
 
 
 # Retrieve zserio type info for a schema class -
 # result is cached for maximum performance.
 def cached_type_info(zserio_t) -> Optional[TypeInfo]:
+    """Return cached zserio ``TypeInfo`` for a generated schema class.
+
+    The zserio Python runtime computes type information from generated metadata.
+    Caching avoids repeated reflection work when generating large OpenAPI files
+    or handling many incoming requests.
+    """
     if not hasattr(zserio_t, "type_info"):
         return None
     key = f"{zserio_t.__module__}.{zserio_t.__qualname__}"
@@ -106,6 +149,12 @@ def cached_type_info(zserio_t) -> Optional[TypeInfo]:
 # names. The first output tuple entry is the pythonic conversion
 # ("my_field_1.my_field_2").
 def find_field(t: TypeInfo, field: str, offset: int = 0, py_path="") -> Tuple[str, Optional[MemberInfo]]:
+    """Find a dotted zserio schema field in ``TypeInfo``.
+
+    ``field`` uses schema names, not Python property names. The returned tuple
+    contains the equivalent dotted Python attribute path and the matching
+    ``MemberInfo``. If no field matches, ``("", None)`` is returned.
+    """
     next_dot = field.find(".", offset)
     subfield = field[offset:next_dot] if next_dot >= 0 else field[offset:]
     for _, member_info in members(t):
@@ -121,6 +170,11 @@ def find_field(t: TypeInfo, field: str, offset: int = 0, py_path="") -> Tuple[st
 
 # Simply yields all MemberInfo for a TypeInfo.
 def members(t: TypeInfo, recursive=False, field_prefix="") -> Iterator[MemberInfo]:
+    """Yield ``(schema_field_name, MemberInfo)`` pairs from zserio type info.
+
+    When ``recursive`` is true, nested compound members are traversed and field
+    names are emitted as dotted schema paths.
+    """
     if TypeAttribute.FIELDS in t.attributes:
         for member in t.attributes[TypeAttribute.FIELDS]:
             field_name = field_prefix+"." if field_prefix else ""
@@ -134,6 +188,12 @@ def members(t: TypeInfo, recursive=False, field_prefix="") -> Iterator[MemberInf
 # It (or a subtype) might take extra parameters, or be
 # an array of non-scalar types.
 def check_uninstantiable(t: TypeInfo, field_name="", recursive=False) -> Optional[NotInstantiableReason]:
+    """Return why a type cannot be auto-instantiated, or ``None`` if it can.
+
+    Auto-instantiation is only safe for request objects with parameterless
+    constructors and scalar arrays. Compound arrays and parameterized zserio
+    structs require user data the generic OpenAPI path cannot synthesize.
+    """
     if TypeAttribute.PARAMETERS in t.attributes and t.attributes[TypeAttribute.PARAMETERS]:
         return NotInstantiableReason(field_name, t.schema_name)
     member_info: MemberInfo
@@ -149,6 +209,12 @@ def check_uninstantiable(t: TypeInfo, field_name="", recursive=False) -> Optiona
 # Returns a fully recursively initialized class instance
 # of a zserio schema type, if possible.
 def instantiate(t: Type) -> Any:
+    """Create a recursively initialized instance of a generated zserio class.
+
+    Non-scalar fields are recursively instantiated so flattened HTTP parameters
+    can later be assigned into nested request objects. Raises
+    :class:`NotInstantiableReason` when the type cannot be synthesized safely.
+    """
     result_instance = t()
     type_info = cached_type_info(t)
     if reason := check_uninstantiable(type_info):
@@ -164,6 +230,7 @@ def instantiate(t: Type) -> Any:
 
 # Get a byte buffer from a string which is encoded in a given format
 def str_to_bytes(s: str, fmt: OAParamFormat) -> bytes:
+    """Decode an OpenAPI string parameter into bytes according to ``fmt``."""
     if fmt == OAParamFormat.BASE64:
         return base64.b64decode(s)
     elif fmt == OAParamFormat.BASE64URL:
@@ -176,6 +243,12 @@ def str_to_bytes(s: str, fmt: OAParamFormat) -> bytes:
 
 # Convert a single passed parameter value to it's correct type
 def parse_param_value(param: OAParam, target_type: Type, value: str) -> Any:
+    """Convert one raw OpenAPI parameter value into a target Python type.
+
+    Handles native string conversion, boolean conversion through ``0``/``1``,
+    enum conversion through the enum value, hexadecimal integer conversion, and
+    binary encodings used for serialized numeric/string zserio values.
+    """
     # Check if it's an enum ...
     if issubclass(target_type, Enum):
         return target_type(parse_param_value(param, int, value))
@@ -203,12 +276,21 @@ def parse_param_value(param: OAParam, target_type: Type, value: str) -> Any:
 
 # Convert an array of passed parameter values to their correct type
 def parse_param_values(param: OAParam, target_type: Type, value: List[str]) -> List[Any]:
+    """Convert a repeated OpenAPI parameter into a list of typed values."""
     return [parse_param_value(param, target_type, item) for item in value]
 
 
 # Get a blob for a zserio request type, a set of request parameter values
 # and an OpenAPI method path spec.
 def request_object_blob(*, req_t: Type, headers: Dict[str, Any], spec: OAMethod, **kwargs) -> bytes:
+    """Build a serialized zserio request blob from HTTP request data.
+
+    ``spec`` describes where each OpenAPI parameter maps into the zserio request
+    object. Whole-request blob parameters are returned directly after decoding.
+    For field-level parameters, the function lazily instantiates ``req_t``,
+    converts raw parameter/header values, assigns them into the generated object,
+    and serializes the object with ``zserio.BitStreamWriter``.
+    """
     # Lazy instantiation of request object and type info
     req: Optional[req_t] = None
     req_t_info = cached_type_info(req_t)

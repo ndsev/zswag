@@ -143,3 +143,52 @@ _deps/
 
 CLAUDE.md
 links
+
+# Java / Gradle
+.gradle/
+.gradletasknamecache
+gradle-app.setting
+.kotlin/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+# Negation must come after *.jar — gitignore evaluates rules top-to-bottom and a
+# later pattern overrides earlier ones. The Gradle wrapper jar is checked in.
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android
+local.properties
+captures/
+*.apk
+*.aab
+*.aar
+.cxx/
+
+# Generated zserio sources (regenerated during build)
+libs/jzswag/jzswag-test/src/main/java/calculator/
+
+# Kotlin temporarily disabled
+**/kotlin-disabled/
+
+# IntelliJ IDEA
+*.iml
+*.ipr
+*.iws
+.idea/
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/

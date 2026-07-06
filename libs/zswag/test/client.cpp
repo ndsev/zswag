@@ -26,7 +26,7 @@ int main (int argc, char* argv[]) {
         try
         {
             spdlog::info("[cpp-test-client]   => Instantiating client.");
-            auto httpClient = std::make_unique<HttpLibHttpClient>();
+            auto httpClient = std::make_unique<CurlHttpClient>();
             auto openApiConfig = fetchOpenAPIConfig(specUrl, *httpClient);
             // See https://github.com/spec-first/connexion/issues/1139
             openApiConfig.servers.insert(openApiConfig.servers.begin(), URIComponents::fromStrPath("/bad/path/we/dont/access"));

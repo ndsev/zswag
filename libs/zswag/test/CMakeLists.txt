@@ -22,6 +22,7 @@ if (ZSWAG_ENABLE_TESTING)
     COMMANDS
       -f "pip install ${WHEEL_DEPLOY_DIRECTORY}/zswag-*.whl"
       -b "python ${CMAKE_CURRENT_SOURCE_DIR}/run_calc.py server 127.0.0.1:16161"
+      -f "python ${CMAKE_CURRENT_SOURCE_DIR}/run_calc.py wait 127.0.0.1:16161"
       -f "$<TARGET_FILE:${PROJECT_NAME}> http://127.0.0.1:16161/openapi.json"
       -f "python ${CMAKE_CURRENT_SOURCE_DIR}/run_calc.py client 127.0.0.1:16161")
 
