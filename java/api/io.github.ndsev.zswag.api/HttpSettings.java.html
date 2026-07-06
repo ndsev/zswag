@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpSettings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-api</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.api</a> &gt; <span class="el_source">HttpSettings.java</span></div><h1>HttpSettings.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.api;
+
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+/**
+ * Multi-scope HTTP settings registry. Mirrors C++ {@code httpcl::Settings}: an
+ * ordered list of {@link HttpConfig} entries, each with an optional URL scope
+ * (glob-like pattern compiled to regex). For a given request URL, all matching
+ * entries are merged into a single effective {@link HttpConfig}.
+ *
+ * &lt;p&gt;Loading from {@code HTTP_SETTINGS_FILE} is performed by
+ * {@code HttpSettingsLoader} in jzswag-shared (which keeps this module free of
+ * a YAML dependency).
+ */
+public final class HttpSettings {
+    private final List&lt;HttpConfig&gt; entries;
+
+<span class="fc" id="L24">    public HttpSettings(@NotNull List&lt;HttpConfig&gt; entries) {</span>
+<span class="fc" id="L25">        this.entries = Collections.unmodifiableList(new ArrayList&lt;&gt;(entries));</span>
+<span class="fc" id="L26">    }</span>
+
+    /** Empty settings — useful as a default when {@code HTTP_SETTINGS_FILE} is unset. */
+    @NotNull
+    public static HttpSettings empty() {
+<span class="fc" id="L31">        return new HttpSettings(Collections.emptyList());</span>
+    }
+
+    @NotNull
+    public List&lt;HttpConfig&gt; getEntries() {
+<span class="fc" id="L36">        return entries;</span>
+    }
+
+    /**
+     * Returns the merged {@link HttpConfig} for all entries whose
+     * {@code urlPattern} matches the given URL. Iterates in declaration order;
+     * each match is merged onto the accumulated result via
+     * {@link HttpConfig#mergedWith(HttpConfig)}.
+     *
+     * &lt;p&gt;Mirrors C++ {@code Settings::operator[](url)}.
+     */
+    @NotNull
+    public HttpConfig forUrl(@NotNull String url) {
+<span class="fc" id="L49">        HttpConfig result = HttpConfig.empty();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (HttpConfig entry : entries) {</span>
+<span class="fc" id="L51">            Optional&lt;Pattern&gt; pattern = entry.getUrlPattern();</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">            if (!pattern.isPresent() || pattern.get().matcher(url).matches()) {</span>
+<span class="fc" id="L53">                result = result.mergedWith(entry);</span>
+            }
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        return result;</span>
+    }
+
+    /**
+     * Converts a glob-like scope pattern (with {@code *} as wildcard) into a
+     * compiled regex, escaping all other regex metacharacters. Mirrors C++
+     * {@code convertToRegex} in {@code http-settings.cpp}.
+     */
+    @NotNull
+    public static Pattern compileScope(@NotNull String scope) {
+<span class="fc" id="L66">        StringBuilder sb = new StringBuilder(&quot;^&quot;);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (int i = 0; i &lt; scope.length(); i++) {</span>
+<span class="fc" id="L68">            char c = scope.charAt(i);</span>
+<span class="fc bfc" id="L69" title="All 5 branches covered.">            switch (c) {</span>
+                case '*':
+<span class="fc" id="L71">                    sb.append(&quot;.*&quot;);</span>
+<span class="fc" id="L72">                    break;</span>
+                case '.':
+<span class="fc" id="L74">                    sb.append(&quot;\\.&quot;);</span>
+<span class="fc" id="L75">                    break;</span>
+                case '\\':
+<span class="fc" id="L77">                    sb.append(&quot;\\\\&quot;);</span>
+<span class="fc" id="L78">                    break;</span>
+                case '^': case '$': case '|': case '(': case ')':
+                case '[': case ']': case '{': case '}': case '?':
+                case '+': case '-': case '!':
+<span class="fc" id="L82">                    sb.append('\\').append(c);</span>
+<span class="fc" id="L83">                    break;</span>
+                default:
+<span class="fc" id="L85">                    sb.append(c);</span>
+            }
+        }
+<span class="fc" id="L88">        sb.append(&quot;.*$&quot;);</span>
+<span class="fc" id="L89">        return Pattern.compile(sb.toString());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

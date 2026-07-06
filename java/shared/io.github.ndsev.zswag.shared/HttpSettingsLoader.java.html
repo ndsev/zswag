@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpSettingsLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-shared</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.shared</a> &gt; <span class="el_source">HttpSettingsLoader.java</span></div><h1>HttpSettingsLoader.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.shared;
+
+import io.github.ndsev.zswag.api.HttpConfig;
+import io.github.ndsev.zswag.api.HttpSettings;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Loads {@link HttpSettings} from a YAML file matching the C++/Python schema
+ * documented under &quot;HTTP Settings File Format&quot; in README.md.
+ *
+ * &lt;p&gt;Top-level shape:
+ * &lt;pre&gt;{@code
+ * http-settings:
+ *   - scope: &lt;glob&gt;           # or url: &lt;regex&gt;
+ *     basic-auth: { user, password|keychain }
+ *     proxy: { host, port, user?, password|keychain? }
+ *     cookies: { ... }
+ *     headers: { ... }
+ *     query: { ... }
+ *     api-key: &lt;value&gt;
+ *     oauth2:
+ *       clientId, clientSecret|clientSecretKeychain,
+ *       tokenUrl?, refreshUrl?, audience?, scope?, useForSpecFetch?,
+ *       tokenEndpointAuth: { method, nonceLength? }
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;Legacy schema (top-level entries treated as a single un-scoped config) is
+ * also accepted, matching C++ {@code http-settings.cpp:466-469}.
+ */
+public final class HttpSettingsLoader {
+<span class="fc" id="L51">    private static final Logger logger = LoggerFactory.getLogger(HttpSettingsLoader.class);</span>
+<span class="fc" id="L52">    private static final Pattern ENV_REFERENCE_PATTERN = Pattern.compile(&quot;\\$env\\.([A-Za-z_][A-Za-z0-9_]*)&quot;);</span>
+<span class="fc" id="L53">    private static final Pattern INVALID_ENV_REFERENCE_PATTERN = Pattern.compile(&quot;\\$env\\.(?![A-Za-z_][A-Za-z0-9_]*)&quot;);</span>
+
+    public static final String ENV_SETTINGS_FILE = &quot;HTTP_SETTINGS_FILE&quot;;
+
+    private HttpSettingsLoader() {}
+
+    /**
+     * Tracks the source path that {@link #loadFromEnvironment} most recently resolved,
+     * so {@link HotReloader} can rebuild a fresh {@link HttpSettings} when the file
+     * changes on disk. Per-thread? No — the env var is process-wide and reading it
+     * twice in close succession is fine. Lazy holder keeps things thread-safe.
+     */
+    @org.jetbrains.annotations.Nullable
+    public static Path environmentSourcePath() {
+<span class="nc" id="L67">        String path = System.getenv(ENV_SETTINGS_FILE);</span>
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        if (path == null || path.isEmpty()) return null;</span>
+<span class="nc" id="L69">        Path file = Paths.get(path);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        return Files.isRegularFile(file) ? file : null;</span>
+    }
+
+    /**
+     * Tracks an {@link HttpSettings} object that gets re-read from disk when the
+     * source file's last-modified timestamp advances. Mirrors C++
+     * {@code httpcl::Settings::operator[]} (http-settings.cpp:520-543) which checks
+     * mtime per call and re-parses on change — supports credential rotation in
+     * long-running clients.
+     *
+     * &lt;p&gt;Thread-safe via double-checked locking on the {@code current} reference.
+     * Failed reloads log a warning and keep the previous snapshot rather than
+     * dropping to empty (better than losing all credentials mid-flight).
+     */
+    public static final class HotReloader {
+        @org.jetbrains.annotations.Nullable
+        private final Path source;
+        private final java.util.concurrent.atomic.AtomicReference&lt;HttpSettings&gt; current;
+        private volatile long lastMtimeMillis;
+
+<span class="fc" id="L90">        private HotReloader(@org.jetbrains.annotations.Nullable Path source, @NotNull HttpSettings initial) {</span>
+<span class="fc" id="L91">            this.source = source;</span>
+<span class="fc" id="L92">            this.current = new java.util.concurrent.atomic.AtomicReference&lt;&gt;(initial);</span>
+<span class="fc" id="L93">            this.lastMtimeMillis = readMtimeOrZero();</span>
+<span class="fc" id="L94">        }</span>
+
+        /** Builds a reloader wired to {@code HTTP_SETTINGS_FILE} (or a no-op one if unset). */
+        @NotNull
+        public static HotReloader fromEnvironment() {
+<span class="nc" id="L99">            Path src = environmentSourcePath();</span>
+<span class="nc" id="L100">            return new HotReloader(src, loadFromEnvironment());</span>
+        }
+
+        /** Builds a reloader against an explicit path (or a no-op one if {@code source} null). */
+        @NotNull
+        public static HotReloader of(@org.jetbrains.annotations.Nullable Path source, @NotNull HttpSettings initial) {
+<span class="fc" id="L106">            return new HotReloader(source, initial);</span>
+        }
+
+        /**
+         * Returns the current settings, reloading from disk if the source file's mtime
+         * has advanced since last call. Calling this once per request is cheap (single
+         * {@code stat}), comparable to the C++ implementation.
+         */
+        @NotNull
+        public HttpSettings current() {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (source == null) return current.get();</span>
+<span class="fc" id="L117">            long mtime = readMtimeOrZero();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (mtime &gt; lastMtimeMillis) {</span>
+<span class="fc" id="L119">                synchronized (this) {</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                    if (mtime &gt; lastMtimeMillis) {</span>
+                        try {
+<span class="fc" id="L122">                            HttpSettings reloaded = loadFromFile(source);</span>
+<span class="fc" id="L123">                            current.set(reloaded);</span>
+<span class="fc" id="L124">                            lastMtimeMillis = mtime;</span>
+<span class="fc" id="L125">                            logger.debug(&quot;Reloaded HTTP_SETTINGS_FILE from '{}' (mtime advanced).&quot;, source);</span>
+<span class="fc" id="L126">                        } catch (IOException | RuntimeException e) {</span>
+                            // SnakeYAML throws ParserException (RuntimeException) on malformed YAML;
+                            // IOException on disk failures. Either way: keep the old snapshot
+                            // rather than dropping to empty during an in-flight rotation.
+<span class="fc" id="L130">                            logger.warn(&quot;Failed to reload HTTP_SETTINGS_FILE '{}': {}. &quot;</span>
+<span class="fc" id="L131">                                    + &quot;Keeping previous snapshot.&quot;, source, e.getMessage());</span>
+                            // Bump lastMtimeMillis so we don't try to reload the same broken
+                            // file every request.
+<span class="fc" id="L134">                            lastMtimeMillis = mtime;</span>
+<span class="fc" id="L135">                        }</span>
+                    }
+<span class="fc" id="L137">                }</span>
+            }
+<span class="fc" id="L139">            return current.get();</span>
+        }
+
+        private long readMtimeOrZero() {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (source == null) return 0L;</span>
+            try {
+<span class="fc" id="L145">                return Files.getLastModifiedTime(source).toMillis();</span>
+<span class="nc" id="L146">            } catch (IOException e) {</span>
+<span class="nc" id="L147">                return 0L;</span>
+            }
+        }
+    }
+
+    /**
+     * Loads settings from {@code HTTP_SETTINGS_FILE} if set; returns empty
+     * settings otherwise. Empty/unset env var, or non-existent path, yield
+     * empty settings (logged at debug level), matching C++ semantics.
+     */
+    @NotNull
+    public static HttpSettings loadFromEnvironment() {
+<span class="fc" id="L159">        String path = System.getenv(ENV_SETTINGS_FILE);</span>
+<span class="pc bpc" id="L160" title="3 of 4 branches missed.">        if (path == null || path.isEmpty()) {</span>
+<span class="fc" id="L161">            logger.debug(&quot;HTTP_SETTINGS_FILE environment variable is empty.&quot;);</span>
+<span class="fc" id="L162">            return HttpSettings.empty();</span>
+        }
+<span class="nc" id="L164">        Path file = Paths.get(path);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (!Files.isRegularFile(file)) {</span>
+<span class="nc" id="L166">            logger.debug(&quot;The HTTP_SETTINGS_FILE path '{}' is not a file.&quot;, path);</span>
+<span class="nc" id="L167">            return HttpSettings.empty();</span>
+        }
+        try {
+<span class="nc" id="L170">            return loadFromFile(file);</span>
+<span class="nc" id="L171">        } catch (IOException e) {</span>
+<span class="nc" id="L172">            logger.error(&quot;Failed to read http-settings from '{}': {}&quot;, path, e.getMessage());</span>
+<span class="nc" id="L173">            return HttpSettings.empty();</span>
+        }
+    }
+
+    @NotNull
+    public static HttpSettings loadFromFile(@NotNull Path file) throws IOException {
+<span class="fc" id="L179">        try (InputStream input = Files.newInputStream(file)) {</span>
+<span class="fc" id="L180">            LoaderOptions options = new LoaderOptions();</span>
+<span class="fc" id="L181">            options.setAllowDuplicateKeys(false);</span>
+<span class="fc" id="L182">            Yaml yaml = new Yaml(new SafeConstructor(options));</span>
+<span class="fc" id="L183">            Object root = yaml.load(input);</span>
+<span class="fc" id="L184">            return parseRoot(root);</span>
+        }
+    }
+
+    @NotNull
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static HttpSettings parseRoot(@Nullable Object root) {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (root == null) {</span>
+<span class="fc" id="L192">            return HttpSettings.empty();</span>
+        }
+        List&lt;Map&lt;String, Object&gt;&gt; entries;
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (root instanceof Map) {</span>
+<span class="fc" id="L196">            Map&lt;String, Object&gt; map = (Map&lt;String, Object&gt;) root;</span>
+<span class="fc" id="L197">            Object node = map.get(&quot;http-settings&quot;);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (node == null) {</span>
+<span class="fc" id="L199">                logger.debug(&quot;No 'http-settings' section found in YAML.&quot;);</span>
+<span class="fc" id="L200">                return HttpSettings.empty();</span>
+            }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (!(node instanceof List)) {</span>
+<span class="fc" id="L203">                throw new IllegalArgumentException(&quot;'http-settings' must be a list&quot;);</span>
+            }
+<span class="fc" id="L205">            entries = (List&lt;Map&lt;String, Object&gt;&gt;) node;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        } else if (root instanceof List) {</span>
+<span class="fc" id="L207">            entries = (List&lt;Map&lt;String, Object&gt;&gt;) root;</span>
+        } else {
+<span class="fc" id="L209">            throw new IllegalArgumentException(</span>
+                    &quot;Top-level YAML must be a map with 'http-settings' key, or a list&quot;);
+        }
+
+<span class="fc" id="L213">        List&lt;HttpConfig&gt; configs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; entry : entries) {</span>
+<span class="fc" id="L215">            configs.add(parseEntry(entry));</span>
+<span class="fc" id="L216">        }</span>
+<span class="fc" id="L217">        return new HttpSettings(configs);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static HttpConfig parseEntry(@NotNull Map&lt;String, Object&gt; entry) {
+<span class="fc" id="L222">        HttpConfig.Builder b = HttpConfig.builder();</span>
+
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (entry.containsKey(&quot;url&quot;)) {</span>
+<span class="fc" id="L225">            String url = expandEnvReferences(String.valueOf(entry.get(&quot;url&quot;)));</span>
+<span class="fc" id="L226">            b.scope(null, Pattern.compile(url));</span>
+<span class="fc" id="L227">        } else {</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            String scope = entry.containsKey(&quot;scope&quot;) ? expandEnvReferences(String.valueOf(entry.get(&quot;scope&quot;))) : &quot;*&quot;;</span>
+<span class="fc" id="L229">            b.scope(scope, HttpSettings.compileScope(scope));</span>
+        }
+
+<span class="fc" id="L232">        Object cookies = entry.get(&quot;cookies&quot;);</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (cookies instanceof Map) {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            for (Map.Entry&lt;?, ?&gt; e : ((Map&lt;?, ?&gt;) cookies).entrySet()) {</span>
+<span class="nc" id="L235">                b.cookie(String.valueOf(e.getKey()), expandEnvReferences(String.valueOf(e.getValue())));</span>
+<span class="nc" id="L236">            }</span>
+        }
+
+<span class="fc" id="L239">        Object headers = entry.get(&quot;headers&quot;);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (headers instanceof Map) {</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; e : ((Map&lt;?, ?&gt;) headers).entrySet()) {</span>
+<span class="fc" id="L242">                b.addHeader(String.valueOf(e.getKey()), expandEnvReferences(String.valueOf(e.getValue())));</span>
+<span class="fc" id="L243">            }</span>
+        }
+
+<span class="fc" id="L246">        Object query = entry.get(&quot;query&quot;);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (query instanceof Map) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; e : ((Map&lt;?, ?&gt;) query).entrySet()) {</span>
+<span class="fc" id="L249">                b.addQuery(String.valueOf(e.getKey()), expandEnvReferences(String.valueOf(e.getValue())));</span>
+<span class="fc" id="L250">            }</span>
+        }
+
+<span class="fc" id="L253">        Object basicAuth = entry.get(&quot;basic-auth&quot;);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (basicAuth instanceof Map) {</span>
+<span class="fc" id="L255">            Map&lt;String, Object&gt; ba = (Map&lt;String, Object&gt;) basicAuth;</span>
+<span class="fc" id="L256">            String user = optString(ba, &quot;user&quot;);</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (user == null) {</span>
+<span class="fc" id="L258">                throw new IllegalArgumentException(&quot;basic-auth requires 'user'&quot;);</span>
+            }
+<span class="fc" id="L260">            String password = optString(ba, &quot;password&quot;);</span>
+<span class="fc" id="L261">            String keychain = optString(ba, &quot;keychain&quot;);</span>
+<span class="fc bfc" id="L262" title="All 4 branches covered.">            if (password == null &amp;&amp; keychain == null) {</span>
+<span class="fc" id="L263">                throw new IllegalArgumentException(&quot;basic-auth requires either 'password' or 'keychain'&quot;);</span>
+            }
+<span class="fc" id="L265">            b.auth(new HttpConfig.BasicAuthentication(</span>
+                    user,
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                    password != null ? password : &quot;&quot;,</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">                    keychain != null ? keychain : &quot;&quot;));</span>
+        }
+
+<span class="fc" id="L271">        Object proxy = entry.get(&quot;proxy&quot;);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (proxy instanceof Map) {</span>
+<span class="fc" id="L273">            Map&lt;String, Object&gt; p = (Map&lt;String, Object&gt;) proxy;</span>
+<span class="fc" id="L274">            String host = optString(p, &quot;host&quot;);</span>
+<span class="fc" id="L275">            Integer port = optInt(p, &quot;port&quot;);</span>
+<span class="pc bpc" id="L276" title="1 of 4 branches missed.">            if (host == null || port == null) {</span>
+<span class="fc" id="L277">                throw new IllegalArgumentException(&quot;proxy requires 'host' and 'port'&quot;);</span>
+            }
+<span class="fc" id="L279">            String user = optString(p, &quot;user&quot;);</span>
+<span class="fc" id="L280">            String password = optString(p, &quot;password&quot;);</span>
+<span class="fc" id="L281">            String keychain = optString(p, &quot;keychain&quot;);</span>
+<span class="pc bpc" id="L282" title="4 of 6 branches missed.">            if (user != null &amp;&amp; password == null &amp;&amp; keychain == null) {</span>
+<span class="nc" id="L283">                throw new IllegalArgumentException(&quot;proxy with 'user' requires 'password' or 'keychain'&quot;);</span>
+            }
+<span class="fc" id="L285">            b.proxy(new HttpConfig.Proxy(</span>
+<span class="fc" id="L286">                    host, port,</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                    user != null ? user : &quot;&quot;,</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                    password != null ? password : &quot;&quot;,</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                    keychain != null ? keychain : &quot;&quot;));</span>
+        }
+
+<span class="fc" id="L292">        Object apiKey = entry.get(&quot;api-key&quot;);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (apiKey != null) {</span>
+<span class="fc" id="L294">            b.apiKey(expandEnvReferences(String.valueOf(apiKey)));</span>
+        }
+
+<span class="fc" id="L297">        Object oauth2 = entry.get(&quot;oauth2&quot;);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        if (oauth2 instanceof Map) {</span>
+<span class="fc" id="L299">            b.oauth2(parseOAuth2((Map&lt;String, Object&gt;) oauth2));</span>
+        }
+
+<span class="fc" id="L302">        return b.build();</span>
+    }
+
+    private static HttpConfig.OAuth2 parseOAuth2(@NotNull Map&lt;String, Object&gt; node) {
+<span class="fc" id="L306">        HttpConfig.OAuth2.Builder b = HttpConfig.OAuth2.builder()</span>
+<span class="fc" id="L307">                .clientId(optString(node, &quot;clientId&quot;))</span>
+<span class="fc" id="L308">                .clientSecret(optString(node, &quot;clientSecret&quot;))</span>
+<span class="fc" id="L309">                .clientSecretKeychain(optString(node, &quot;clientSecretKeychain&quot;))</span>
+<span class="fc" id="L310">                .tokenUrl(optString(node, &quot;tokenUrl&quot;))</span>
+<span class="fc" id="L311">                .refreshUrl(optString(node, &quot;refreshUrl&quot;))</span>
+<span class="fc" id="L312">                .audience(optString(node, &quot;audience&quot;));</span>
+
+<span class="fc" id="L314">        Object scope = node.get(&quot;scope&quot;);</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        if (scope instanceof List) {</span>
+<span class="fc" id="L316">            List&lt;String&gt; scopes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            for (Object s : (List&lt;?&gt;) scope) scopes.add(expandEnvReferences(String.valueOf(s)));</span>
+<span class="fc" id="L318">            b.scopes(scopes);</span>
+        }
+
+<span class="fc" id="L321">        Object useForSpecFetch = node.get(&quot;useForSpecFetch&quot;);</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        if (useForSpecFetch instanceof Boolean) {</span>
+<span class="fc" id="L323">            b.useForSpecFetch((Boolean) useForSpecFetch);</span>
+        }
+
+<span class="fc" id="L326">        Object tea = node.get(&quot;tokenEndpointAuth&quot;);</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (tea instanceof Map) {</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L329">            Map&lt;String, Object&gt; teaMap = (Map&lt;String, Object&gt;) tea;</span>
+<span class="fc" id="L330">            String method = optString(teaMap, &quot;method&quot;);</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            if (method != null) {</span>
+<span class="pc bpc" id="L332" title="1 of 3 branches missed.">                switch (method) {</span>
+                    case &quot;rfc6749-client-secret-basic&quot;:
+<span class="nc" id="L334">                        b.tokenEndpointAuthMethod(HttpConfig.OAuth2.TokenEndpointAuthMethod.RFC6749_CLIENT_SECRET_BASIC);</span>
+<span class="nc" id="L335">                        break;</span>
+                    case &quot;rfc5849-oauth1-signature&quot;:
+<span class="fc" id="L337">                        b.tokenEndpointAuthMethod(HttpConfig.OAuth2.TokenEndpointAuthMethod.RFC5849_OAUTH1_SIGNATURE);</span>
+<span class="fc" id="L338">                        break;</span>
+                    default:
+<span class="fc" id="L340">                        throw new IllegalArgumentException(&quot;Unknown tokenEndpointAuth method: &quot; + method);</span>
+                }
+            }
+<span class="fc" id="L343">            Integer nonceLength = optInt(teaMap, &quot;nonceLength&quot;);</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            if (nonceLength != null) {</span>
+<span class="fc" id="L345">                b.nonceLength(nonceLength);</span>
+            }
+        }
+
+<span class="fc" id="L349">        return b.build();</span>
+    }
+
+    // ------------------------------------------------------------------------
+    // Write-back: serialize HttpSettings back to YAML.
+    //
+    // Mirrors C++ Settings::store (http-settings.cpp:484). Useful for tooling
+    // that updates credentials programmatically and re-writes the settings file.
+    // The HotReloader on the active HTTP client will pick the change up
+    // automatically on the next request.
+    // ------------------------------------------------------------------------
+
+    /**
+     * Writes a {@link HttpSettings} snapshot to a YAML file in the same schema this
+     * loader reads. Secrets are written verbatim; the caller is responsible for
+     * choosing whether to embed cleartext passwords or keychain references when
+     * building the {@link HttpConfig} entries.
+     *
+     * @param destination path to write to (will be created or overwritten)
+     * @param settings    snapshot to serialize
+     * @throws IOException on filesystem failure
+     */
+    public static void writeToFile(@NotNull Path destination, @NotNull HttpSettings settings) throws IOException {
+<span class="fc" id="L372">        try (BufferedWriter writer = Files.newBufferedWriter(destination)) {</span>
+<span class="fc" id="L373">            org.yaml.snakeyaml.DumperOptions opts = new org.yaml.snakeyaml.DumperOptions();</span>
+<span class="fc" id="L374">            opts.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);</span>
+<span class="fc" id="L375">            opts.setIndent(2);</span>
+<span class="fc" id="L376">            opts.setPrettyFlow(true);</span>
+<span class="fc" id="L377">            new Yaml(opts).dump(settingsToYamlTree(settings), writer);</span>
+        }
+<span class="fc" id="L379">    }</span>
+
+    /** Convert HttpSettings → POJO tree (Maps/Lists/Strings) for SnakeYAML's dump(). */
+    @NotNull
+    private static Map&lt;String, Object&gt; settingsToYamlTree(@NotNull HttpSettings settings) {
+<span class="fc" id="L384">        List&lt;Map&lt;String, Object&gt;&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        for (HttpConfig config : settings.getEntries()) {</span>
+<span class="fc" id="L386">            entries.add(configToYamlTree(config));</span>
+<span class="fc" id="L387">        }</span>
+<span class="fc" id="L388">        Map&lt;String, Object&gt; root = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L389">        root.put(&quot;http-settings&quot;, entries);</span>
+<span class="fc" id="L390">        return root;</span>
+    }
+
+    @NotNull
+    private static Map&lt;String, Object&gt; configToYamlTree(@NotNull HttpConfig config) {
+<span class="fc" id="L395">        Map&lt;String, Object&gt; e = new LinkedHashMap&lt;&gt;();</span>
+        // Scope: prefer the original scope glob, fall back to urlPattern if only that's set.
+<span class="fc" id="L397">        config.getScope().ifPresent(s -&gt; e.put(&quot;scope&quot;, s));</span>
+<span class="pc bpc" id="L398" title="3 of 4 branches missed.">        if (!config.getScope().isPresent() &amp;&amp; config.getUrlPattern().isPresent()) {</span>
+<span class="nc" id="L399">            e.put(&quot;url&quot;, config.getUrlPattern().get().pattern());</span>
+        }
+<span class="fc" id="L401">        config.getAuth().ifPresent(auth -&gt; {</span>
+<span class="fc" id="L402">            Map&lt;String, Object&gt; a = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L403">            a.put(&quot;user&quot;, auth.user);</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            if (!auth.password.isEmpty()) a.put(&quot;password&quot;, auth.password);</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            if (!auth.keychain.isEmpty()) a.put(&quot;keychain&quot;, auth.keychain);</span>
+<span class="fc" id="L406">            e.put(&quot;basic-auth&quot;, a);</span>
+<span class="fc" id="L407">        });</span>
+<span class="fc" id="L408">        config.getProxy().ifPresent(p -&gt; {</span>
+<span class="nc" id="L409">            Map&lt;String, Object&gt; proxy = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L410">            proxy.put(&quot;host&quot;, p.host);</span>
+<span class="nc" id="L411">            proxy.put(&quot;port&quot;, p.port);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            if (!p.user.isEmpty()) proxy.put(&quot;user&quot;, p.user);</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            if (!p.password.isEmpty()) proxy.put(&quot;password&quot;, p.password);</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">            if (!p.keychain.isEmpty()) proxy.put(&quot;keychain&quot;, p.keychain);</span>
+<span class="nc" id="L415">            e.put(&quot;proxy&quot;, proxy);</span>
+<span class="nc" id="L416">        });</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (!config.getCookies().isEmpty()) e.put(&quot;cookies&quot;, new LinkedHashMap&lt;&gt;(config.getCookies()));</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (!config.getHeaders().isEmpty()) {</span>
+            // Flatten single-value headers; preserve list form for multi-valued.
+<span class="fc" id="L420">            Map&lt;String, Object&gt; headers = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;String&gt;&gt; h : config.getHeaders().entrySet()) {</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                headers.put(h.getKey(), h.getValue().size() == 1 ? h.getValue().get(0) : new ArrayList&lt;&gt;(h.getValue()));</span>
+<span class="fc" id="L423">            }</span>
+<span class="fc" id="L424">            e.put(&quot;headers&quot;, headers);</span>
+        }
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        if (!config.getQuery().isEmpty()) {</span>
+<span class="fc" id="L427">            Map&lt;String, Object&gt; query = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;String&gt;&gt; q : config.getQuery().entrySet()) {</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">                query.put(q.getKey(), q.getValue().size() == 1 ? q.getValue().get(0) : new ArrayList&lt;&gt;(q.getValue()));</span>
+<span class="fc" id="L430">            }</span>
+<span class="fc" id="L431">            e.put(&quot;query&quot;, query);</span>
+        }
+<span class="pc" id="L433">        config.getApiKey().ifPresent(k -&gt; e.put(&quot;api-key&quot;, k));</span>
+<span class="fc" id="L434">        config.getOAuth2().ifPresent(o -&gt; {</span>
+<span class="fc" id="L435">            Map&lt;String, Object&gt; oauth = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">            if (!o.clientId.isEmpty()) oauth.put(&quot;clientId&quot;, o.clientId);</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">            if (!o.clientSecret.isEmpty()) oauth.put(&quot;clientSecret&quot;, o.clientSecret);</span>
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">            if (!o.clientSecretKeychain.isEmpty()) oauth.put(&quot;clientSecretKeychain&quot;, o.clientSecretKeychain);</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">            if (!o.tokenUrlOverride.isEmpty()) oauth.put(&quot;tokenUrl&quot;, o.tokenUrlOverride);</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">            if (!o.refreshUrlOverride.isEmpty()) oauth.put(&quot;refreshUrl&quot;, o.refreshUrlOverride);</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">            if (!o.audience.isEmpty()) oauth.put(&quot;audience&quot;, o.audience);</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">            if (!o.scopesOverride.isEmpty()) oauth.put(&quot;scope&quot;, new ArrayList&lt;&gt;(o.scopesOverride));</span>
+<span class="fc" id="L443">            e.put(&quot;oauth2&quot;, oauth);</span>
+<span class="fc" id="L444">        });</span>
+<span class="fc" id="L445">        return e;</span>
+    }
+
+    @Nullable
+    private static String optString(@NotNull Map&lt;String, Object&gt; map, @NotNull String key) {
+<span class="fc" id="L450">        Object v = map.get(key);</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        return v == null ? null : expandEnvReferences(String.valueOf(v));</span>
+    }
+
+    @Nullable
+    private static Integer optInt(@NotNull Map&lt;String, Object&gt; map, @NotNull String key) {
+<span class="fc" id="L456">        Object v = map.get(key);</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        if (v == null) return null;</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">        if (v instanceof Number) return ((Number) v).intValue();</span>
+<span class="nc" id="L459">        String expanded = expandEnvReferences(String.valueOf(v));</span>
+        try {
+<span class="nc" id="L461">            return Integer.parseInt(expanded);</span>
+<span class="nc" id="L462">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L463">            throw new IllegalArgumentException(&quot;'&quot; + key + &quot;' must be an integer, got: &quot; + expanded);</span>
+        }
+    }
+
+    static String expandEnvReferences(@NotNull String value) {
+<span class="fc" id="L468">        return expandEnvReferences(value, System::getenv);</span>
+    }
+
+    static String expandEnvReferences(@NotNull String value, @NotNull Function&lt;String, String&gt; getenv) {
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        if (INVALID_ENV_REFERENCE_PATTERN.matcher(value).find()) {</span>
+<span class="nc" id="L473">            throw new IllegalArgumentException(</span>
+                    &quot;Invalid environment variable reference in HTTP settings: expected '$env.NAME'.&quot;);
+        }
+
+<span class="fc" id="L477">        Matcher matcher = ENV_REFERENCE_PATTERN.matcher(value);</span>
+<span class="fc" id="L478">        StringBuffer result = new StringBuffer();</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L480">            String name = matcher.group(1);</span>
+<span class="fc" id="L481">            String envValue = getenv.apply(name);</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">            if (envValue == null) {</span>
+<span class="fc" id="L483">                throw new IllegalArgumentException(</span>
+                        &quot;Environment variable '&quot; + name + &quot;' referenced by HTTP settings is not set.&quot;);
+            }
+<span class="fc" id="L486">            matcher.appendReplacement(result, Matcher.quoteReplacement(envValue));</span>
+<span class="fc" id="L487">        }</span>
+<span class="fc" id="L488">        matcher.appendTail(result);</span>
+<span class="fc" id="L489">        return result.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

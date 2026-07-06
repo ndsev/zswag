@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-api</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.api</a> &gt; <span class="el_source">HttpResponse.java</span></div><h1>HttpResponse.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.api;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Represents an HTTP response received from a server.
+ */
+public class HttpResponse {
+    private final int statusCode;
+    private final String statusMessage;
+    private final Map&lt;String, String&gt; headers;
+    private final byte[] body;
+
+    public HttpResponse(int statusCode, @Nullable String statusMessage,
+<span class="fc" id="L21">                        @Nullable Map&lt;String, String&gt; headers, @Nullable byte[] body) {</span>
+<span class="fc" id="L22">        this.statusCode = statusCode;</span>
+<span class="fc" id="L23">        this.statusMessage = statusMessage;</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        this.headers = headers != null ? Collections.unmodifiableMap(new HashMap&lt;&gt;(headers)) : Collections.emptyMap();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        this.body = body != null ? Arrays.copyOf(body, body.length) : null;</span>
+<span class="fc" id="L26">    }</span>
+
+    /**
+     * @return HTTP status code (e.g., 200, 404, 500)
+     */
+    public int getStatusCode() {
+<span class="fc" id="L32">        return statusCode;</span>
+    }
+
+    /**
+     * @return HTTP status message (e.g., &quot;OK&quot;, &quot;Not Found&quot;)
+     */
+    @Nullable
+    public String getStatusMessage() {
+<span class="fc" id="L40">        return statusMessage;</span>
+    }
+
+    /**
+     * @return Response headers as unmodifiable map
+     */
+    @NotNull
+    public Map&lt;String, String&gt; getHeaders() {
+<span class="fc" id="L48">        return headers;</span>
+    }
+
+    /**
+     * @return Response body as defensive copy (may be null)
+     */
+    @Nullable
+    public byte[] getBody() {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return body != null ? Arrays.copyOf(body, body.length) : null;</span>
+    }
+
+    /**
+     * @return true if status code is in the 2xx range
+     */
+    public boolean isSuccessful() {
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        return statusCode &gt;= 200 &amp;&amp; statusCode &lt; 300;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

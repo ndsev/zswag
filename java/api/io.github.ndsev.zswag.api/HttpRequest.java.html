@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-api</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.api</a> &gt; <span class="el_source">HttpRequest.java</span></div><h1>HttpRequest.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.api;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Represents an HTTP request to be sent to a server.
+ */
+public class HttpRequest {
+    private final String method;
+    private final String url;
+    private final Map&lt;String, String&gt; headers;
+    private final byte[] body;
+
+<span class="fc" id="L20">    private HttpRequest(String method, String url, Map&lt;String, String&gt; headers, byte[] body) {</span>
+<span class="fc" id="L21">        this.method = method;</span>
+<span class="fc" id="L22">        this.url = url;</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        this.headers = headers != null ? Collections.unmodifiableMap(new HashMap&lt;&gt;(headers)) : Collections.emptyMap();</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        this.body = body != null ? Arrays.copyOf(body, body.length) : null;</span>
+<span class="fc" id="L25">    }</span>
+
+    /**
+     * @return HTTP method (GET, POST, PUT, DELETE, etc.)
+     */
+    @NotNull
+    public String getMethod() {
+<span class="fc" id="L32">        return method;</span>
+    }
+
+    /**
+     * @return Complete URL including scheme, host, path, and query string
+     */
+    @NotNull
+    public String getUrl() {
+<span class="fc" id="L40">        return url;</span>
+    }
+
+    /**
+     * @return HTTP headers as unmodifiable map
+     */
+    @NotNull
+    public Map&lt;String, String&gt; getHeaders() {
+<span class="fc" id="L48">        return headers;</span>
+    }
+
+    /**
+     * @return Request body as defensive copy (may be null for GET/DELETE)
+     */
+    @Nullable
+    public byte[] getBody() {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return body != null ? Arrays.copyOf(body, body.length) : null;</span>
+    }
+
+    /**
+     * Creates a new builder for constructing HttpRequest instances.
+     */
+    @NotNull
+    public static Builder builder() {
+<span class="fc" id="L64">        return new Builder();</span>
+    }
+
+    /**
+     * Builder for HttpRequest instances.
+     */
+    public static class Builder {
+        private String method;
+        private String url;
+<span class="fc" id="L73">        private Map&lt;String, String&gt; headers = new HashMap&lt;&gt;();</span>
+        private byte[] body;
+
+<span class="fc" id="L76">        private Builder() {</span>
+<span class="fc" id="L77">        }</span>
+
+        @NotNull
+        public Builder method(@NotNull String method) {
+<span class="fc" id="L81">            this.method = method;</span>
+<span class="fc" id="L82">            return this;</span>
+        }
+
+        @NotNull
+        public Builder url(@NotNull String url) {
+<span class="fc" id="L87">            this.url = url;</span>
+<span class="fc" id="L88">            return this;</span>
+        }
+
+        @NotNull
+        public Builder header(@NotNull String name, @NotNull String value) {
+<span class="fc" id="L93">            this.headers.put(name, value);</span>
+<span class="fc" id="L94">            return this;</span>
+        }
+
+        @NotNull
+        public Builder headers(@NotNull Map&lt;String, String&gt; headers) {
+<span class="fc" id="L99">            this.headers.putAll(headers);</span>
+<span class="fc" id="L100">            return this;</span>
+        }
+
+        @NotNull
+        public Builder body(@Nullable byte[] body) {
+<span class="fc" id="L105">            this.body = body;</span>
+<span class="fc" id="L106">            return this;</span>
+        }
+
+        @NotNull
+        public HttpRequest build() {
+<span class="fc bfc" id="L111" title="All 4 branches covered.">            if (method == null || url == null) {</span>
+<span class="fc" id="L112">                throw new IllegalStateException(&quot;Method and URL are required&quot;);</span>
+            }
+<span class="fc" id="L114">            return new HttpRequest(method, url, headers, body);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

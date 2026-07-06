@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParameterFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-api</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.api</a> &gt; <span class="el_source">ParameterFormat.java</span></div><h1>ParameterFormat.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.api;
+
+/**
+ * Parameter value encoding format for zserio types.
+ */
+<span class="fc" id="L6">public enum ParameterFormat {</span>
+    /**
+     * String representation (default)
+     */
+<span class="fc" id="L10">    STRING,</span>
+
+    /**
+     * Hexadecimal encoding (0x prefix)
+     */
+<span class="fc" id="L15">    HEX,</span>
+
+    /**
+     * Standard Base64 encoding (RFC 4648)
+     */
+<span class="fc" id="L20">    BASE64,</span>
+
+    /**
+     * Base64 URL-safe encoding (RFC 4648 Section 5)
+     */
+<span class="fc" id="L25">    BASE64URL,</span>
+
+    /**
+     * Raw binary data
+     */
+<span class="fc" id="L30">    BINARY</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

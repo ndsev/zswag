@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidKeychain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-android</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.android</a> &gt; <span class="el_source">AndroidKeychain.java</span></div><h1>AndroidKeychain.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.android;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.api.KeychainException;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.util.Arrays;
+import java.util.Base64;
+
+/**
+ * Android keychain integration using the platform Keystore. Mirrors the
+ * {@link IKeychain} contract that the JVM {@code Keychain} class implements,
+ * so {@code OAuth2Handler} and {@code AndroidHttpClient} consume both
+ * interchangeably via dependency injection.
+ *
+ * &lt;p&gt;Storage strategy:
+ * &lt;ul&gt;
+ *   &lt;li&gt;A symmetric AES-256-GCM key is generated in the platform Keystore on
+ *       first use, aliased {@code io.github.ndsev.zswag.keychain.master}.
+ *       The key never leaves the secure hardware (TEE / StrongBox where
+ *       available); only a {@link Cipher} handle does.&lt;/li&gt;
+ *   &lt;li&gt;Per-credential entries (one per {@code service|user} pair) are
+ *       encrypted with that key and stored in a private
+ *       {@link SharedPreferences} file
+ *       ({@code io.github.ndsev.zswag.keychain}). The on-disk blob is
+ *       {@code base64(iv_len:byte | iv | ciphertext_with_gcm_tag)}.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;Why not {@code androidx.security:security-crypto}? That library is
+ * distributed as an AAR which the {@code java-library}-based build of this
+ * module cannot consume (see this module's build.gradle for the aapt2-on-arm
+ * trade-off). Doing the AES/GCM dance manually keeps us inside Java APIs
+ * that work both at compile time (against the Robolectric android.jar) and
+ * at runtime (on a real device).
+ *
+ * &lt;p&gt;Storage of new secrets is a programmatic operation
+ * ({@link #store(String, String, String)}); zswag itself only ever
+ * &lt;em&gt;reads&lt;/em&gt; via {@link IKeychain#load} so writes are typically issued
+ * out-of-band by the host app.
+ */
+public final class AndroidKeychain implements IKeychain {
+<span class="fc" id="L55">    private static final Logger logger = LoggerFactory.getLogger(AndroidKeychain.class);</span>
+
+    /** Matches the JVM keychain package id so credentials stored on a JVM laptop and synced to a device line up. */
+    static final String KEYSTORE_TYPE = &quot;AndroidKeyStore&quot;;
+    static final String KEY_ALIAS = &quot;io.github.ndsev.zswag.keychain.master&quot;;
+    static final String PREFS_NAME = &quot;io.github.ndsev.zswag.keychain&quot;;
+    private static final int GCM_TAG_BITS = 128;
+
+    private final Context appContext;
+
+<span class="fc" id="L65">    public AndroidKeychain(@NotNull Context context) {</span>
+<span class="fc" id="L66">        this.appContext = context.getApplicationContext();</span>
+<span class="fc" id="L67">    }</span>
+
+    @Override
+    @NotNull
+    public String load(@NotNull String service, @NotNull String user) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (service.isEmpty()) {</span>
+<span class="fc" id="L73">            throw new KeychainException(&quot;keychain: service identifier must not be empty&quot;);</span>
+        }
+<span class="fc" id="L75">        SharedPreferences prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);</span>
+<span class="fc" id="L76">        String key = entryKey(service, user);</span>
+<span class="fc" id="L77">        String encoded = prefs.getString(key, null);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (encoded == null) {</span>
+<span class="fc" id="L79">            throw new KeychainException(&quot;keychain: no entry for service='&quot; + service + &quot;' user='&quot; + user + &quot;'&quot;);</span>
+        }
+        try {
+<span class="nc" id="L82">            return decrypt(encoded);</span>
+<span class="nc" id="L83">        } catch (Exception e) {</span>
+<span class="nc" id="L84">            throw new KeychainException(&quot;keychain: failed to decrypt entry for '&quot; + key + &quot;': &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    /**
+     * Stores or overwrites a credential under {@code (service, user)}. Apps
+     * typically call this once at first-run during their auth onboarding;
+     * zswag itself never writes.
+     */
+    public void store(@NotNull String service, @NotNull String user, @NotNull String secret) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (service.isEmpty()) {</span>
+<span class="fc" id="L95">            throw new KeychainException(&quot;keychain: service identifier must not be empty&quot;);</span>
+        }
+        try {
+<span class="nc" id="L98">            String encrypted = encrypt(secret);</span>
+<span class="nc" id="L99">            appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)</span>
+<span class="nc" id="L100">                    .edit()</span>
+<span class="nc" id="L101">                    .putString(entryKey(service, user), encrypted)</span>
+<span class="nc" id="L102">                    .apply();</span>
+<span class="nc" id="L103">            logger.debug(&quot;Stored keychain entry for service='{}' user='{}'&quot;, service, user);</span>
+<span class="nc" id="L104">        } catch (Exception e) {</span>
+<span class="nc" id="L105">            throw new KeychainException(&quot;keychain: failed to encrypt entry: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L106">        }</span>
+<span class="nc" id="L107">    }</span>
+
+    /** Removes the credential under {@code (service, user)} if present. */
+    public void delete(@NotNull String service, @NotNull String user) {
+<span class="fc" id="L111">        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)</span>
+<span class="fc" id="L112">                .edit()</span>
+<span class="fc" id="L113">                .remove(entryKey(service, user))</span>
+<span class="fc" id="L114">                .apply();</span>
+<span class="fc" id="L115">    }</span>
+
+    @NotNull
+    private static String entryKey(@NotNull String service, @NotNull String user) {
+<span class="fc" id="L119">        return service + &quot;|&quot; + user;</span>
+    }
+
+    @NotNull
+    private SecretKey getOrCreateMasterKey() throws Exception {
+<span class="nc" id="L124">        KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);</span>
+<span class="nc" id="L125">        ks.load(null);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (ks.containsAlias(KEY_ALIAS)) {</span>
+<span class="nc" id="L127">            KeyStore.Entry entry = ks.getEntry(KEY_ALIAS, null);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (entry instanceof KeyStore.SecretKeyEntry) {</span>
+<span class="nc" id="L129">                return ((KeyStore.SecretKeyEntry) entry).getSecretKey();</span>
+            }
+<span class="nc" id="L131">            throw new KeychainException(&quot;keychain: unexpected entry type for alias &quot; + KEY_ALIAS);</span>
+        }
+<span class="nc" id="L133">        KeyGenerator kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_TYPE);</span>
+<span class="nc" id="L134">        kg.init(new KeyGenParameterSpec.Builder(</span>
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+<span class="nc" id="L137">                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)</span>
+<span class="nc" id="L138">                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)</span>
+<span class="nc" id="L139">                .setKeySize(256)</span>
+<span class="nc" id="L140">                .build());</span>
+<span class="nc" id="L141">        return kg.generateKey();</span>
+    }
+
+    @NotNull
+    private String encrypt(@NotNull String plaintext) throws Exception {
+<span class="nc" id="L146">        SecretKey key = getOrCreateMasterKey();</span>
+<span class="nc" id="L147">        Cipher cipher = Cipher.getInstance(&quot;AES/GCM/NoPadding&quot;);</span>
+<span class="nc" id="L148">        cipher.init(Cipher.ENCRYPT_MODE, key);</span>
+<span class="nc" id="L149">        byte[] iv = cipher.getIV();</span>
+<span class="nc" id="L150">        byte[] ct = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L151">        ByteBuffer buf = ByteBuffer.allocate(1 + iv.length + ct.length);</span>
+<span class="nc" id="L152">        buf.put((byte) iv.length).put(iv).put(ct);</span>
+<span class="nc" id="L153">        return Base64.getEncoder().encodeToString(buf.array());</span>
+    }
+
+    @NotNull
+    private String decrypt(@NotNull String encoded) throws Exception {
+<span class="nc" id="L158">        byte[] packed = Base64.getDecoder().decode(encoded);</span>
+<span class="nc" id="L159">        int ivLen = packed[0] &amp; 0xff;</span>
+<span class="nc" id="L160">        byte[] iv = Arrays.copyOfRange(packed, 1, 1 + ivLen);</span>
+<span class="nc" id="L161">        byte[] ct = Arrays.copyOfRange(packed, 1 + ivLen, packed.length);</span>
+<span class="nc" id="L162">        SecretKey key = getOrCreateMasterKey();</span>
+<span class="nc" id="L163">        Cipher cipher = Cipher.getInstance(&quot;AES/GCM/NoPadding&quot;);</span>
+<span class="nc" id="L164">        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));</span>
+<span class="nc" id="L165">        return new String(cipher.doFinal(ct), StandardCharsets.UTF_8);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

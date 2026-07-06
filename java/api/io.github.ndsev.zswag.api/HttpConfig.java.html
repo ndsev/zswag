@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-api</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.api</a> &gt; <span class="el_source">HttpConfig.java</span></div><h1>HttpConfig.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.api;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+/**
+ * Per-request HTTP configuration. Mirrors C++ {@code httpcl::Config} and Python
+ * {@code zswag.HTTPConfig}: extra headers, query parameters, cookies, optional
+ * basic-auth, proxy, OAuth2, and API key.
+ *
+ * &lt;p&gt;Instances are immutable. Use {@link Builder} to construct, {@link #toBuilder()}
+ * to derive a modified copy, and {@link #mergedWith(HttpConfig)} to combine two
+ * configs (the {@code other} config wins on scalar fields; multi-valued fields are
+ * unioned).
+ *
+ * &lt;p&gt;When held inside an {@link HttpSettings} multi-scope registry, the optional
+ * {@code scope} / {@code urlPattern} fields select which request URLs the config
+ * applies to.
+ */
+public final class HttpConfig {
+    private final Map&lt;String, List&lt;String&gt;&gt; headers;
+    private final Map&lt;String, List&lt;String&gt;&gt; query;
+    private final Map&lt;String, String&gt; cookies;
+    @Nullable private final Duration timeout;
+    @Nullable private final Boolean sslStrict;
+    private final BasicAuthentication auth;
+    private final Proxy proxy;
+    private final OAuth2 oauth2;
+    private final String apiKey;
+    private final String scope;
+    private final Pattern urlPattern;
+
+<span class="fc" id="L43">    private HttpConfig(Builder builder) {</span>
+<span class="fc" id="L44">        this.headers = unmodifiableDeepCopy(builder.headers);</span>
+<span class="fc" id="L45">        this.query = unmodifiableDeepCopy(builder.query);</span>
+<span class="fc" id="L46">        this.cookies = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(builder.cookies));</span>
+<span class="fc" id="L47">        this.timeout = builder.timeout;</span>
+<span class="fc" id="L48">        this.sslStrict = builder.sslStrict;</span>
+<span class="fc" id="L49">        this.auth = builder.auth;</span>
+<span class="fc" id="L50">        this.proxy = builder.proxy;</span>
+<span class="fc" id="L51">        this.oauth2 = builder.oauth2;</span>
+<span class="fc" id="L52">        this.apiKey = builder.apiKey;</span>
+<span class="fc" id="L53">        this.scope = builder.scope;</span>
+<span class="fc" id="L54">        this.urlPattern = builder.urlPattern;</span>
+<span class="fc" id="L55">    }</span>
+
+    private static Map&lt;String, List&lt;String&gt;&gt; unmodifiableDeepCopy(Map&lt;String, List&lt;String&gt;&gt; source) {
+<span class="fc" id="L58">        Map&lt;String, List&lt;String&gt;&gt; copy = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : source.entrySet()) {</span>
+<span class="fc" id="L60">            copy.put(entry.getKey(), Collections.unmodifiableList(new ArrayList&lt;&gt;(entry.getValue())));</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc" id="L62">        return Collections.unmodifiableMap(copy);</span>
+    }
+
+<span class="fc" id="L65">    @NotNull public Map&lt;String, List&lt;String&gt;&gt; getHeaders() { return headers; }</span>
+<span class="fc" id="L66">    @NotNull public Map&lt;String, List&lt;String&gt;&gt; getQuery() { return query; }</span>
+<span class="fc" id="L67">    @NotNull public Map&lt;String, String&gt; getCookies() { return cookies; }</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">    @NotNull public Duration getTimeout() { return timeout != null ? timeout : defaultTimeout(); }</span>
+
+    /**
+     * Returns the raw timeout field — {@code null} means &quot;no opinion&quot; (the effective
+     * value is determined by the transport's env-derived default). Used by transports
+     * (e.g. {@code JvmHttpClient}) to distinguish &quot;caller explicitly set 60s&quot; from
+     * &quot;caller didn't touch it&quot; so {@code HTTP_TIMEOUT} can override the latter.
+     */
+<span class="nc" id="L76">    @Nullable public Duration getTimeoutOrNull() { return timeout; }</span>
+    /**
+     * Per-request SSL strictness override. Defaults to {@code true} meaning
+     * &quot;no opinion&quot; — the effective SSL behavior is determined by the
+     * {@code HTTP_SSL_STRICT} environment variable (matching C++/Python). An
+     * explicit {@code false} on this config forces permissive mode regardless
+     * of env (no C++ equivalent — Java-only extension).
+     */
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">    public boolean isSslStrict() { return sslStrict == null || sslStrict; }</span>
+<span class="fc" id="L85">    @NotNull public Optional&lt;BasicAuthentication&gt; getAuth() { return Optional.ofNullable(auth); }</span>
+<span class="fc" id="L86">    @NotNull public Optional&lt;Proxy&gt; getProxy() { return Optional.ofNullable(proxy); }</span>
+<span class="fc" id="L87">    @NotNull public Optional&lt;OAuth2&gt; getOAuth2() { return Optional.ofNullable(oauth2); }</span>
+<span class="fc" id="L88">    @NotNull public Optional&lt;String&gt; getApiKey() { return Optional.ofNullable(apiKey); }</span>
+<span class="fc" id="L89">    @NotNull public Optional&lt;String&gt; getScope() { return Optional.ofNullable(scope); }</span>
+<span class="fc" id="L90">    @NotNull public Optional&lt;Pattern&gt; getUrlPattern() { return Optional.ofNullable(urlPattern); }</span>
+
+    /**
+     * Returns the first header value for the given name, or empty if absent.
+     */
+    @NotNull
+    public Optional&lt;String&gt; getHeader(@NotNull String name) {
+<span class="fc" id="L97">        List&lt;String&gt; values = headers.get(name);</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        return (values == null || values.isEmpty()) ? Optional.empty() : Optional.of(values.get(0));</span>
+    }
+
+    /**
+     * Returns a new {@code HttpConfig} merged with {@code other}. Mirrors C++
+     * {@code Config::operator|=}: cookies, headers, query are unioned (other's
+     * entries appended). Auth, proxy, apiKey, oauth2 from {@code other} replace
+     * this config's values when present (oauth2 sub-fields merge field-by-field).
+     */
+    @NotNull
+    public HttpConfig mergedWith(@NotNull HttpConfig other) {
+<span class="fc" id="L109">        Builder b = toBuilder();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; e : other.headers.entrySet()) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            for (String value : e.getValue()) b.addHeader(e.getKey(), value);</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; e : other.query.entrySet()) {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (String value : e.getValue()) b.addQuery(e.getKey(), value);</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; e : other.cookies.entrySet()) {</span>
+<span class="fc" id="L117">            b.cookie(e.getKey(), e.getValue());</span>
+<span class="fc" id="L118">        }</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (other.auth != null) b.auth(other.auth);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (other.proxy != null) b.proxy(other.proxy);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (other.apiKey != null) b.apiKey(other.apiKey);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (other.oauth2 != null) {</span>
+<span class="fc" id="L123">            b.oauth2(other.oauth2.mergedOnto(this.oauth2));</span>
+        }
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (other.timeout != null) b.timeout(other.timeout);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (other.sslStrict != null) b.sslStrict(other.sslStrict);</span>
+<span class="fc" id="L127">        return b.build();</span>
+    }
+
+    static Duration defaultTimeout() {
+<span class="fc" id="L131">        return Duration.ofSeconds(60);</span>
+    }
+
+<span class="fc" id="L134">    @NotNull public Builder toBuilder() { return new Builder(this); }</span>
+<span class="fc" id="L135">    @NotNull public static Builder builder() { return new Builder(); }</span>
+
+    /** Empty config — useful as a starting point for merging. */
+    @NotNull
+    public static HttpConfig empty() {
+<span class="fc" id="L140">        return builder().build();</span>
+    }
+
+    /**
+     * Returns a redacted summary of this config suitable for logging.
+     * Passwords, secrets, API keys are masked.
+     */
+    @NotNull
+    public String toSafeString() {
+<span class="fc" id="L149">        StringBuilder sb = new StringBuilder();</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (auth != null) {</span>
+<span class="fc" id="L151">            sb.append(&quot;  - Basic auth: user=&quot;).append(auth.user);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (!auth.password.isEmpty()) sb.append(&quot;, password=****&quot;);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (!auth.keychain.isEmpty()) sb.append(&quot;, keychain=&quot;).append(auth.keychain);</span>
+<span class="fc" id="L154">            sb.append(&quot;\n&quot;);</span>
+        }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (oauth2 != null) {</span>
+<span class="fc" id="L157">            sb.append(&quot;  - OAuth2: clientId=&quot;).append(oauth2.clientId);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (!oauth2.clientSecret.isEmpty()) sb.append(&quot;, clientSecret=****&quot;);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (!oauth2.clientSecretKeychain.isEmpty()) sb.append(&quot;, clientSecretKeychain=&quot;).append(oauth2.clientSecretKeychain);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (!oauth2.tokenUrlOverride.isEmpty()) sb.append(&quot;, tokenUrl=&quot;).append(oauth2.tokenUrlOverride);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (!oauth2.audience.isEmpty()) sb.append(&quot;, audience=&quot;).append(oauth2.audience);</span>
+<span class="fc" id="L162">            sb.append(&quot;\n&quot;);</span>
+        }
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (proxy != null) {</span>
+<span class="fc" id="L165">            sb.append(&quot;  - Proxy: &quot;).append(proxy.host).append(&quot;:&quot;).append(proxy.port);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            if (!proxy.user.isEmpty()) sb.append(&quot;, user=&quot;).append(proxy.user).append(&quot;, password=****&quot;);</span>
+<span class="fc" id="L167">            sb.append(&quot;\n&quot;);</span>
+        }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (apiKey != null) sb.append(&quot;  - API key: ****\n&quot;);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (!cookies.isEmpty()) sb.append(&quot;  - Cookies: &quot;).append(cookies.keySet()).append(&quot;\n&quot;);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (!headers.isEmpty()) {</span>
+<span class="fc" id="L172">            sb.append(&quot;  - Headers: &quot;);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : headers.entrySet()) {</span>
+<span class="fc" id="L174">                String k = entry.getKey();</span>
+<span class="pc bpc" id="L175" title="1 of 6 branches missed.">                String redacted = (k.equalsIgnoreCase(&quot;Authorization&quot;) || k.toLowerCase().contains(&quot;token&quot;) || k.toLowerCase().contains(&quot;secret&quot;))</span>
+<span class="fc" id="L176">                        ? &quot;****&quot; : String.join(&quot;,&quot;, entry.getValue());</span>
+<span class="fc" id="L177">                sb.append(k).append(&quot;=&quot;).append(redacted).append(&quot; &quot;);</span>
+<span class="fc" id="L178">            }</span>
+<span class="fc" id="L179">            sb.append(&quot;\n&quot;);</span>
+        }
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (!query.isEmpty()) sb.append(&quot;  - Query keys: &quot;).append(query.keySet()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L182">        return sb.toString();</span>
+    }
+
+    public static final class BasicAuthentication {
+        @NotNull public final String user;
+        @NotNull public final String password;
+        @NotNull public final String keychain;
+
+<span class="fc" id="L190">        public BasicAuthentication(@NotNull String user, @NotNull String password, @NotNull String keychain) {</span>
+<span class="fc" id="L191">            this.user = Objects.requireNonNull(user);</span>
+<span class="fc" id="L192">            this.password = Objects.requireNonNull(password);</span>
+<span class="fc" id="L193">            this.keychain = Objects.requireNonNull(keychain);</span>
+<span class="fc" id="L194">        }</span>
+
+        public static BasicAuthentication ofPassword(String user, String password) {
+<span class="fc" id="L197">            return new BasicAuthentication(user, password, &quot;&quot;);</span>
+        }
+
+        public static BasicAuthentication ofKeychain(String user, String keychainService) {
+<span class="fc" id="L201">            return new BasicAuthentication(user, &quot;&quot;, keychainService);</span>
+        }
+    }
+
+    public static final class Proxy {
+        @NotNull public final String host;
+        public final int port;
+        @NotNull public final String user;
+        @NotNull public final String password;
+        @NotNull public final String keychain;
+
+<span class="fc" id="L212">        public Proxy(@NotNull String host, int port, @NotNull String user, @NotNull String password, @NotNull String keychain) {</span>
+<span class="fc" id="L213">            this.host = Objects.requireNonNull(host);</span>
+<span class="fc" id="L214">            this.port = port;</span>
+<span class="fc" id="L215">            this.user = Objects.requireNonNull(user);</span>
+<span class="fc" id="L216">            this.password = Objects.requireNonNull(password);</span>
+<span class="fc" id="L217">            this.keychain = Objects.requireNonNull(keychain);</span>
+<span class="fc" id="L218">        }</span>
+    }
+
+    /**
+     * OAuth2 client-credentials flow configuration. Mirrors C++ {@code Config::OAuth2}.
+     */
+    public static final class OAuth2 {
+<span class="fc" id="L225">        public enum TokenEndpointAuthMethod {</span>
+            /** RFC 6749 Section 2.3.1: HTTP Basic with client_id/client_secret in Authorization header. */
+<span class="fc" id="L227">            RFC6749_CLIENT_SECRET_BASIC,</span>
+            /** RFC 5849: OAuth 1.0 HMAC-SHA256 signature on the token request. */
+<span class="fc" id="L229">            RFC5849_OAUTH1_SIGNATURE</span>
+        }
+
+        // Explicit-set flags for non-string fields, used by mergedOnto to know
+        // whether `this` actually configured the field or just carries the default.
+        static final int FLAG_USE_FOR_SPEC_FETCH = 1 &lt;&lt; 0;
+        static final int FLAG_TOKEN_ENDPOINT_AUTH_METHOD = 1 &lt;&lt; 1;
+        static final int FLAG_NONCE_LENGTH = 1 &lt;&lt; 2;
+
+        @NotNull public final String clientId;
+        @NotNull public final String clientSecret;
+        @NotNull public final String clientSecretKeychain;
+        @NotNull public final String tokenUrlOverride;
+        @NotNull public final String refreshUrlOverride;
+        @NotNull public final String audience;
+        @NotNull public final List&lt;String&gt; scopesOverride;
+        public final boolean useForSpecFetch;
+        @NotNull public final TokenEndpointAuthMethod tokenEndpointAuthMethod;
+        public final int nonceLength;
+        private final int explicitFlags;
+
+        public OAuth2(
+                @NotNull String clientId,
+                @NotNull String clientSecret,
+                @NotNull String clientSecretKeychain,
+                @NotNull String tokenUrlOverride,
+                @NotNull String refreshUrlOverride,
+                @NotNull String audience,
+                @NotNull List&lt;String&gt; scopesOverride,
+                boolean useForSpecFetch,
+                @NotNull TokenEndpointAuthMethod tokenEndpointAuthMethod,
+                int nonceLength) {
+            // Public constructor: caller passed concrete values for everything,
+            // so all non-string fields are treated as explicitly set.
+<span class="fc" id="L263">            this(clientId, clientSecret, clientSecretKeychain, tokenUrlOverride,</span>
+                    refreshUrlOverride, audience, scopesOverride,
+                    useForSpecFetch, tokenEndpointAuthMethod, nonceLength,
+                    FLAG_USE_FOR_SPEC_FETCH | FLAG_TOKEN_ENDPOINT_AUTH_METHOD | FLAG_NONCE_LENGTH);
+<span class="fc" id="L267">        }</span>
+
+        private OAuth2(
+                @NotNull String clientId,
+                @NotNull String clientSecret,
+                @NotNull String clientSecretKeychain,
+                @NotNull String tokenUrlOverride,
+                @NotNull String refreshUrlOverride,
+                @NotNull String audience,
+                @NotNull List&lt;String&gt; scopesOverride,
+                boolean useForSpecFetch,
+                @NotNull TokenEndpointAuthMethod tokenEndpointAuthMethod,
+                int nonceLength,
+<span class="fc" id="L280">                int explicitFlags) {</span>
+<span class="fc" id="L281">            this.clientId = Objects.requireNonNull(clientId);</span>
+<span class="fc" id="L282">            this.clientSecret = Objects.requireNonNull(clientSecret);</span>
+<span class="fc" id="L283">            this.clientSecretKeychain = Objects.requireNonNull(clientSecretKeychain);</span>
+<span class="fc" id="L284">            this.tokenUrlOverride = Objects.requireNonNull(tokenUrlOverride);</span>
+<span class="fc" id="L285">            this.refreshUrlOverride = Objects.requireNonNull(refreshUrlOverride);</span>
+<span class="fc" id="L286">            this.audience = Objects.requireNonNull(audience);</span>
+<span class="fc" id="L287">            this.scopesOverride = Collections.unmodifiableList(new ArrayList&lt;&gt;(scopesOverride));</span>
+<span class="fc" id="L288">            this.useForSpecFetch = useForSpecFetch;</span>
+<span class="fc" id="L289">            this.tokenEndpointAuthMethod = Objects.requireNonNull(tokenEndpointAuthMethod);</span>
+<span class="fc" id="L290">            this.nonceLength = nonceLength;</span>
+<span class="fc" id="L291">            this.explicitFlags = explicitFlags;</span>
+<span class="fc" id="L292">        }</span>
+
+        @NotNull
+        OAuth2 mergedOnto(@Nullable OAuth2 base) {
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (base == null) return this;</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">            boolean newUseForSpecFetch = (explicitFlags &amp; FLAG_USE_FOR_SPEC_FETCH) != 0</span>
+<span class="pc" id="L298">                    ? useForSpecFetch : base.useForSpecFetch;</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            TokenEndpointAuthMethod newTokenAuthMethod = (explicitFlags &amp; FLAG_TOKEN_ENDPOINT_AUTH_METHOD) != 0</span>
+<span class="pc" id="L300">                    ? tokenEndpointAuthMethod : base.tokenEndpointAuthMethod;</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            int newNonceLength = (explicitFlags &amp; FLAG_NONCE_LENGTH) != 0</span>
+<span class="pc" id="L302">                    ? nonceLength : base.nonceLength;</span>
+            // Union the flags so further merges still see the explicit-set state from either side.
+<span class="fc" id="L304">            int mergedFlags = explicitFlags | base.explicitFlags;</span>
+<span class="fc" id="L305">            return new OAuth2(</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">                    !clientId.isEmpty() ? clientId : base.clientId,</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">                    !clientSecret.isEmpty() ? clientSecret : base.clientSecret,</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                    !clientSecretKeychain.isEmpty() ? clientSecretKeychain : base.clientSecretKeychain,</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                    !tokenUrlOverride.isEmpty() ? tokenUrlOverride : base.tokenUrlOverride,</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                    !refreshUrlOverride.isEmpty() ? refreshUrlOverride : base.refreshUrlOverride,</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">                    !audience.isEmpty() ? audience : base.audience,</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                    !scopesOverride.isEmpty() ? scopesOverride : base.scopesOverride,</span>
+                    newUseForSpecFetch,
+                    newTokenAuthMethod,
+                    newNonceLength,
+                    mergedFlags);
+        }
+
+<span class="fc" id="L319">        public static Builder builder() { return new Builder(); }</span>
+
+<span class="fc" id="L321">        public static final class Builder {</span>
+<span class="fc" id="L322">            private String clientId = &quot;&quot;;</span>
+<span class="fc" id="L323">            private String clientSecret = &quot;&quot;;</span>
+<span class="fc" id="L324">            private String clientSecretKeychain = &quot;&quot;;</span>
+<span class="fc" id="L325">            private String tokenUrlOverride = &quot;&quot;;</span>
+<span class="fc" id="L326">            private String refreshUrlOverride = &quot;&quot;;</span>
+<span class="fc" id="L327">            private String audience = &quot;&quot;;</span>
+<span class="fc" id="L328">            private List&lt;String&gt; scopesOverride = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L329">            private boolean useForSpecFetch = true;</span>
+<span class="fc" id="L330">            private TokenEndpointAuthMethod tokenEndpointAuthMethod = TokenEndpointAuthMethod.RFC6749_CLIENT_SECRET_BASIC;</span>
+<span class="fc" id="L331">            private int nonceLength = 16;</span>
+<span class="fc" id="L332">            private int explicitFlags = 0;</span>
+
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            public Builder clientId(String v) { this.clientId = v == null ? &quot;&quot; : v; return this; }</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">            public Builder clientSecret(String v) { this.clientSecret = v == null ? &quot;&quot; : v; return this; }</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            public Builder clientSecretKeychain(String v) { this.clientSecretKeychain = v == null ? &quot;&quot; : v; return this; }</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            public Builder tokenUrl(String v) { this.tokenUrlOverride = v == null ? &quot;&quot; : v; return this; }</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            public Builder refreshUrl(String v) { this.refreshUrlOverride = v == null ? &quot;&quot; : v; return this; }</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">            public Builder audience(String v) { this.audience = v == null ? &quot;&quot; : v; return this; }</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">            public Builder scopes(List&lt;String&gt; v) { this.scopesOverride = v == null ? new ArrayList&lt;&gt;() : new ArrayList&lt;&gt;(v); return this; }</span>
+            public Builder useForSpecFetch(boolean v) {
+<span class="fc" id="L342">                this.useForSpecFetch = v;</span>
+<span class="fc" id="L343">                this.explicitFlags |= FLAG_USE_FOR_SPEC_FETCH;</span>
+<span class="fc" id="L344">                return this;</span>
+            }
+            public Builder tokenEndpointAuthMethod(TokenEndpointAuthMethod v) {
+<span class="fc" id="L347">                this.tokenEndpointAuthMethod = v;</span>
+<span class="fc" id="L348">                this.explicitFlags |= FLAG_TOKEN_ENDPOINT_AUTH_METHOD;</span>
+<span class="fc" id="L349">                return this;</span>
+            }
+            public Builder nonceLength(int v) {
+<span class="fc bfc" id="L352" title="All 4 branches covered.">                if (v &lt; 8 || v &gt; 64) {</span>
+<span class="fc" id="L353">                    throw new IllegalArgumentException(&quot;tokenEndpointAuth.nonceLength must be between 8 and 64&quot;);</span>
+                }
+<span class="fc" id="L355">                this.nonceLength = v;</span>
+<span class="fc" id="L356">                this.explicitFlags |= FLAG_NONCE_LENGTH;</span>
+<span class="fc" id="L357">                return this;</span>
+            }
+            public OAuth2 build() {
+<span class="fc" id="L360">                return new OAuth2(clientId, clientSecret, clientSecretKeychain, tokenUrlOverride,</span>
+                        refreshUrlOverride, audience, scopesOverride, useForSpecFetch,
+                        tokenEndpointAuthMethod, nonceLength, explicitFlags);
+            }
+        }
+    }
+
+    public static final class Builder {
+<span class="fc" id="L368">        private final Map&lt;String, List&lt;String&gt;&gt; headers = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L369">        private final Map&lt;String, List&lt;String&gt;&gt; query = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L370">        private final Map&lt;String, String&gt; cookies = new LinkedHashMap&lt;&gt;();</span>
+        @Nullable private Duration timeout;
+        @Nullable private Boolean sslStrict;
+        private BasicAuthentication auth;
+        private Proxy proxy;
+        private OAuth2 oauth2;
+        private String apiKey;
+        private String scope;
+        private Pattern urlPattern;
+
+<span class="fc" id="L380">        Builder() {}</span>
+
+<span class="fc" id="L382">        Builder(HttpConfig config) {</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;String&gt;&gt; e : config.headers.entrySet()) {</span>
+<span class="fc" id="L384">                this.headers.put(e.getKey(), new ArrayList&lt;&gt;(e.getValue()));</span>
+<span class="fc" id="L385">            }</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;String&gt;&gt; e : config.query.entrySet()) {</span>
+<span class="fc" id="L387">                this.query.put(e.getKey(), new ArrayList&lt;&gt;(e.getValue()));</span>
+<span class="fc" id="L388">            }</span>
+<span class="fc" id="L389">            this.cookies.putAll(config.cookies);</span>
+<span class="fc" id="L390">            this.timeout = config.timeout;</span>
+<span class="fc" id="L391">            this.sslStrict = config.sslStrict;</span>
+<span class="fc" id="L392">            this.auth = config.auth;</span>
+<span class="fc" id="L393">            this.proxy = config.proxy;</span>
+<span class="fc" id="L394">            this.oauth2 = config.oauth2;</span>
+<span class="fc" id="L395">            this.apiKey = config.apiKey;</span>
+<span class="fc" id="L396">            this.scope = config.scope;</span>
+<span class="fc" id="L397">            this.urlPattern = config.urlPattern;</span>
+<span class="fc" id="L398">        }</span>
+
+        @NotNull public Builder header(@NotNull String name, @NotNull String value) {
+<span class="fc" id="L401">            this.headers.computeIfAbsent(name, k -&gt; new ArrayList&lt;&gt;()).clear();</span>
+<span class="fc" id="L402">            this.headers.get(name).add(value);</span>
+<span class="fc" id="L403">            return this;</span>
+        }
+        @NotNull public Builder addHeader(@NotNull String name, @NotNull String value) {
+<span class="fc" id="L406">            this.headers.computeIfAbsent(name, k -&gt; new ArrayList&lt;&gt;()).add(value);</span>
+<span class="fc" id="L407">            return this;</span>
+        }
+        @NotNull public Builder headers(@NotNull Map&lt;String, String&gt; entries) {
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; e : entries.entrySet()) header(e.getKey(), e.getValue());</span>
+<span class="fc" id="L411">            return this;</span>
+        }
+
+        @NotNull public Builder query(@NotNull String name, @NotNull String value) {
+<span class="fc" id="L415">            this.query.computeIfAbsent(name, k -&gt; new ArrayList&lt;&gt;()).clear();</span>
+<span class="fc" id="L416">            this.query.get(name).add(value);</span>
+<span class="fc" id="L417">            return this;</span>
+        }
+        @NotNull public Builder addQuery(@NotNull String name, @NotNull String value) {
+<span class="pc" id="L420">            this.query.computeIfAbsent(name, k -&gt; new ArrayList&lt;&gt;()).add(value);</span>
+<span class="fc" id="L421">            return this;</span>
+        }
+
+        @NotNull public Builder cookie(@NotNull String name, @NotNull String value) {
+<span class="fc" id="L425">            this.cookies.put(name, value);</span>
+<span class="fc" id="L426">            return this;</span>
+        }
+        @NotNull public Builder cookies(@NotNull Map&lt;String, String&gt; entries) {
+<span class="fc" id="L429">            this.cookies.putAll(entries);</span>
+<span class="fc" id="L430">            return this;</span>
+        }
+
+<span class="fc" id="L433">        @NotNull public Builder timeout(@NotNull Duration timeout) { this.timeout = timeout; return this; }</span>
+<span class="fc" id="L434">        @NotNull public Builder sslStrict(boolean sslStrict) { this.sslStrict = sslStrict; return this; }</span>
+        /** Clears the explicit-set state of timeout, restoring the inherited default behaviour. */
+<span class="fc" id="L436">        @NotNull public Builder unsetTimeout() { this.timeout = null; return this; }</span>
+        /** Clears the explicit-set state of sslStrict, restoring &quot;no opinion&quot; — the
+         *  effective behaviour is then determined by {@code HTTP_SSL_STRICT}. */
+<span class="fc" id="L439">        @NotNull public Builder unsetSslStrict() { this.sslStrict = null; return this; }</span>
+
+<span class="fc" id="L441">        @NotNull public Builder auth(@Nullable BasicAuthentication auth) { this.auth = auth; return this; }</span>
+        @NotNull public Builder basicAuth(@NotNull String user, @NotNull String password) {
+<span class="fc" id="L443">            this.auth = BasicAuthentication.ofPassword(user, password);</span>
+<span class="fc" id="L444">            return this;</span>
+        }
+
+<span class="fc" id="L447">        @NotNull public Builder proxy(@Nullable Proxy proxy) { this.proxy = proxy; return this; }</span>
+
+<span class="fc" id="L449">        @NotNull public Builder oauth2(@Nullable OAuth2 oauth2) { this.oauth2 = oauth2; return this; }</span>
+
+<span class="fc" id="L451">        @NotNull public Builder apiKey(@Nullable String apiKey) { this.apiKey = apiKey; return this; }</span>
+
+        @NotNull public Builder bearerToken(@NotNull String token) {
+<span class="fc" id="L454">            return header(&quot;Authorization&quot;, &quot;Bearer &quot; + token);</span>
+        }
+
+        @NotNull public Builder scope(@Nullable String scope, @Nullable Pattern urlPattern) {
+<span class="fc" id="L458">            this.scope = scope;</span>
+<span class="fc" id="L459">            this.urlPattern = urlPattern;</span>
+<span class="fc" id="L460">            return this;</span>
+        }
+
+<span class="fc" id="L463">        @NotNull public HttpConfig build() { return new HttpConfig(this); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

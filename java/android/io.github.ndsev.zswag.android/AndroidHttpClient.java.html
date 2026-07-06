@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidHttpClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-android</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.android</a> &gt; <span class="el_source">AndroidHttpClient.java</span></div><h1>AndroidHttpClient.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.android;
+
+import io.github.ndsev.zswag.api.HttpConfig;
+import io.github.ndsev.zswag.api.HttpException;
+import io.github.ndsev.zswag.api.HttpRequest;
+import io.github.ndsev.zswag.api.HttpResponse;
+import io.github.ndsev.zswag.api.HttpSettings;
+import io.github.ndsev.zswag.api.IHttpClient;
+import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.shared.HttpSettingsLoader;
+import okhttp3.Authenticator;
+import okhttp3.Call;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.Route;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Android {@link IHttpClient} on top of OkHttp 4. Mirrors {@code JvmHttpClient}'s
+ * behaviour exactly so a request configured the same way produces the same
+ * wire-level traffic on either platform:
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;persistent {@link HttpSettings} (scope-matched against the URL) merged
+ *       with the per-call adhoc {@link HttpConfig};&lt;/li&gt;
+ *   &lt;li&gt;per-request headers from the OpenAPI dispatch layer suppress duplicate
+ *       merged-config entries (case-insensitive) so OkHttp doesn't emit double
+ *       Authorization / Cookie headers;&lt;/li&gt;
+ *   &lt;li&gt;basic-auth resolved from cleartext password or {@link IKeychain};&lt;/li&gt;
+ *   &lt;li&gt;per-URL proxy config builds a one-shot OkHttpClient (matches
+ *       {@code JvmHttpClient}'s &quot;rare path&quot; approach);&lt;/li&gt;
+ *   &lt;li&gt;{@code HTTP_SSL_STRICT} env var + {@link HttpConfig#isSslStrict()}
+ *       drive a TrustEverythingManager when relaxed mode is required;&lt;/li&gt;
+ *   &lt;li&gt;{@code HTTP_TIMEOUT} env var sets the connect / read / write timeout
+ *       (default 60 s, matching the C++/JVM clients).&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public class AndroidHttpClient implements IHttpClient {
+<span class="fc" id="L65">    private static final Logger logger = LoggerFactory.getLogger(AndroidHttpClient.class);</span>
+
+    private static final int DEFAULT_TIMEOUT_SECONDS = 60;
+<span class="fc" id="L68">    private static final MediaType OCTET_STREAM = MediaType.parse(&quot;application/octet-stream&quot;);</span>
+
+    private final HttpSettingsLoader.HotReloader settingsReloader;
+    private final IKeychain keychain;
+    private final OkHttpClient strictClient;
+    private final OkHttpClient permissiveClient;
+    /** Cache of proxied clients keyed on host:port|strict|permissive — see comment on
+     *  the proxy branch in {@link #execute}. */
+<span class="fc" id="L76">    private final java.util.concurrent.ConcurrentMap&lt;String, OkHttpClient&gt; proxyClientCache =</span>
+            new java.util.concurrent.ConcurrentHashMap&lt;&gt;();
+
+    /**
+     * Loads persistent settings from {@code HTTP_SETTINGS_FILE} (auto-reloads on mtime change,
+     * matching C++ behaviour) and uses an in-memory IKeychain stub.
+     */
+    public AndroidHttpClient() {
+<span class="nc" id="L84">        this(HttpSettingsLoader.HotReloader.fromEnvironment(), (s, u) -&gt; {</span>
+<span class="nc" id="L85">            throw new IllegalStateException(</span>
+                    &quot;AndroidHttpClient was created without an IKeychain; basic-auth keychain lookup is not available. &quot;
+                    + &quot;Pass an AndroidKeychain to the constructor.&quot;);
+        });
+<span class="nc" id="L89">    }</span>
+
+    public AndroidHttpClient(@NotNull HttpSettings persistentSettings) {
+<span class="nc" id="L92">        this(persistentSettings, (s, u) -&gt; {</span>
+<span class="nc" id="L93">            throw new IllegalStateException(</span>
+                    &quot;AndroidHttpClient was created without an IKeychain; basic-auth keychain lookup is not available. &quot;
+                    + &quot;Pass an AndroidKeychain to the constructor.&quot;);
+        });
+<span class="nc" id="L97">    }</span>
+
+    public AndroidHttpClient(@NotNull HttpSettings persistentSettings, @NotNull IKeychain keychain) {
+        // Caller-supplied snapshot: no source file -&gt; no hot-reload.
+<span class="fc" id="L101">        this(HttpSettingsLoader.HotReloader.of(null, persistentSettings), keychain);</span>
+<span class="fc" id="L102">    }</span>
+
+<span class="fc" id="L104">    AndroidHttpClient(@NotNull HttpSettingsLoader.HotReloader reloader, @NotNull IKeychain keychain) {</span>
+<span class="fc" id="L105">        AndroidLogging.init();</span>
+<span class="fc" id="L106">        this.settingsReloader = reloader;</span>
+<span class="fc" id="L107">        this.keychain = keychain;</span>
+<span class="fc" id="L108">        Duration timeout = readTimeoutFromEnv();</span>
+<span class="fc" id="L109">        this.strictClient = buildOkHttpClient(timeout, true);</span>
+<span class="fc" id="L110">        this.permissiveClient = buildOkHttpClient(timeout, false);</span>
+<span class="fc" id="L111">    }</span>
+
+    /** Returns the current persistent settings, re-reading the source file if its mtime changed. */
+    @Override
+    @NotNull
+    public HttpSettings getPersistentSettings() {
+<span class="fc" id="L117">        return settingsReloader.current();</span>
+    }
+
+    @NotNull
+    private static Duration readTimeoutFromEnv() {
+<span class="fc" id="L122">        String envTimeout = System.getenv(&quot;HTTP_TIMEOUT&quot;);</span>
+<span class="pc bpc" id="L123" title="3 of 4 branches missed.">        if (envTimeout != null &amp;&amp; !envTimeout.isEmpty()) {</span>
+            try {
+<span class="nc" id="L125">                return Duration.ofSeconds(Integer.parseInt(envTimeout));</span>
+<span class="nc" id="L126">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L127">                logger.warn(&quot;Invalid HTTP_TIMEOUT value '{}', using default {}s&quot;, envTimeout, DEFAULT_TIMEOUT_SECONDS);</span>
+            }
+        }
+<span class="fc" id="L130">        return Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS);</span>
+    }
+
+    private static boolean envSslStrict() {
+        // Match C++ httpcl::CurlHttpClient (libs/httpcl/src/http-client.cpp:57-58):
+        // any non-empty value enables strict; unset or empty disables. Aligned with
+        // JvmHttpClient and the Python client (pyzswagcl) for cross-client parity.
+<span class="fc" id="L137">        String env = System.getenv(&quot;HTTP_SSL_STRICT&quot;);</span>
+<span class="pc bpc" id="L138" title="3 of 4 branches missed.">        return env != null &amp;&amp; !env.isEmpty();</span>
+    }
+
+    @NotNull
+    private static OkHttpClient buildOkHttpClient(@NotNull Duration timeout, boolean sslStrict) {
+<span class="fc" id="L143">        OkHttpClient.Builder b = new OkHttpClient.Builder()</span>
+<span class="fc" id="L144">                .connectTimeout(timeout.getSeconds(), TimeUnit.SECONDS)</span>
+<span class="fc" id="L145">                .readTimeout(timeout.getSeconds(), TimeUnit.SECONDS)</span>
+<span class="fc" id="L146">                .writeTimeout(timeout.getSeconds(), TimeUnit.SECONDS)</span>
+<span class="fc" id="L147">                .followRedirects(true)</span>
+<span class="fc" id="L148">                .followSslRedirects(true);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (!sslStrict) {</span>
+<span class="fc" id="L150">            installPermissiveSsl(b);</span>
+        }
+<span class="fc" id="L152">        return b.build();</span>
+    }
+
+    private static void installPermissiveSsl(@NotNull OkHttpClient.Builder b) {
+        try {
+<span class="fc" id="L157">            TrustEverythingManager tm = new TrustEverythingManager();</span>
+<span class="fc" id="L158">            SSLContext ctx = SSLContext.getInstance(&quot;TLS&quot;);</span>
+<span class="fc" id="L159">            ctx.init(null, new TrustManager[]{tm}, new java.security.SecureRandom());</span>
+<span class="fc" id="L160">            b.sslSocketFactory(ctx.getSocketFactory(), tm);</span>
+<span class="pc" id="L161">            b.hostnameVerifier((host, session) -&gt; true);</span>
+<span class="nc" id="L162">        } catch (NoSuchAlgorithmException | KeyManagementException e) {</span>
+<span class="nc" id="L163">            logger.warn(&quot;Failed to install permissive SSLContext: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L164">        }</span>
+<span class="fc" id="L165">    }</span>
+
+    @Override
+    @NotNull
+    public HttpResponse execute(@NotNull HttpRequest request, @NotNull HttpConfig adhoc) throws HttpException {
+<span class="fc" id="L170">        HttpConfig effective = settingsReloader.current().forUrl(request.getUrl()).mergedWith(adhoc);</span>
+
+<span class="pc bpc" id="L172" title="3 of 4 branches missed.">        boolean sslStrict = envSslStrict() &amp;&amp; effective.isSslStrict();</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        OkHttpClient client = sslStrict ? strictClient : permissiveClient;</span>
+
+        // Cache proxied OkHttpClients per (host:port, sslStrict) so concurrent requests
+        // share the connection pool / dispatcher threads. OkHttp explicitly recommends one
+        // client per process; rebuilding per-request loses keep-alive and adds visible
+        // battery / memory cost on Android.
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (effective.getProxy().isPresent()) {</span>
+<span class="nc" id="L180">            HttpConfig.Proxy proxy = effective.getProxy().get();</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            String cacheKey = proxy.host + &quot;:&quot; + proxy.port + &quot;|&quot; + (sslStrict ? &quot;strict&quot; : &quot;permissive&quot;);</span>
+<span class="nc" id="L182">            Duration callTimeoutForProxy = effective.getTimeout();</span>
+<span class="nc" id="L183">            client = proxyClientCache.computeIfAbsent(cacheKey,</span>
+<span class="nc" id="L184">                    k -&gt; buildClientWithProxy(callTimeoutForProxy, sslStrict, proxy));</span>
+        }
+
+        // Honour the merged HttpConfig's per-request timeout. JvmHttpClient applies this
+        // via HttpRequest.Builder#timeout; on OkHttp we derive a client from the pool so
+        // the connection cache is shared but callTimeout reflects the per-call value.
+        // Only override when the caller explicitly set a timeout — otherwise the base
+        // client's HTTP_TIMEOUT-derived value already applies (matches JvmHttpClient).
+<span class="fc" id="L192">        Duration explicitTimeout = effective.getTimeoutOrNull();</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (explicitTimeout != null) {</span>
+<span class="nc" id="L194">            client = client.newBuilder()</span>
+<span class="nc" id="L195">                    .callTimeout(explicitTimeout.getSeconds(), TimeUnit.SECONDS)</span>
+<span class="nc" id="L196">                    .build();</span>
+        }
+
+<span class="fc" id="L199">        String url = applyQueryParams(request.getUrl(), effective.getQuery());</span>
+<span class="fc" id="L200">        logger.debug(&quot;Executing {} request to {}&quot;, request.getMethod(), url);</span>
+
+<span class="fc" id="L202">        Request.Builder rb = new Request.Builder().url(url);</span>
+
+        // Per-request headers (case-insensitive) win over merged config to avoid duplicates.
+<span class="fc" id="L205">        Set&lt;String&gt; perRequestHeaderNames = new TreeSet&lt;&gt;(String.CASE_INSENSITIVE_ORDER);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; h : request.getHeaders().entrySet()) {</span>
+<span class="fc" id="L207">            rb.addHeader(h.getKey(), h.getValue());</span>
+<span class="fc" id="L208">            perRequestHeaderNames.add(h.getKey());</span>
+<span class="fc" id="L209">        }</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; h : effective.getHeaders().entrySet()) {</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (perRequestHeaderNames.contains(h.getKey())) continue;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            for (String v : h.getValue()) {</span>
+<span class="fc" id="L213">                rb.addHeader(h.getKey(), v);</span>
+<span class="fc" id="L214">            }</span>
+<span class="fc" id="L215">        }</span>
+
+        // Cookies → single Cookie header (skip if a Cookie header was already set per-request)
+<span class="fc bfc" id="L218" title="All 4 branches covered.">        if (!effective.getCookies().isEmpty() &amp;&amp; !perRequestHeaderNames.contains(&quot;Cookie&quot;)) {</span>
+<span class="fc" id="L219">            StringJoiner cookieJoiner = new StringJoiner(&quot;; &quot;);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; e : effective.getCookies().entrySet()) {</span>
+<span class="fc" id="L221">                cookieJoiner.add(e.getKey() + &quot;=&quot; + e.getValue());</span>
+<span class="fc" id="L222">            }</span>
+<span class="fc" id="L223">            rb.addHeader(&quot;Cookie&quot;, cookieJoiner.toString());</span>
+        }
+
+        // Basic auth — only when Authorization isn't already set.
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (effective.getAuth().isPresent()</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                &amp;&amp; !perRequestHeaderNames.contains(&quot;Authorization&quot;)</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                &amp;&amp; !containsHeaderIgnoreCase(effective.getHeaders(), &quot;Authorization&quot;)) {</span>
+<span class="fc" id="L230">            HttpConfig.BasicAuthentication auth = effective.getAuth().get();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            String password = !auth.password.isEmpty()</span>
+<span class="fc" id="L232">                    ? auth.password</span>
+<span class="pc" id="L233">                    : keychain.load(auth.keychain, auth.user);</span>
+<span class="fc" id="L234">            String credentials = auth.user + &quot;:&quot; + password;</span>
+<span class="fc" id="L235">            String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L236">            rb.addHeader(&quot;Authorization&quot;, &quot;Basic &quot; + encoded);</span>
+        }
+
+        // HTTP method + body.
+<span class="fc" id="L240">        String method = request.getMethod().toUpperCase();</span>
+<span class="fc" id="L241">        byte[] bodyBytes = request.getBody();</span>
+<span class="fc bfc" id="L242" title="All 5 branches covered.">        switch (method) {</span>
+            case &quot;GET&quot;:
+<span class="fc" id="L244">                rb.get();</span>
+<span class="fc" id="L245">                break;</span>
+            case &quot;POST&quot;:
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                rb.post(bodyBytes != null ? RequestBody.create(bodyBytes, OCTET_STREAM) : RequestBody.create(new byte[0], null));</span>
+<span class="fc" id="L248">                break;</span>
+            case &quot;PUT&quot;:
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                rb.put(bodyBytes != null ? RequestBody.create(bodyBytes, OCTET_STREAM) : RequestBody.create(new byte[0], null));</span>
+<span class="fc" id="L251">                break;</span>
+            case &quot;DELETE&quot;:
+<span class="fc bfc" id="L253" title="All 2 branches covered.">                rb.delete(bodyBytes != null ? RequestBody.create(bodyBytes, OCTET_STREAM) : null);</span>
+<span class="fc" id="L254">                break;</span>
+            default:
+<span class="fc" id="L256">                throw new HttpException(&quot;Unsupported HTTP method: &quot; + request.getMethod());</span>
+        }
+
+<span class="fc" id="L259">        Call call = client.newCall(rb.build());</span>
+<span class="fc" id="L260">        try (Response response = call.execute()) {</span>
+<span class="fc" id="L261">            int code = response.code();</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            byte[] respBody = response.body() != null ? response.body().bytes() : null;</span>
+            // Return the first value per header name (OkHttp's response.header(name)
+            // returns the *last* value, which would diverge from JvmHttpClient's
+            // behaviour). Iterate explicitly.
+<span class="fc" id="L266">            Map&lt;String, String&gt; headers = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            for (String name : response.headers().names()) {</span>
+<span class="fc" id="L268">                List&lt;String&gt; values = response.headers().values(name);</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (!values.isEmpty()) {</span>
+<span class="fc" id="L270">                    headers.put(name, values.get(0));</span>
+                }
+<span class="fc" id="L272">            }</span>
+<span class="fc" id="L273">            logger.debug(&quot;Received response with status code: {}&quot;, code);</span>
+<span class="fc" id="L274">            return new HttpResponse(code, response.message(), headers, respBody);</span>
+<span class="fc" id="L275">        } catch (IOException e) {</span>
+<span class="fc" id="L276">            logger.error(&quot;HTTP request failed: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L277">            throw new HttpException(&quot;HTTP request failed: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    private OkHttpClient buildClientWithProxy(@NotNull Duration timeout, boolean sslStrict, @NotNull HttpConfig.Proxy proxy) {
+<span class="nc" id="L282">        OkHttpClient.Builder b = new OkHttpClient.Builder()</span>
+<span class="nc" id="L283">                .connectTimeout(timeout.getSeconds(), TimeUnit.SECONDS)</span>
+<span class="nc" id="L284">                .readTimeout(timeout.getSeconds(), TimeUnit.SECONDS)</span>
+<span class="nc" id="L285">                .writeTimeout(timeout.getSeconds(), TimeUnit.SECONDS)</span>
+<span class="nc" id="L286">                .proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxy.host, proxy.port)));</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (!sslStrict) installPermissiveSsl(b);</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (!proxy.user.isEmpty()) {</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            String password = !proxy.password.isEmpty() ? proxy.password : keychain.load(proxy.keychain, proxy.user);</span>
+<span class="nc" id="L290">            String creds = &quot;Basic &quot; + Base64.getEncoder()</span>
+<span class="nc" id="L291">                    .encodeToString((proxy.user + &quot;:&quot; + password).getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L292">            b.proxyAuthenticator(new Authenticator() {</span>
+                @Override
+                @Nullable
+                public Request authenticate(@Nullable Route route, @NotNull Response response) {
+<span class="nc" id="L296">                    return response.request().newBuilder().header(&quot;Proxy-Authorization&quot;, creds).build();</span>
+                }
+            });
+        }
+<span class="nc" id="L300">        return b.build();</span>
+    }
+
+    private static boolean containsHeaderIgnoreCase(@NotNull Map&lt;String, List&lt;String&gt;&gt; headers, @NotNull String name) {
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (String key : headers.keySet()) {</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (name.equalsIgnoreCase(key)) return true;</span>
+<span class="nc" id="L306">        }</span>
+<span class="fc" id="L307">        return false;</span>
+    }
+
+    @NotNull
+    private static String applyQueryParams(@NotNull String baseUrl, @NotNull Map&lt;String, List&lt;String&gt;&gt; query) {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (query.isEmpty()) return baseUrl;</span>
+<span class="fc" id="L313">        StringBuilder sb = new StringBuilder(baseUrl);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        boolean hasQuery = baseUrl.indexOf('?') &gt;= 0;</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; e : query.entrySet()) {</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            for (String v : e.getValue()) {</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">                sb.append(hasQuery ? '&amp;' : '?');</span>
+<span class="fc" id="L318">                hasQuery = true;</span>
+<span class="fc" id="L319">                sb.append(java.net.URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8));</span>
+<span class="fc" id="L320">                sb.append('=');</span>
+<span class="fc" id="L321">                sb.append(java.net.URLEncoder.encode(v, StandardCharsets.UTF_8));</span>
+<span class="fc" id="L322">            }</span>
+<span class="fc" id="L323">        }</span>
+<span class="fc" id="L324">        return sb.toString();</span>
+    }
+
+    private static final class TrustEverythingManager implements X509TrustManager {
+<span class="nc" id="L328">        @Override public void checkClientTrusted(X509Certificate[] chain, String authType) {}</span>
+<span class="nc" id="L329">        @Override public void checkServerTrusted(X509Certificate[] chain, String authType) {}</span>
+<span class="fc" id="L330">        @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

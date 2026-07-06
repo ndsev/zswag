@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Keychain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-jvm</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.jvm</a> &gt; <span class="el_source">Keychain.java</span></div><h1>Keychain.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.jvm;
+
+import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.api.KeychainException;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * JVM keychain integration: load credentials from the OS-native credential
+ * store. Mirrors C++ {@code httpcl::secret} (which wraps the {@code keychain}
+ * library).
+ *
+ * &lt;p&gt;Implementation strategy: shells out to the platform-native keychain CLI
+ * (no JNI). Linux: {@code secret-tool}; macOS: {@code security}; Windows:
+ * not yet implemented.
+ *
+ * &lt;p&gt;If the platform tool is unavailable or returns no entry, callers see a
+ * {@link KeychainException} — preferable to silently sending an empty password.
+ */
+public final class Keychain implements IKeychain {
+<span class="fc" id="L29">    private static final Logger logger = LoggerFactory.getLogger(Keychain.class);</span>
+
+    /** Matches C++ {@code KEYCHAIN_PACKAGE} so secrets stored by C++ are visible to Java. */
+    static final String PACKAGE = &quot;lib.openapi.zserio.client&quot;;
+
+    private static final long TIMEOUT_SECONDS = 60;
+
+<span class="fc" id="L36">    public Keychain() {}</span>
+
+    @Override
+    @NotNull
+    public String load(@NotNull String service, @NotNull String user) {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (service.isEmpty()) {</span>
+<span class="fc" id="L42">            throw new KeychainException(&quot;keychain: service identifier must not be empty&quot;);</span>
+        }
+<span class="fc" id="L44">        logger.debug(&quot;Loading secret (service={}, user={}) ...&quot;, service, user);</span>
+<span class="fc" id="L45">        Os os = detectOs();</span>
+        try {
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">            switch (os) {</span>
+                case LINUX:
+<span class="nc" id="L49">                    return loadLinux(service, user);</span>
+                case MACOS:
+<span class="nc" id="L51">                    return loadMacOs(service, user);</span>
+                case WINDOWS:
+<span class="nc" id="L53">                    return loadWindows(service, user);</span>
+                default:
+<span class="fc" id="L55">                    throw new KeychainException(&quot;keychain: unsupported platform &quot; + System.getProperty(&quot;os.name&quot;));</span>
+            }
+<span class="nc" id="L57">        } catch (InterruptedException e) {</span>
+            // Real interruption — restore the interrupt flag so callers can react.
+<span class="nc" id="L59">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L60">            throw new KeychainException(&quot;keychain: interrupted while loading secret: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L61">        } catch (IOException e) {</span>
+            // I/O failure — do NOT touch the interrupt flag.
+<span class="nc" id="L63">            throw new KeychainException(&quot;keychain: failed to load secret: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    private static String loadLinux(String service, String user) throws IOException, InterruptedException {
+<span class="fc" id="L68">        ProcessBuilder pb = new ProcessBuilder(&quot;secret-tool&quot;, &quot;lookup&quot;,</span>
+                &quot;package&quot;, PACKAGE,
+                &quot;service&quot;, service,
+                &quot;user&quot;, user);
+<span class="nc" id="L72">        return runReadStdout(pb, &quot;secret-tool&quot;);</span>
+    }
+
+    private static String loadMacOs(String service, String user) throws IOException, InterruptedException {
+<span class="fc" id="L76">        ProcessBuilder pb = new ProcessBuilder(&quot;security&quot;, &quot;find-generic-password&quot;,</span>
+                &quot;-s&quot;, service,
+                &quot;-a&quot;, user,
+                &quot;-w&quot;);
+<span class="nc" id="L80">        return runReadStdout(pb, &quot;security&quot;).trim();</span>
+    }
+
+    /**
+     * Windows credential manager support is not yet implemented for the Java JVM client.
+     * &lt;p&gt;
+     * The C++ httpcl library wraps the C-language {@code keychain} library which handles
+     * the Windows Data Protection API (DPAPI) under the hood; Python (via pyzswagcl)
+     * inherits that. A Java equivalent would either shell out to {@code cmdkey}/
+     * {@code vaultcmd} or call DPAPI through JNA — both are non-trivial and have been
+     * scheduled for a separate follow-up.
+     * &lt;p&gt;
+     * Workaround for Windows users today: put cleartext credentials in
+     * {@code http-settings.yaml} via {@code password:} (instead of {@code keychain:}),
+     * or pass them adhoc through {@code HttpConfig.basicAuth(user, password)}.
+     */
+    private static String loadWindows(String service, String user) {
+<span class="fc" id="L97">        throw new KeychainException(</span>
+                &quot;keychain: Windows credential manager lookup is not yet implemented in the Java JVM client. &quot;
+                + &quot;Workaround: use a cleartext 'password:' entry in http-settings.yaml, or &quot;
+                + &quot;configure credentials adhoc via HttpConfig.basicAuth(user, password). &quot;
+                + &quot;See README.md → Keychain integration for details. &quot;
+                + &quot;(The C++ and Python clients DO support Windows credential manager.)&quot;);
+    }
+
+    private static String runReadStdout(@NotNull ProcessBuilder pb, @NotNull String tool) throws IOException, InterruptedException {
+<span class="fc" id="L106">        pb.redirectErrorStream(false);</span>
+        Process p;
+        try {
+<span class="nc" id="L109">            p = pb.start();</span>
+<span class="fc" id="L110">        } catch (IOException e) {</span>
+<span class="fc" id="L111">            throw new KeychainException(&quot;keychain: '&quot; + tool + &quot;' is not installed or not on PATH&quot;, e);</span>
+<span class="nc" id="L112">        }</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (!p.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {</span>
+<span class="nc" id="L114">            p.destroyForcibly();</span>
+<span class="nc" id="L115">            throw new KeychainException(&quot;keychain: '&quot; + tool + &quot;' timed out after &quot; + TIMEOUT_SECONDS + &quot;s&quot;);</span>
+        }
+<span class="nc" id="L117">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L118">        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {</span>
+            String line;
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            while ((line = r.readLine()) != null) out.append(line).append('\n');</span>
+        }
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (p.exitValue() != 0) {</span>
+            String stderr;
+<span class="nc" id="L124">            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getErrorStream(), StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L125">                StringBuilder e = new StringBuilder();</span>
+                String line;
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                while ((line = r.readLine()) != null) e.append(line).append('\n');</span>
+<span class="nc" id="L128">                stderr = e.toString().trim();</span>
+            }
+<span class="nc" id="L130">            throw new KeychainException(&quot;keychain: '&quot; + tool + &quot;' exited &quot; + p.exitValue() +</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                    (stderr.isEmpty() ? &quot;&quot; : &quot;: &quot; + stderr));</span>
+        }
+<span class="nc" id="L133">        String s = out.toString();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (s.endsWith(&quot;\n&quot;)) s = s.substring(0, s.length() - 1);</span>
+<span class="nc" id="L135">        return s;</span>
+    }
+
+<span class="fc" id="L138">    private enum Os { LINUX, MACOS, WINDOWS, UNKNOWN }</span>
+
+    private static Os detectOs() {
+<span class="fc" id="L141">        String name = System.getProperty(&quot;os.name&quot;, &quot;&quot;).toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (name.contains(&quot;linux&quot;)) return Os.LINUX;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (name.contains(&quot;mac&quot;)) return Os.MACOS;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (name.contains(&quot;win&quot;)) return Os.WINDOWS;</span>
+<span class="fc" id="L145">        return Os.UNKNOWN;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

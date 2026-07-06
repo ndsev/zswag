@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OAClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-jvm</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.jvm</a> &gt; <span class="el_source">OAClient.java</span></div><h1>OAClient.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.jvm;
+
+import io.github.ndsev.zswag.api.HttpConfig;
+import io.github.ndsev.zswag.api.HttpException;
+import io.github.ndsev.zswag.api.HttpSettings;
+import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.shared.HttpSettingsLoader;
+import io.github.ndsev.zswag.shared.OpenApiClient;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import zserio.runtime.ZserioError;
+import zserio.runtime.io.Writer;
+import zserio.runtime.service.ServiceClientInterface;
+import zserio.runtime.service.ServiceData;
+
+import java.io.IOException;
+
+/**
+ * JVM Java port of Python's {@code services.MyService.Client(OAClient(url))}
+ * idiom. Implements zserio's {@link ServiceClientInterface} so that any
+ * zserio-Java-generated {@code XClient} class accepts an instance of this
+ * class as its transport.
+ *
+ * &lt;p&gt;Usage:
+ * &lt;pre&gt;{@code
+ * OAClient transport = new OAClient(&quot;http://api.example.com/openapi.json&quot;);
+ * Calculator.CalculatorClient calc = new Calculator.CalculatorClient(transport);
+ * Double result = calc.powerMethod(new BaseAndExponent(...));
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;Internally delegates to {@link OpenApiClient}, which performs
+ * {@code x-zserio-request-part} request decomposition.
+ */
+public final class OAClient implements ServiceClientInterface {
+<span class="nc" id="L37">    private static final Logger logger = LoggerFactory.getLogger(OAClient.class);</span>
+
+    private final OpenApiClient delegate;
+
+    /**
+     * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}.
+     * Subsequent mtime changes to the settings file are picked up on the next request
+     * (matches C++ {@code Settings::operator[]} hot-reload). Use the
+     * {@link #OAClient(String, HttpSettings, HttpConfig)} form instead if you want
+     * to pin a specific snapshot.
+     */
+    public OAClient(@NotNull String openApiSpecUrl) throws IOException {
+<span class="nc" id="L49">        this(openApiSpecUrl, HttpConfig.empty(), 0);</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Env-driven constructor with an explicit {@code serverIndex}. Persistent
+     * settings come from {@code HTTP_SETTINGS_FILE} via a {@link HttpSettingsLoader.HotReloader}
+     * so file changes are picked up automatically.
+     */
+    public OAClient(@NotNull String openApiSpecUrl, @NotNull HttpConfig adhoc, int serverIndex)
+<span class="nc" id="L58">            throws IOException {</span>
+<span class="nc" id="L59">        IKeychain keychain = new Keychain();</span>
+        // Package-private ctor: env-driven HotReloader so the source path is preserved
+        // and mtime advances trigger an automatic reload on the next request.
+<span class="nc" id="L62">        JvmHttpClient http = new JvmHttpClient(HttpSettingsLoader.HotReloader.fromEnvironment(), keychain);</span>
+<span class="nc" id="L63">        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain, serverIndex);</span>
+<span class="nc" id="L64">    }</span>
+
+    /**
+     * Creates a client with explicit persistent settings (typically loaded via
+     * {@link HttpSettingsLoader}) and no adhoc config.
+     */
+    public OAClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent) throws IOException {
+<span class="nc" id="L71">        this(openApiSpecUrl, persistent, HttpConfig.empty());</span>
+<span class="nc" id="L72">    }</span>
+
+    /**
+     * Creates a client with explicit persistent settings AND a per-instance
+     * adhoc {@link HttpConfig}. Mirrors the C++/Python pattern of passing
+     * {@code httpcl::Config}/{@code HTTPConfig} into {@code OAClient}.
+     */
+    public OAClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc)
+            throws IOException {
+<span class="nc" id="L81">        this(openApiSpecUrl, persistent, adhoc, 0);</span>
+<span class="nc" id="L82">    }</span>
+
+    /**
+     * Creates a client targeting a specific entry of the spec's
+     * {@code servers[]} array. Mirrors C++ {@code OAClient(..., uint32_t serverIndex)}
+     * and Python {@code OAClient(..., server_index=N)} — see issue #113.
+     *
+     * @param serverIndex index into the parsed {@code servers[]} array (default 0).
+     *                    {@link IOException} is thrown during construction if the
+     *                    index is out of bounds.
+     */
+    public OAClient(@NotNull String openApiSpecUrl, @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc,
+<span class="nc" id="L94">                    int serverIndex) throws IOException {</span>
+<span class="nc" id="L95">        IKeychain keychain = new Keychain();</span>
+<span class="nc" id="L96">        JvmHttpClient http = new JvmHttpClient(persistent, keychain);</span>
+<span class="nc" id="L97">        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain, serverIndex);</span>
+<span class="nc" id="L98">    }</span>
+
+    /** Lower-level constructor — for tests / advanced use. */
+<span class="nc" id="L101">    public OAClient(@NotNull OpenApiClient delegate) {</span>
+<span class="nc" id="L102">        this.delegate = delegate;</span>
+<span class="nc" id="L103">    }</span>
+
+    /** Exposes the underlying OpenAPI client (read-only) for introspection. */
+    @NotNull
+    public OpenApiClient getOpenApiClient() {
+<span class="nc" id="L108">        return delegate;</span>
+    }
+
+    /**
+     * Implementation of zserio's {@link ServiceClientInterface}: decomposes the
+     * typed request, dispatches the HTTP call, returns response bytes.
+     */
+    @Override
+    public byte[] callMethod(java.lang.String methodName,
+                             ServiceData&lt;? extends Writer&gt; requestData,
+                             @Nullable java.lang.Object context) throws ZserioError {
+<span class="nc" id="L119">        Writer typed = requestData.getZserioObject();</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (typed == null) {</span>
+<span class="nc" id="L121">            throw new ZserioError(&quot;OAClient.callMethod: requestData.getZserioObject() returned null&quot;);</span>
+        }
+        try {
+<span class="nc" id="L124">            return delegate.callMethod(methodName, typed);</span>
+<span class="nc" id="L125">        } catch (HttpException e) {</span>
+<span class="nc" id="L126">            ZserioError err = new ZserioError(&quot;OAClient: &quot; + methodName + &quot; failed: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L127">            throw err;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

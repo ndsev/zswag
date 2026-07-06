@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenAPIParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-shared</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.shared</a> &gt; <span class="el_source">OpenAPIParser.java</span></div><h1>OpenAPIParser.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.shared;
+
+import io.github.ndsev.zswag.api.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+
+/**
+ * Parser for OpenAPI 3.0 specifications, with full support for the zswag
+ * extensions ({@code x-zserio-request-part}, {@code application/x-zserio-object}
+ * request bodies, OAuth2 {@code clientCredentials} flow).
+ *
+ * &lt;p&gt;Mirrors the C++ {@code openapi-parser.cpp} dispatch model:
+ * &lt;ul&gt;
+ *   &lt;li&gt;Only HTTP methods GET/POST/PUT/DELETE are recognised; PATCH operations
+ *       are ignored (see README &quot;OpenAPI Options Interoperability&quot; — patch
+ *       cannot be realised over the zserio transport interface).&lt;/li&gt;
+ *   &lt;li&gt;Only the OAuth2 {@code clientCredentials} flow is accepted; other
+ *       flows ({@code authorizationCode}, {@code implicit}, {@code password})
+ *       cause the scheme to be rejected with {@link IllegalArgumentException}.&lt;/li&gt;
+ *   &lt;li&gt;Top-level {@code security:} is loaded as the default, applied to any
+ *       operation that does not declare its own {@code security}.&lt;/li&gt;
+ *   &lt;li&gt;Per-operation {@code security} preserves the OR-of-AND structure as
+ *       a list of {@link SecurityRequirement} alternatives. Empty list
+ *       ({@code security: []}) means &quot;explicitly no auth required&quot;.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public class OpenAPIParser {
+<span class="fc" id="L43">    private static final Logger logger = LoggerFactory.getLogger(OpenAPIParser.class);</span>
+
+    private final Map&lt;String, Object&gt; spec;
+<span class="fc" id="L46">    private final Map&lt;String, MethodInfo&gt; methods = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L47">    private final Map&lt;String, SecurityScheme&gt; securitySchemes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L48">    private final List&lt;String&gt; servers = new ArrayList&lt;&gt;();</span>
+
+    /** Top-level (default) security requirement; null = no global default. */
+    @Nullable
+    private List&lt;SecurityRequirement&gt; defaultSecurity;
+
+    /**
+     * Parses a spec from a URL/path. For HTTPS URLs, the caller may need to
+     * supply OAuth2 tokens via the {@link #fetch(String, java.util.function.Consumer)}
+     * helper; this constructor does not authenticate the spec fetch.
+     */
+    public OpenAPIParser(@NotNull String specLocation) throws IOException {
+<span class="pc" id="L60">        this(loadSpec(specLocation, h -&gt; {}));</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Parses a spec where the caller has already added auth headers (e.g.
+     * an OAuth2 bearer token for {@code useForSpecFetch}) via
+     * {@code headerInjector}.
+     *
+     * &lt;p&gt;&lt;b&gt;Note:&lt;/b&gt; this constructor uses a raw {@code URLConnection} for HTTP(S)
+     * spec URLs and therefore does NOT honour {@code HTTP_SSL_STRICT}, proxy
+     * settings, {@code HTTP_TIMEOUT}, basic-auth, or persistent headers/cookies/query
+     * from {@code http-settings.yaml}. Prefer
+     * {@link #OpenAPIParser(String, IHttpClient, HttpConfig, java.util.Map)} for
+     * full parity with the C++ spec-fetch path.
+     */
+    public OpenAPIParser(@NotNull String specLocation,
+                         @NotNull java.util.function.Consumer&lt;URLConnection&gt; headerInjector) throws IOException {
+<span class="nc" id="L77">        this(loadSpec(specLocation, headerInjector));</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * Parses a spec fetched via the configured {@link IHttpClient}, so the spec-fetch
+     * request respects {@code HTTP_SSL_STRICT}, proxy, basic-auth, {@code HTTP_TIMEOUT},
+     * and any persistent {@code headers:}/{@code cookies:}/{@code query:} from
+     * {@code http-settings.yaml} — matching the C++ {@code fetchOpenAPIConfig} flow.
+     *
+     * @param specLocation  HTTP(S) URL of the spec, or a local file path
+     * @param httpClient    transport used when the location is HTTP(S); ignored for files
+     * @param adhoc         per-call HTTP config (e.g. pre-minted OAuth2 Bearer header
+     *                      — pass {@link HttpConfig#empty()} if no extra config is needed)
+     * @param extraHeaders  additional headers to add on top of the merged config
+     *                      (typically empty; reserved for special-casing the OAuth2
+     *                      {@code useForSpecFetch} token injection)
+     */
+    public OpenAPIParser(@NotNull String specLocation,
+                         @NotNull IHttpClient httpClient,
+                         @NotNull HttpConfig adhoc,
+                         @NotNull java.util.Map&lt;String, String&gt; extraHeaders) throws IOException {
+<span class="fc" id="L98">        this(loadSpecViaHttpClient(specLocation, httpClient, adhoc, extraHeaders));</span>
+<span class="fc" id="L99">    }</span>
+
+<span class="fc" id="L101">    private OpenAPIParser(@NotNull Map&lt;String, Object&gt; spec) {</span>
+<span class="fc" id="L102">        this.spec = spec;</span>
+<span class="fc" id="L103">        parseSpec();</span>
+<span class="fc" id="L104">    }</span>
+
+    @NotNull
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; loadSpec(@NotNull String location,
+                                                @NotNull java.util.function.Consumer&lt;URLConnection&gt; headerInjector) throws IOException {
+<span class="fc" id="L110">        logger.info(&quot;Loading OpenAPI spec from: {}&quot;, location);</span>
+        InputStream input;
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        if (location.startsWith(&quot;http://&quot;) || location.startsWith(&quot;https://&quot;)) {</span>
+<span class="nc" id="L113">            URLConnection conn = new URL(location).openConnection();</span>
+<span class="nc" id="L114">            headerInjector.accept(conn);</span>
+<span class="nc" id="L115">            input = conn.getInputStream();</span>
+<span class="nc" id="L116">        } else {</span>
+<span class="fc" id="L117">            input = Files.newInputStream(Paths.get(location));</span>
+        }
+<span class="fc" id="L119">        try (input) {</span>
+<span class="fc" id="L120">            return parseYaml(input);</span>
+        }
+    }
+
+    /**
+     * Fetches the spec through the supplied {@link IHttpClient} so SSL/proxy/timeout/
+     * persistent-settings all apply (matches C++ {@code fetchOpenAPIConfig}). Falls
+     * back to the local-file path when the location isn't an HTTP URL.
+     */
+    @NotNull
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; loadSpecViaHttpClient(@NotNull String location,
+                                                             @NotNull IHttpClient httpClient,
+                                                             @NotNull HttpConfig adhoc,
+                                                             @NotNull java.util.Map&lt;String, String&gt; extraHeaders)
+            throws IOException {
+<span class="fc" id="L136">        logger.info(&quot;Loading OpenAPI spec from: {} (via {})&quot;, location, httpClient.getClass().getSimpleName());</span>
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">        if (location.startsWith(&quot;http://&quot;) || location.startsWith(&quot;https://&quot;)) {</span>
+            // Build a GET request; the IHttpClient layer applies persistent settings + adhoc
+            // + env vars (HTTP_SSL_STRICT, HTTP_TIMEOUT) and handles proxy/basic-auth.
+<span class="fc" id="L140">            HttpRequest.Builder rb = HttpRequest.builder().method(&quot;GET&quot;).url(location);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            for (java.util.Map.Entry&lt;String, String&gt; h : extraHeaders.entrySet()) {</span>
+<span class="nc" id="L142">                rb.header(h.getKey(), h.getValue());</span>
+<span class="nc" id="L143">            }</span>
+            HttpResponse response;
+            try {
+<span class="fc" id="L146">                response = httpClient.execute(rb.build(), adhoc);</span>
+<span class="nc" id="L147">            } catch (HttpException e) {</span>
+<span class="nc" id="L148">                throw new IOException(&quot;Spec fetch failed for '&quot; + location + &quot;': &quot; + e.getMessage(), e);</span>
+<span class="fc" id="L149">            }</span>
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">            if (response.getStatusCode() &lt; 200 || response.getStatusCode() &gt;= 300) {</span>
+<span class="nc" id="L151">                throw new IOException(&quot;Spec fetch failed for '&quot; + location + &quot;': HTTP &quot;</span>
+<span class="nc" id="L152">                        + response.getStatusCode());</span>
+            }
+<span class="fc" id="L154">            byte[] body = response.getBody();</span>
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">            if (body == null || body.length == 0) {</span>
+<span class="nc" id="L156">                throw new IOException(&quot;Spec fetch returned an empty body for '&quot; + location + &quot;'&quot;);</span>
+            }
+<span class="fc" id="L158">            try (java.io.ByteArrayInputStream stream = new java.io.ByteArrayInputStream(body)) {</span>
+<span class="fc" id="L159">                return parseYaml(stream);</span>
+            }
+        }
+        // Non-HTTP location: read directly from the filesystem.
+<span class="fc" id="L163">        try (InputStream input = Files.newInputStream(Paths.get(location))) {</span>
+<span class="fc" id="L164">            return parseYaml(input);</span>
+        }
+    }
+
+    @NotNull
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; parseYaml(@NotNull InputStream input) throws IOException {
+<span class="fc" id="L171">        LoaderOptions options = new LoaderOptions();</span>
+<span class="fc" id="L172">        options.setAllowDuplicateKeys(false);</span>
+<span class="fc" id="L173">        Yaml yaml = new Yaml(new SafeConstructor(options));</span>
+<span class="fc" id="L174">        Map&lt;String, Object&gt; loaded = yaml.load(input);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (loaded == null) {</span>
+<span class="fc" id="L176">            throw new IOException(&quot;Failed to load OpenAPI spec - empty or invalid YAML&quot;);</span>
+        }
+<span class="fc" id="L178">        return loaded;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void parseSpec() {
+        // servers
+<span class="fc" id="L184">        List&lt;Map&lt;String, Object&gt;&gt; serversList = (List&lt;Map&lt;String, Object&gt;&gt;) spec.get(&quot;servers&quot;);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (serversList != null) {</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            for (Map&lt;String, Object&gt; server : serversList) {</span>
+<span class="fc" id="L187">                String url = (String) server.get(&quot;url&quot;);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                if (url != null) {</span>
+<span class="fc" id="L189">                    servers.add(url);</span>
+<span class="fc" id="L190">                    logger.debug(&quot;Found server: {}&quot;, url);</span>
+                }
+<span class="fc" id="L192">            }</span>
+        }
+
+        // securitySchemes
+<span class="fc" id="L196">        Map&lt;String, Object&gt; components = (Map&lt;String, Object&gt;) spec.get(&quot;components&quot;);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (components != null) {</span>
+<span class="fc" id="L198">            Map&lt;String, Object&gt; securitySchemesMap = (Map&lt;String, Object&gt;) components.get(&quot;securitySchemes&quot;);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (securitySchemesMap != null) {</span>
+<span class="fc" id="L200">                parseSecuritySchemes(securitySchemesMap);</span>
+            }
+        }
+
+        // root-level (default) security
+<span class="fc" id="L205">        Object rootSec = spec.get(&quot;security&quot;);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (rootSec instanceof List) {</span>
+<span class="fc" id="L207">            this.defaultSecurity = parseSecurityList((List&lt;Map&lt;String, Object&gt;&gt;) rootSec);</span>
+<span class="fc" id="L208">            logger.debug(&quot;Parsed root-level default security: {} alternatives&quot;, defaultSecurity.size());</span>
+        }
+
+        // paths
+<span class="fc" id="L212">        Map&lt;String, Object&gt; paths = (Map&lt;String, Object&gt;) spec.get(&quot;paths&quot;);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (paths != null) {</span>
+<span class="fc" id="L214">            parsePaths(paths);</span>
+        }
+<span class="fc" id="L216">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void parseSecuritySchemes(@NotNull Map&lt;String, Object&gt; schemesMap) {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : schemesMap.entrySet()) {</span>
+<span class="fc" id="L221">            String name = entry.getKey();</span>
+<span class="fc" id="L222">            Map&lt;String, Object&gt; schemeData = (Map&lt;String, Object&gt;) entry.getValue();</span>
+<span class="fc" id="L223">            String typeStr = (String) schemeData.get(&quot;type&quot;);</span>
+<span class="fc" id="L224">            SecuritySchemeType type = parseSecuritySchemeType(typeStr);</span>
+
+<span class="fc" id="L226">            SecurityScheme.Builder builder = SecurityScheme.builder(name, type);</span>
+
+<span class="pc bpc" id="L228" title="1 of 5 branches missed.">            switch (type) {</span>
+                case HTTP:
+<span class="fc" id="L230">                    builder.scheme((String) schemeData.get(&quot;scheme&quot;));</span>
+<span class="fc" id="L231">                    break;</span>
+                case API_KEY:
+<span class="fc" id="L233">                    builder.apiKeyLocation(parseParameterLocation((String) schemeData.get(&quot;in&quot;)));</span>
+<span class="fc" id="L234">                    builder.apiKeyName((String) schemeData.get(&quot;name&quot;));</span>
+<span class="fc" id="L235">                    break;</span>
+                case OAUTH2:
+<span class="fc" id="L237">                    parseOAuth2Flows(name, (Map&lt;String, Object&gt;) schemeData.get(&quot;flows&quot;), builder);</span>
+<span class="fc" id="L238">                    break;</span>
+                case OPEN_ID_CONNECT:
+                    // Match C++ openapi-parser.cpp: reject at parse time so a Java client and a
+                    // C++ client either both load or both refuse the same spec. A spec containing
+                    // an openIdConnect scheme that isn't actually used at any operation will be
+                    // rejected here too — same trade-off as C++.
+<span class="fc" id="L244">                    throw new IllegalArgumentException(</span>
+                            &quot;Security scheme '&quot; + name + &quot;' uses openIdConnect, which is not supported &quot;
+                                    + &quot;by zswag clients (use 'http' bearer or 'oauth2' clientCredentials instead)&quot;);
+            }
+
+<span class="fc" id="L249">            SecurityScheme scheme = builder.build();</span>
+<span class="fc" id="L250">            securitySchemes.put(name, scheme);</span>
+<span class="fc" id="L251">            logger.debug(&quot;Parsed security scheme: {} ({})&quot;, name, type);</span>
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void parseOAuth2Flows(@NotNull String schemeName, @Nullable Map&lt;String, Object&gt; flows,
+                                   @NotNull SecurityScheme.Builder builder) {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (flows == null) {</span>
+<span class="fc" id="L259">            throw new IllegalArgumentException(&quot;OAuth2 scheme '&quot; + schemeName + &quot;' is missing the 'flows' object&quot;);</span>
+        }
+<span class="fc" id="L261">        Map&lt;String, Object&gt; clientCredentials = (Map&lt;String, Object&gt;) flows.get(&quot;clientCredentials&quot;);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (clientCredentials == null) {</span>
+            // Match C++ openapi-parser.cpp:381 — only clientCredentials is supported.
+<span class="fc" id="L264">            throw new IllegalArgumentException(</span>
+                    &quot;OAuth2 scheme '&quot; + schemeName + &quot;': only the 'clientCredentials' flow is supported by zswag&quot; +
+<span class="fc" id="L266">                    &quot; (got flows: &quot; + flows.keySet() + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L268">        builder.tokenUrl((String) clientCredentials.get(&quot;tokenUrl&quot;));</span>
+<span class="fc" id="L269">        builder.refreshUrl((String) clientCredentials.get(&quot;refreshUrl&quot;));</span>
+<span class="fc" id="L270">        Object scopes = clientCredentials.get(&quot;scopes&quot;);</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (scopes instanceof Map) {</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; e : ((Map&lt;?, ?&gt;) scopes).entrySet()) {</span>
+<span class="fc" id="L273">                builder.addOAuth2Scope(String.valueOf(e.getKey()), String.valueOf(e.getValue()));</span>
+<span class="fc" id="L274">            }</span>
+        }
+<span class="fc" id="L276">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void parsePaths(@NotNull Map&lt;String, Object&gt; paths) {
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; pathEntry : paths.entrySet()) {</span>
+<span class="fc" id="L281">            String pathTemplate = pathEntry.getKey();</span>
+<span class="fc" id="L282">            Map&lt;String, Object&gt; pathItem = (Map&lt;String, Object&gt;) pathEntry.getValue();</span>
+            // PATCH is intentionally absent — see class javadoc.
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            for (String httpMethod : Arrays.asList(&quot;get&quot;, &quot;post&quot;, &quot;put&quot;, &quot;delete&quot;)) {</span>
+<span class="fc" id="L285">                Map&lt;String, Object&gt; operation = (Map&lt;String, Object&gt;) pathItem.get(httpMethod);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                if (operation != null) {</span>
+<span class="fc" id="L287">                    parseOperation(pathTemplate, httpMethod.toUpperCase(Locale.ROOT), operation);</span>
+                }
+<span class="fc" id="L289">            }</span>
+            // Warn if patch is declared so users know it'll be silently ignored.
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (pathItem.get(&quot;patch&quot;) != null) {</span>
+<span class="fc" id="L292">                logger.warn(&quot;Path '{}' declares a PATCH operation which zswag does not support; it will be ignored.&quot;, pathTemplate);</span>
+            }
+<span class="fc" id="L294">        }</span>
+<span class="fc" id="L295">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void parseOperation(@NotNull String pathTemplate, @NotNull String httpMethod,
+                                @NotNull Map&lt;String, Object&gt; operation) {
+<span class="fc" id="L300">        String operationId = (String) operation.get(&quot;operationId&quot;);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (operationId == null) {</span>
+<span class="fc" id="L302">            operationId = httpMethod + pathTemplate.replaceAll(&quot;[^a-zA-Z0-9]&quot;, &quot;_&quot;);</span>
+        }
+
+<span class="fc" id="L305">        MethodInfo methodInfo = new MethodInfo(operationId, pathTemplate, httpMethod);</span>
+
+        // parameters
+<span class="fc" id="L308">        List&lt;Map&lt;String, Object&gt;&gt; parameters = (List&lt;Map&lt;String, Object&gt;&gt;) operation.get(&quot;parameters&quot;);</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (parameters != null) {</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (Map&lt;String, Object&gt; param : parameters) {</span>
+<span class="fc" id="L311">                methodInfo.addParameter(parseParameter(param, pathTemplate));</span>
+<span class="fc" id="L312">            }</span>
+        }
+
+        // requestBody (body parameter is implicit when application/x-zserio-object content type is declared)
+<span class="fc" id="L316">        Map&lt;String, Object&gt; requestBody = (Map&lt;String, Object&gt;) operation.get(&quot;requestBody&quot;);</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (requestBody != null) {</span>
+<span class="fc" id="L318">            Map&lt;String, Object&gt; content = (Map&lt;String, Object&gt;) requestBody.get(&quot;content&quot;);</span>
+<span class="pc bpc" id="L319" title="1 of 4 branches missed.">            if (content != null &amp;&amp; content.containsKey(&quot;application/x-zserio-object&quot;)) {</span>
+<span class="fc" id="L320">                methodInfo.bodyRequestObject = true;</span>
+<span class="pc bpc" id="L321" title="2 of 4 branches missed.">            } else if (content != null &amp;&amp; !content.isEmpty()) {</span>
+<span class="fc" id="L322">                logger.warn(&quot;Operation {} {} has a requestBody with media types {} — only application/x-zserio-object is consumed by zswag&quot;,</span>
+<span class="fc" id="L323">                        httpMethod, pathTemplate, content.keySet());</span>
+            }
+        }
+
+        // security: per-op overrides global
+<span class="fc" id="L328">        Object opSec = operation.get(&quot;security&quot;);</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (opSec instanceof List) {</span>
+<span class="fc" id="L330">            methodInfo.security = parseSecurityList((List&lt;Map&lt;String, Object&gt;&gt;) opSec);</span>
+        } else {
+<span class="fc" id="L332">            methodInfo.security = null; // inherit default</span>
+        }
+
+<span class="fc" id="L335">        methods.put(operationId, methodInfo);</span>
+<span class="fc" id="L336">        logger.debug(&quot;Parsed operation: {} {} ({})&quot;, httpMethod, pathTemplate, operationId);</span>
+<span class="fc" id="L337">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @NotNull
+    private static List&lt;SecurityRequirement&gt; parseSecurityList(@NotNull List&lt;Map&lt;String, Object&gt;&gt; raw) {
+<span class="fc" id="L342">        List&lt;SecurityRequirement&gt; alternatives = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; alt : raw) {</span>
+<span class="fc" id="L344">            Map&lt;String, List&lt;String&gt;&gt; required = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; e : alt.entrySet()) {</span>
+<span class="fc" id="L346">                List&lt;String&gt; scopes = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                if (e.getValue() instanceof List) {</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                    for (Object s : (List&lt;?&gt;) e.getValue()) {</span>
+<span class="fc" id="L349">                        scopes.add(String.valueOf(s));</span>
+<span class="fc" id="L350">                    }</span>
+                }
+<span class="fc" id="L352">                required.put(e.getKey(), scopes);</span>
+<span class="fc" id="L353">            }</span>
+<span class="fc" id="L354">            alternatives.add(new SecurityRequirement(required));</span>
+<span class="fc" id="L355">        }</span>
+<span class="fc" id="L356">        return alternatives;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @NotNull
+    private OpenAPIParameter parseParameter(@NotNull Map&lt;String, Object&gt; paramData, @NotNull String pathTemplate) {
+<span class="fc" id="L362">        String name = (String) paramData.get(&quot;name&quot;);</span>
+<span class="fc" id="L363">        ParameterLocation location = parseParameterLocation((String) paramData.get(&quot;in&quot;));</span>
+
+<span class="fc" id="L365">        OpenAPIParameter.Builder builder = OpenAPIParameter.builder(name, location);</span>
+
+<span class="fc" id="L367">        Boolean required = (Boolean) paramData.get(&quot;required&quot;);</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        if (required != null) builder.required(required);</span>
+
+<span class="fc" id="L370">        String style = (String) paramData.get(&quot;style&quot;);</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        if (style != null) {</span>
+<span class="fc" id="L372">            ParameterStyle ps = parseParameterStyle(style);</span>
+<span class="nc" id="L373">            validateStyleLocation(name, location, ps, pathTemplate);</span>
+<span class="nc" id="L374">            builder.style(ps);</span>
+        }
+
+<span class="fc" id="L377">        Boolean explode = (Boolean) paramData.get(&quot;explode&quot;);</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (explode != null) builder.explode(explode);</span>
+
+<span class="fc" id="L380">        Map&lt;String, Object&gt; schema = (Map&lt;String, Object&gt;) paramData.get(&quot;schema&quot;);</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        if (schema != null) {</span>
+<span class="fc" id="L382">            String format = (String) schema.get(&quot;format&quot;);</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            if (format != null) builder.format(parseParameterFormat(format));</span>
+        }
+
+        // The zswag extension that drives request decomposition.
+<span class="fc" id="L387">        Object xrp = paramData.get(&quot;x-zserio-request-part&quot;);</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        if (xrp != null) {</span>
+<span class="fc" id="L389">            builder.requestPart(String.valueOf(xrp));</span>
+        }
+
+<span class="fc" id="L392">        return builder.build();</span>
+    }
+
+    private static void validateStyleLocation(@NotNull String paramName, @NotNull ParameterLocation loc,
+                                              @NotNull ParameterStyle style, @NotNull String pathTemplate) {
+        // Mirrors C++ openapi-parser.cpp:191-209
+<span class="pc bpc" id="L398" title="1 of 4 branches missed.">        switch (style) {</span>
+            case MATRIX:
+            case LABEL:
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">                if (loc != ParameterLocation.PATH) {</span>
+<span class="fc" id="L402">                    throw new IllegalArgumentException(</span>
+                            &quot;Parameter '&quot; + paramName + &quot;' on &quot; + pathTemplate +
+                            &quot;: style '&quot; + style + &quot;' is only valid for path parameters&quot;);
+                }
+                break;
+            case FORM:
+<span class="pc bpc" id="L408" title="2 of 4 branches missed.">                if (loc != ParameterLocation.QUERY &amp;&amp; loc != ParameterLocation.COOKIE) {</span>
+<span class="fc" id="L409">                    throw new IllegalArgumentException(</span>
+                            &quot;Parameter '&quot; + paramName + &quot;' on &quot; + pathTemplate +
+                            &quot;: style 'form' is only valid for query or cookie parameters&quot;);
+                }
+                break;
+            case SIMPLE:
+<span class="pc bpc" id="L415" title="3 of 4 branches missed.">                if (loc == ParameterLocation.QUERY || loc == ParameterLocation.COOKIE) {</span>
+<span class="fc" id="L416">                    throw new IllegalArgumentException(</span>
+                            &quot;Parameter '&quot; + paramName + &quot;' on &quot; + pathTemplate +
+                            &quot;: style 'simple' is not valid for query or cookie parameters&quot;);
+                }
+                break;
+            default:
+                break;
+        }
+<span class="nc" id="L424">    }</span>
+
+    @NotNull
+    private SecuritySchemeType parseSecuritySchemeType(@Nullable String type) {
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (type == null) return SecuritySchemeType.HTTP;</span>
+<span class="fc bfc" id="L429" title="All 5 branches covered.">        switch (type.toLowerCase(Locale.ROOT)) {</span>
+<span class="fc" id="L430">            case &quot;http&quot;: return SecuritySchemeType.HTTP;</span>
+<span class="fc" id="L431">            case &quot;apikey&quot;: return SecuritySchemeType.API_KEY;</span>
+<span class="fc" id="L432">            case &quot;oauth2&quot;: return SecuritySchemeType.OAUTH2;</span>
+<span class="fc" id="L433">            case &quot;openidconnect&quot;: return SecuritySchemeType.OPEN_ID_CONNECT;</span>
+            default:
+<span class="fc" id="L435">                throw new IllegalArgumentException(&quot;Unknown security scheme type: &quot; + type);</span>
+        }
+    }
+
+    @NotNull
+    private ParameterLocation parseParameterLocation(@Nullable String location) {
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        if (location == null) return ParameterLocation.QUERY;</span>
+<span class="fc bfc" id="L442" title="All 5 branches covered.">        switch (location.toLowerCase(Locale.ROOT)) {</span>
+<span class="fc" id="L443">            case &quot;path&quot;: return ParameterLocation.PATH;</span>
+<span class="fc" id="L444">            case &quot;query&quot;: return ParameterLocation.QUERY;</span>
+<span class="fc" id="L445">            case &quot;header&quot;: return ParameterLocation.HEADER;</span>
+<span class="fc" id="L446">            case &quot;cookie&quot;: return ParameterLocation.COOKIE;</span>
+            default:
+<span class="fc" id="L448">                throw new IllegalArgumentException(&quot;Unknown parameter location: &quot; + location);</span>
+        }
+    }
+
+    @NotNull
+    private ParameterStyle parseParameterStyle(@Nullable String style) {
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (style == null) return ParameterStyle.SIMPLE;</span>
+<span class="pc bpc" id="L455" title="4 of 8 branches missed.">        switch (style.toLowerCase(Locale.ROOT)) {</span>
+<span class="fc" id="L456">            case &quot;simple&quot;: return ParameterStyle.SIMPLE;</span>
+<span class="nc" id="L457">            case &quot;label&quot;: return ParameterStyle.LABEL;</span>
+<span class="fc" id="L458">            case &quot;matrix&quot;: return ParameterStyle.MATRIX;</span>
+<span class="fc" id="L459">            case &quot;form&quot;: return ParameterStyle.FORM;</span>
+<span class="nc" id="L460">            case &quot;spacedelimited&quot;: return ParameterStyle.SPACE_DELIMITED;</span>
+<span class="nc" id="L461">            case &quot;pipedelimited&quot;: return ParameterStyle.PIPE_DELIMITED;</span>
+<span class="nc" id="L462">            case &quot;deepobject&quot;: return ParameterStyle.DEEP_OBJECT;</span>
+            default:
+<span class="fc" id="L464">                throw new IllegalArgumentException(&quot;Unknown parameter style: &quot; + style);</span>
+        }
+    }
+
+    @NotNull
+    private ParameterFormat parseParameterFormat(@Nullable String format) {
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        if (format == null) return ParameterFormat.STRING;</span>
+<span class="pc bpc" id="L471" title="2 of 6 branches missed.">        switch (format.toLowerCase(Locale.ROOT)) {</span>
+<span class="fc" id="L472">            case &quot;hex&quot;: return ParameterFormat.HEX;</span>
+            case &quot;byte&quot;:            // Alias for base64 per OpenAPI spec
+<span class="fc" id="L474">            case &quot;base64&quot;: return ParameterFormat.BASE64;</span>
+<span class="nc" id="L475">            case &quot;base64url&quot;: return ParameterFormat.BASE64URL;</span>
+<span class="nc" id="L476">            case &quot;binary&quot;: return ParameterFormat.BINARY;</span>
+<span class="fc" id="L477">            case &quot;string&quot;: return ParameterFormat.STRING;</span>
+            default:
+<span class="fc" id="L479">                logger.debug(&quot;Unknown parameter format '{}', defaulting to STRING&quot;, format);</span>
+<span class="fc" id="L480">                return ParameterFormat.STRING;</span>
+        }
+    }
+
+<span class="fc" id="L484">    @NotNull public List&lt;String&gt; getServers() { return Collections.unmodifiableList(servers); }</span>
+<span class="fc" id="L485">    @NotNull public Map&lt;String, SecurityScheme&gt; getSecuritySchemes() { return Collections.unmodifiableMap(securitySchemes); }</span>
+<span class="fc" id="L486">    @Nullable public MethodInfo getMethod(@NotNull String operationId) { return methods.get(operationId); }</span>
+<span class="fc" id="L487">    @NotNull public Map&lt;String, MethodInfo&gt; getMethods() { return Collections.unmodifiableMap(methods); }</span>
+
+    /** Top-level default security requirement (or empty if no root-level security). */
+    @NotNull public Optional&lt;List&lt;SecurityRequirement&gt;&gt; getDefaultSecurity() {
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        return Optional.ofNullable(defaultSecurity == null ? null : Collections.unmodifiableList(defaultSecurity));</span>
+    }
+
+    /** One OpenAPI operation. */
+    public static class MethodInfo {
+        private final String operationId;
+        private final String pathTemplate;
+        private final String httpMethod;
+<span class="fc" id="L499">        private final List&lt;OpenAPIParameter&gt; parameters = new ArrayList&lt;&gt;();</span>
+        boolean bodyRequestObject;
+        @Nullable List&lt;SecurityRequirement&gt; security;  // null = inherit global default
+
+<span class="fc" id="L503">        public MethodInfo(@NotNull String operationId, @NotNull String pathTemplate, @NotNull String httpMethod) {</span>
+<span class="fc" id="L504">            this.operationId = operationId;</span>
+<span class="fc" id="L505">            this.pathTemplate = pathTemplate;</span>
+<span class="fc" id="L506">            this.httpMethod = httpMethod;</span>
+<span class="fc" id="L507">        }</span>
+
+<span class="fc" id="L509">        public void addParameter(@NotNull OpenAPIParameter parameter) { parameters.add(parameter); }</span>
+
+<span class="fc" id="L511">        @NotNull public String getOperationId() { return operationId; }</span>
+<span class="fc" id="L512">        @NotNull public String getPathTemplate() { return pathTemplate; }</span>
+<span class="fc" id="L513">        @NotNull public String getHttpMethod() { return httpMethod; }</span>
+<span class="fc" id="L514">        @NotNull public List&lt;OpenAPIParameter&gt; getParameters() { return Collections.unmodifiableList(parameters); }</span>
+
+        /** True if the operation declares an {@code application/x-zserio-object} request body. */
+<span class="fc" id="L517">        public boolean hasZserioBody() { return bodyRequestObject; }</span>
+
+        /**
+         * Per-operation security as an OR-of-AND list of alternatives, or empty
+         * if the operation should fall back to the global default security.
+         * An empty list (operation explicitly declares {@code security: []})
+         * means &quot;no auth required&quot;.
+         */
+        @NotNull
+        public Optional&lt;List&lt;SecurityRequirement&gt;&gt; getSecurity() {
+<span class="fc bfc" id="L527" title="All 2 branches covered.">            return Optional.ofNullable(security == null ? null : Collections.unmodifiableList(security));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

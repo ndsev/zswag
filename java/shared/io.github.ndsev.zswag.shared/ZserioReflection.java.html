@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZserioReflection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-shared</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.shared</a> &gt; <span class="el_source">ZserioReflection.java</span></div><h1>ZserioReflection.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.shared;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import zserio.runtime.io.BitStreamWriter;
+import zserio.runtime.io.ByteArrayBitStreamWriter;
+import zserio.runtime.io.Writer;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
+
+/**
+ * Resolves zswag {@code x-zserio-request-part} dotted paths against typed
+ * zserio request objects via JavaBean-style getter reflection. Mirrors the
+ * Python/C++ &quot;find by member path&quot; flow ({@code reflectable-&gt;find(field)}
+ * in {@code oaclient.cpp:141}) but uses Java's POJO accessor convention
+ * because zserio Java codegen does not emit a runtime introspection view.
+ *
+ * &lt;p&gt;Path semantics:
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code &quot;*&quot;} means &quot;the whole request object&quot; — caller serializes it.&lt;/li&gt;
+ *   &lt;li&gt;Empty path means &quot;the whole request object&quot; — same as {@code &quot;*&quot;}.&lt;/li&gt;
+ *   &lt;li&gt;Dot-separated segments are zserio identifiers (snake_case allowed);
+ *       each is normalized to lowerCamel and looked up via {@code getXxx()}.&lt;/li&gt;
+ *   &lt;li&gt;Zserio enum values are unwrapped to their underlying numeric via
+ *       {@code ZserioEnum.getGenericValue()} so they can be encoded via the
+ *       OpenAPI parameter format (string/hex/base64/...).&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;Resolution returns the raw Java value (primitive box, array, byte[],
+ * String, or another zserio compound). The caller decides how to encode it.
+ */
+public final class ZserioReflection {
+
+    private ZserioReflection() {}
+
+    /**
+     * Resolves the given path against {@code root}.
+     * Returns {@code null} only when an intermediate segment evaluates to {@code null};
+     * use {@link #resolveOptional} for caller-controlled handling.
+     *
+     * @throws IllegalArgumentException if a path segment doesn't correspond to a getter.
+     */
+    @Nullable
+    public static Object resolve(@NotNull Object root, @NotNull String dottedPath) {
+<span class="fc bfc" id="L46" title="All 4 branches covered.">        if (dottedPath.isEmpty() || &quot;*&quot;.equals(dottedPath)) {</span>
+<span class="fc" id="L47">            return root;</span>
+        }
+<span class="fc" id="L49">        Object current = root;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (String segment : dottedPath.split(&quot;\\.&quot;)) {</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (current == null) {</span>
+<span class="nc" id="L52">                return null;</span>
+            }
+<span class="fc" id="L54">            current = invokeGetter(current, segment);</span>
+        }
+        // Unwrap zserio enum to its underlying numeric.
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (current instanceof zserio.runtime.ZserioEnum) {</span>
+<span class="fc" id="L58">            return ((zserio.runtime.ZserioEnum) current).getGenericValue();</span>
+        }
+<span class="fc" id="L60">        return current;</span>
+    }
+
+    /**
+     * Serializes a zserio {@link Writer} (any zserio struct/choice/union/etc.)
+     * to a byte array using the standard bitstream writer. Mirrors the
+     * {@code writeAll} step in {@code OAClient::callMethod} for whole-blob bodies.
+     */
+    @NotNull
+    public static byte[] serialize(@NotNull Writer obj) {
+<span class="nc" id="L70">        try (ByteArrayBitStreamWriter w = new ByteArrayBitStreamWriter()) {</span>
+<span class="nc" id="L71">            obj.write(w);</span>
+<span class="nc" id="L72">            return w.toByteArray();</span>
+<span class="nc" id="L73">        } catch (IOException e) {</span>
+<span class="nc" id="L74">            throw new IllegalStateException(&quot;Failed to serialize zserio object: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    /**
+     * Convenience: resolves the path and, if the result is a zserio
+     * {@link Writer}, serializes it to bytes (i.e. nested-compound case at
+     * the same code path as {@code reflectableToParameterValue}'s
+     * {@code STRUCT/CHOICE/UNION} branch in {@code oaclient.cpp:97-112}).
+     */
+    @Nullable
+    public static Object resolveOrSerialize(@NotNull Object root, @NotNull String dottedPath) {
+<span class="nc" id="L86">        Object resolved = resolve(root, dottedPath);</span>
+<span class="nc bnc" id="L87" title="All 6 branches missed.">        if (resolved instanceof Writer &amp;&amp; !&quot;*&quot;.equals(dottedPath) &amp;&amp; !dottedPath.isEmpty()) {</span>
+<span class="nc" id="L88">            return serialize((Writer) resolved);</span>
+        }
+<span class="nc" id="L90">        return resolved;</span>
+    }
+
+    /**
+     * Calls the JavaBean getter for the given zserio identifier on {@code obj}.
+     * Tries {@code getX} first, then {@code isX} for booleans.
+     */
+    @NotNull
+    private static Object invokeGetter(@NotNull Object obj, @NotNull String zserioIdent) {
+<span class="fc" id="L99">        String getter = toGetterName(zserioIdent, &quot;get&quot;);</span>
+<span class="fc" id="L100">        Class&lt;?&gt; cls = obj.getClass();</span>
+<span class="fc" id="L101">        Method m = findNoArgMethod(cls, getter);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (m == null) {</span>
+<span class="fc" id="L103">            String isGetter = toGetterName(zserioIdent, &quot;is&quot;);</span>
+<span class="fc" id="L104">            m = findNoArgMethod(cls, isGetter);</span>
+        }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (m == null) {</span>
+<span class="fc" id="L107">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L108">                    &quot;No getter for zserio field '&quot; + zserioIdent + &quot;' on &quot; + cls.getSimpleName()</span>
+<span class="fc" id="L109">                            + &quot; (tried &quot; + getter + &quot;() and &quot; + toGetterName(zserioIdent, &quot;is&quot;) + &quot;())&quot;);</span>
+        }
+        try {
+<span class="fc" id="L112">            Object result = m.invoke(obj);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (result == null) {</span>
+<span class="nc" id="L114">                throw new IllegalStateException(</span>
+<span class="nc" id="L115">                        &quot;Getter &quot; + cls.getSimpleName() + &quot;.&quot; + m.getName() + &quot;() returned null while resolving zserio path&quot;);</span>
+            }
+<span class="fc" id="L117">            return result;</span>
+<span class="nc" id="L118">        } catch (ReflectiveOperationException e) {</span>
+<span class="nc" id="L119">            throw new IllegalStateException(</span>
+<span class="nc" id="L120">                    &quot;Failed to invoke &quot; + cls.getSimpleName() + &quot;.&quot; + m.getName() + &quot;(): &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    @Nullable
+    private static Method findNoArgMethod(@NotNull Class&lt;?&gt; cls, @NotNull String name) {
+        try {
+<span class="fc" id="L127">            return cls.getMethod(name);</span>
+<span class="fc" id="L128">        } catch (NoSuchMethodException e) {</span>
+<span class="fc" id="L129">            return null;</span>
+        }
+    }
+
+    /**
+     * Converts a zserio identifier ({@code base}, {@code enum_value}, {@code my_field_2}) to
+     * its corresponding JavaBean getter name with the given prefix
+     * ({@code &quot;get&quot;} or {@code &quot;is&quot;}). Snake_case underscores mark word boundaries
+     * (each next word starts capitalized); other characters pass through.
+     */
+    @NotNull
+    static String toGetterName(@NotNull String zserioIdent, @NotNull String prefix) {
+<span class="fc" id="L141">        StringBuilder out = new StringBuilder(prefix);</span>
+<span class="fc" id="L142">        boolean nextUpper = true;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int i = 0; i &lt; zserioIdent.length(); i++) {</span>
+<span class="fc" id="L144">            char c = zserioIdent.charAt(i);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (c == '_') {</span>
+<span class="fc" id="L146">                nextUpper = true;</span>
+<span class="fc" id="L147">                continue;</span>
+            }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            out.append(nextUpper ? Character.toUpperCase(c) : c);</span>
+<span class="fc" id="L150">            nextUpper = false;</span>
+        }
+<span class="fc" id="L152">        return out.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OAuth1Signature.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-shared</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.shared</a> &gt; <span class="el_source">OAuth1Signature.java</span></div><h1>OAuth1Signature.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.shared;
+
+import org.jetbrains.annotations.NotNull;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.InvalidKeyException;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * OAuth 1.0 (RFC 5849) signature utilities — HMAC-SHA256 only. Java port of
+ * C++ {@code httpcl::oauth1::*}. Used for the
+ * {@code rfc5849-oauth1-signature} variant of OAuth2 token-endpoint
+ * authentication.
+ */
+public final class OAuth1Signature {
+<span class="fc" id="L26">    private static final SecureRandom RANDOM = new SecureRandom();</span>
+<span class="fc" id="L27">    private static final char[] ALPHANUM =</span>
+<span class="fc" id="L28">            (&quot;0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz&quot;).toCharArray();</span>
+
+    private OAuth1Signature() {}
+
+    /** Cryptographically secure alphanumeric nonce of the given length (8..64). */
+    @NotNull
+    public static String generateNonce(int length) {
+<span class="fc bfc" id="L35" title="All 4 branches covered.">        if (length &lt; 8 || length &gt; 64) {</span>
+<span class="fc" id="L36">            throw new IllegalArgumentException(&quot;Nonce length must be between 8 and 64&quot;);</span>
+        }
+<span class="fc" id="L38">        StringBuilder sb = new StringBuilder(length);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L40">            sb.append(ALPHANUM[RANDOM.nextInt(ALPHANUM.length)]);</span>
+        }
+<span class="fc" id="L42">        return sb.toString();</span>
+    }
+
+    /** Seconds-since-epoch as decimal string. */
+    @NotNull
+    public static String generateTimestamp() {
+<span class="fc" id="L48">        return Long.toString(System.currentTimeMillis() / 1000L);</span>
+    }
+
+    /**
+     * RFC 3986 percent-encoding: keep unreserved characters (A-Z, a-z, 0-9, -, ., _, ~);
+     * percent-encode everything else as upper-case hex.
+     */
+    @NotNull
+    public static String percentEncode(@NotNull String input) {
+<span class="fc" id="L57">        byte[] bytes = input.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L58">        StringBuilder sb = new StringBuilder(bytes.length * 3);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (byte b : bytes) {</span>
+<span class="fc" id="L60">            int u = b &amp; 0xFF;</span>
+<span class="fc bfc" id="L61" title="All 20 branches covered.">            if ((u &gt;= 'A' &amp;&amp; u &lt;= 'Z')</span>
+                    || (u &gt;= 'a' &amp;&amp; u &lt;= 'z')
+                    || (u &gt;= '0' &amp;&amp; u &lt;= '9')
+                    || u == '-' || u == '.' || u == '_' || u == '~') {
+<span class="fc" id="L65">                sb.append((char) u);</span>
+            } else {
+<span class="fc" id="L67">                sb.append('%');</span>
+<span class="fc" id="L68">                sb.append(Character.toUpperCase(Character.forDigit((u &gt;&gt; 4) &amp; 0xF, 16)));</span>
+<span class="fc" id="L69">                sb.append(Character.toUpperCase(Character.forDigit(u &amp; 0xF, 16)));</span>
+            }
+        }
+<span class="fc" id="L72">        return sb.toString();</span>
+    }
+
+    /**
+     * Builds the signature base string per RFC 5849 Section 3.4.1:
+     * {@code METHOD&amp;percent(URL)&amp;percent(sorted-percent-encoded-params)}.
+     */
+    @NotNull
+    static String buildSignatureBaseString(@NotNull String httpMethod, @NotNull String url,
+                                           @NotNull Map&lt;String, String&gt; params) {
+<span class="fc" id="L82">        List&lt;String&gt; encodedPairs = new ArrayList&lt;&gt;(params.size());</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; e : params.entrySet()) {</span>
+<span class="fc" id="L84">            encodedPairs.add(percentEncode(e.getKey()) + &quot;=&quot; + percentEncode(e.getValue()));</span>
+<span class="fc" id="L85">        }</span>
+<span class="fc" id="L86">        Collections.sort(encodedPairs);</span>
+<span class="fc" id="L87">        StringBuilder paramString = new StringBuilder();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (int i = 0; i &lt; encodedPairs.size(); i++) {</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (i &gt; 0) paramString.append('&amp;');</span>
+<span class="fc" id="L90">            paramString.append(encodedPairs.get(i));</span>
+        }
+<span class="fc" id="L92">        return httpMethod.toUpperCase(Locale.ROOT) + &quot;&amp;&quot; + percentEncode(url) + &quot;&amp;&quot; + percentEncode(paramString.toString());</span>
+    }
+
+    /**
+     * Computes HMAC-SHA256 signature for a token request.
+     * Signing key is {@code percent(consumer_secret)&amp;percent(token_secret)}; for the
+     * client-credentials flow {@code token_secret} is empty.
+     */
+    @NotNull
+    public static String computeSignature(@NotNull String httpMethod, @NotNull String url,
+                                          @NotNull Map&lt;String, String&gt; params,
+                                          @NotNull String consumerSecret, @NotNull String tokenSecret) {
+<span class="fc" id="L104">        String base = buildSignatureBaseString(httpMethod, url, params);</span>
+<span class="fc" id="L105">        String key = percentEncode(consumerSecret) + &quot;&amp;&quot; + percentEncode(tokenSecret);</span>
+        try {
+<span class="fc" id="L107">            Mac mac = Mac.getInstance(&quot;HmacSHA256&quot;);</span>
+<span class="fc" id="L108">            mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), &quot;HmacSHA256&quot;));</span>
+<span class="fc" id="L109">            byte[] hmac = mac.doFinal(base.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L110">            return Base64.getEncoder().encodeToString(hmac);</span>
+<span class="nc" id="L111">        } catch (NoSuchAlgorithmException | InvalidKeyException e) {</span>
+<span class="nc" id="L112">            throw new IllegalStateException(&quot;HMAC-SHA256 unavailable: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    /**
+     * Builds the {@code Authorization: OAuth ...} header for a signed token
+     * request, including all five {@code oauth_*} parameters and the computed
+     * signature. Body parameters are included in signature computation but are
+     * NOT echoed in the header.
+     */
+    @NotNull
+    public static String buildAuthorizationHeader(
+            @NotNull String httpMethod, @NotNull String url,
+            @NotNull String consumerKey, @NotNull String consumerSecret,
+            @NotNull Map&lt;String, String&gt; bodyParams, int nonceLength) {
+<span class="fc" id="L127">        String timestamp = generateTimestamp();</span>
+<span class="fc" id="L128">        String nonce = generateNonce(nonceLength);</span>
+
+<span class="fc" id="L130">        Map&lt;String, String&gt; allParams = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L131">        allParams.put(&quot;oauth_consumer_key&quot;, consumerKey);</span>
+<span class="fc" id="L132">        allParams.put(&quot;oauth_signature_method&quot;, &quot;HMAC-SHA256&quot;);</span>
+<span class="fc" id="L133">        allParams.put(&quot;oauth_timestamp&quot;, timestamp);</span>
+<span class="fc" id="L134">        allParams.put(&quot;oauth_nonce&quot;, nonce);</span>
+<span class="fc" id="L135">        allParams.put(&quot;oauth_version&quot;, &quot;1.0&quot;);</span>
+<span class="fc" id="L136">        allParams.putAll(bodyParams);</span>
+
+<span class="fc" id="L138">        String signature = computeSignature(httpMethod, url, allParams, consumerSecret, &quot;&quot;);</span>
+
+<span class="fc" id="L140">        StringBuilder h = new StringBuilder(&quot;OAuth &quot;);</span>
+<span class="fc" id="L141">        h.append(&quot;oauth_consumer_key=\&quot;&quot;).append(percentEncode(consumerKey)).append(&quot;\&quot;, &quot;);</span>
+<span class="fc" id="L142">        h.append(&quot;oauth_signature_method=\&quot;HMAC-SHA256\&quot;, &quot;);</span>
+<span class="fc" id="L143">        h.append(&quot;oauth_timestamp=\&quot;&quot;).append(timestamp).append(&quot;\&quot;, &quot;);</span>
+<span class="fc" id="L144">        h.append(&quot;oauth_nonce=\&quot;&quot;).append(percentEncode(nonce)).append(&quot;\&quot;, &quot;);</span>
+<span class="fc" id="L145">        h.append(&quot;oauth_version=\&quot;1.0\&quot;, &quot;);</span>
+<span class="fc" id="L146">        h.append(&quot;oauth_signature=\&quot;&quot;).append(percentEncode(signature)).append(&quot;\&quot;&quot;);</span>
+<span class="fc" id="L147">        return h.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

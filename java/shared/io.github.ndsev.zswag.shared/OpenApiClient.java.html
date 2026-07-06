@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenApiClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-shared</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.shared</a> &gt; <span class="el_source">OpenApiClient.java</span></div><h1>OpenApiClient.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.shared;
+
+import io.github.ndsev.zswag.api.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import zserio.runtime.io.Writer;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.function.Function;
+
+/**
+ * The Java port of the C++ {@code zswagcl::OpenApiClient} / Python
+ * {@code zswag.OAClient}: dispatches OpenAPI calls described by a spec, with
+ * full {@code x-zserio-request-part} request-decomposition logic.
+ *
+ * &lt;p&gt;Two entry points:
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link #callMethod(String, Object)} — the recommended typed API.
+ *       Takes a zserio request object; uses POJO reflection (via
+ *       {@link ZserioReflection}) to resolve {@code x-zserio-request-part}
+ *       paths and encode each parameter into the request URL, headers,
+ *       cookies, or query. The whole serialized request is sent as the body
+ *       when the operation declares an {@code application/x-zserio-object}
+ *       request body.&lt;/li&gt;
+ *   &lt;li&gt;{@link #callMethod(String, Map, byte[])} — low-level entry point
+ *       where the caller has already decomposed the request into a parameter
+ *       map and/or pre-serialized body bytes. Useful for non-zserio OpenAPI
+ *       endpoints or for testing.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public class OpenApiClient implements IOpenApiClient {
+<span class="fc" id="L35">    private static final Logger logger = LoggerFactory.getLogger(OpenApiClient.class);</span>
+
+    /** zswag MIME type for both request bodies and response Accept header. */
+    public static final String ZSERIO_OBJECT_CONTENT_TYPE = &quot;application/x-zserio-object&quot;;
+
+    private final String specLocation;
+    private final IHttpClient httpClient;
+    private final HttpConfig adhoc;
+    private final IKeychain keychain;
+    private final OpenAPIParser parser;
+    private final String baseUrl;
+    private final int serverIndex;
+
+    public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                         @NotNull IKeychain keychain) throws IOException {
+<span class="nc" id="L50">        this(specLocation, httpClient, HttpConfig.empty(), keychain, 0);</span>
+<span class="nc" id="L51">    }</span>
+
+    public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                         @NotNull HttpConfig adhoc, @NotNull IKeychain keychain) throws IOException {
+<span class="fc" id="L55">        this(specLocation, httpClient, adhoc, keychain, 0);</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * @param serverIndex index into the spec's {@code servers[]} array (default 0).
+     *                    Matches C++ {@code OAClient(..., uint32_t serverIndex)} and
+     *                    Python {@code OAClient(..., server_index=N)}. Out-of-bounds
+     *                    values raise an {@link IOException} during construction.
+     */
+    public OpenApiClient(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                         @NotNull HttpConfig adhoc, @NotNull IKeychain keychain,
+<span class="fc" id="L66">                         int serverIndex) throws IOException {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (serverIndex &lt; 0) {</span>
+<span class="fc" id="L68">            throw new IllegalArgumentException(</span>
+                    &quot;serverIndex must be &gt;= 0, got &quot; + serverIndex);
+        }
+<span class="fc" id="L71">        this.specLocation = specLocation;</span>
+<span class="fc" id="L72">        this.httpClient = httpClient;</span>
+<span class="fc" id="L73">        this.adhoc = adhoc;</span>
+<span class="fc" id="L74">        this.keychain = keychain;</span>
+<span class="fc" id="L75">        this.serverIndex = serverIndex;</span>
+<span class="fc" id="L76">        this.parser = parseSpec(specLocation, httpClient, adhoc, keychain);</span>
+        // Validate the chosen index against the parsed spec's servers list.
+        // An empty servers list is treated as [{ &quot;url&quot;: &quot;/&quot; }] per OpenAPI 3.0+ §4.7.5,
+        // so index 0 is always valid even with no declared servers.
+<span class="fc" id="L80">        int actualServerCount = Math.max(parser.getServers().size(), 1);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (serverIndex &gt;= actualServerCount) {</span>
+<span class="fc" id="L82">            throw new IOException(String.format(</span>
+                    &quot;serverIndex %d is out of bounds (spec declares %d server(s))&quot;,
+<span class="fc" id="L84">                    serverIndex, actualServerCount));</span>
+        }
+<span class="fc" id="L86">        this.baseUrl = resolveBaseUrl();</span>
+<span class="fc" id="L87">    }</span>
+
+    /**
+     * Parses the OpenAPI spec, optionally pre-acquiring an OAuth2 access token
+     * and injecting it as an {@code Authorization: Bearer} header on the spec
+     * fetch request. This is required when the spec endpoint itself sits
+     * behind OAuth2 (the user opts in via
+     * {@link HttpConfig.OAuth2#useForSpecFetch}, default {@code true}).
+     *
+     * &lt;p&gt;When {@code useForSpecFetch=true} but the merged config lacks
+     * {@code tokenUrl} (we have nothing else to fall back on at this point
+     * — the spec hasn't been parsed yet so its {@code flows.clientCredentials.tokenUrl}
+     * is unknown), throws {@link IOException} with a descriptive message
+     * rather than silently fetching unauthenticated and 401-ing.
+     */
+    @NotNull
+    private static OpenAPIParser parseSpec(@NotNull String specLocation, @NotNull IHttpClient httpClient,
+                                           @NotNull HttpConfig adhoc, @NotNull IKeychain keychain) throws IOException {
+<span class="fc" id="L105">        HttpConfig effective = httpClient.getPersistentSettings().forUrl(specLocation).mergedWith(adhoc);</span>
+<span class="fc" id="L106">        HttpConfig.OAuth2 oauth = effective.getOAuth2().orElse(null);</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">        boolean isHttpSpec = specLocation.startsWith(&quot;http://&quot;) || specLocation.startsWith(&quot;https://&quot;);</span>
+        // Build the extra-headers map used for the OAuth2 Bearer injection (useForSpecFetch).
+        // Empty for the no-OAuth2 / disabled / local-file cases.
+<span class="fc" id="L110">        java.util.Map&lt;String, String&gt; extraHeaders = java.util.Collections.emptyMap();</span>
+<span class="pc bpc" id="L111" title="3 of 6 branches missed.">        if (isHttpSpec &amp;&amp; oauth != null &amp;&amp; oauth.useForSpecFetch) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (oauth.tokenUrlOverride.isEmpty()) {</span>
+<span class="nc" id="L113">                logger.warn(&quot;[OAuth2] useForSpecFetch=true but oauth2.tokenUrl is not set in http-settings; &quot;</span>
+                        + &quot;fetching spec '{}' unauthenticated. Set oauth2.tokenUrl, or set useForSpecFetch=false &quot;
+                        + &quot;to suppress this warning if the spec endpoint is publicly readable.&quot;, specLocation);
+            } else {
+                try {
+<span class="nc" id="L118">                    OAuth2Handler handler = new OAuth2Handler(httpClient, keychain);</span>
+<span class="nc" id="L119">                    String token = handler.getAccessToken(</span>
+                            oauth, oauth.tokenUrlOverride, oauth.tokenUrlOverride, oauth.scopesOverride);
+<span class="nc" id="L121">                    logger.debug(&quot;[OAuth2] Pre-fetch token acquired for spec endpoint {}&quot;, specLocation);</span>
+<span class="nc" id="L122">                    extraHeaders = java.util.Collections.singletonMap(&quot;Authorization&quot;, &quot;Bearer &quot; + token);</span>
+<span class="nc" id="L123">                } catch (HttpException e) {</span>
+<span class="nc" id="L124">                    logger.warn(&quot;[OAuth2] Pre-fetch token mint failed for spec '{}': {}. &quot;</span>
+<span class="nc" id="L125">                            + &quot;Continuing without Authorization header.&quot;, specLocation, e.getMessage());</span>
+<span class="nc" id="L126">                }</span>
+            }
+        }
+        // Route the spec fetch through the configured IHttpClient so HTTP_SSL_STRICT, proxy,
+        // basic-auth, HTTP_TIMEOUT, and persistent headers/cookies/query all apply — matches
+        // C++ fetchOpenAPIConfig (openapi-parser.cpp:499). Local-file specs go through the
+        // filesystem directly (the IHttpClient path is skipped internally).
+<span class="fc" id="L133">        return new OpenAPIParser(specLocation, httpClient, adhoc, extraHeaders);</span>
+    }
+
+    /**
+     * Instance-level wrapper: picks {@code servers[serverIndex].url} (or &quot;/&quot; if absent)
+     * and delegates to the static resolver. Kept package-private for testing.
+     */
+    @NotNull
+    private String resolveBaseUrl() {
+<span class="fc" id="L142">        List&lt;String&gt; servers = parser.getServers();</span>
+        // Per OpenAPI 3.0+ §4.7.5, absent/empty `servers` implies `[{ &quot;url&quot;: &quot;/&quot; }]`;
+        // the constructor guarantees serverIndex == 0 in that case.
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        String serverUrl = !servers.isEmpty() ? servers.get(serverIndex) : &quot;/&quot;;</span>
+<span class="fc" id="L146">        return resolveBaseUrl(specLocation, serverUrl);</span>
+    }
+
+    /**
+     * Resolves an OpenAPI {@code servers[].url} against the spec location, per
+     * OpenAPI 3.0+ (clarified in OpenAPI 3.2.0 §4.5.2.1).
+     *
+     * &lt;p&gt;Supports the three permitted URL forms:
+     * &lt;ul&gt;
+     *   &lt;li&gt;&lt;b&gt;Absolute&lt;/b&gt; — {@code https://api.example.com/v1}: returned as-is.&lt;/li&gt;
+     *   &lt;li&gt;&lt;b&gt;Server-relative&lt;/b&gt; — {@code /v1}: base scheme+host from the spec URL, with the
+     *       given path.&lt;/li&gt;
+     *   &lt;li&gt;&lt;b&gt;Document-relative&lt;/b&gt; — {@code .}, {@code ./v2}, {@code ../v2}, {@code v2}:
+     *       resolved as a URI reference against the spec URL via {@link java.net.URI#resolve},
+     *       which implements RFC 3986 §5.3.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * &lt;p&gt;Works for HTTP(S) and local-file spec locations alike. Package-private so
+     * tests can exercise each branch directly without spinning up an HTTP server.
+     */
+    @NotNull
+    static String resolveBaseUrl(@NotNull String specLocation, @NotNull String serverUrl) {
+        java.net.URI specBase;
+        try {
+<span class="fc" id="L170">            specBase = specLocationAsUri(specLocation);</span>
+<span class="nc" id="L171">        } catch (java.net.URISyntaxException e) {</span>
+<span class="nc" id="L172">            logger.warn(&quot;Spec location '{}' is not a valid URI; returning server URL as-is: {}&quot;,</span>
+<span class="nc" id="L173">                    specLocation, e.getMessage());</span>
+<span class="nc" id="L174">            return serverUrl;</span>
+<span class="fc" id="L175">        }</span>
+
+        java.net.URI serverRef;
+        try {
+<span class="fc" id="L179">            serverRef = new java.net.URI(serverUrl);</span>
+<span class="fc" id="L180">        } catch (java.net.URISyntaxException e) {</span>
+<span class="fc" id="L181">            logger.warn(&quot;Server URL '{}' is not a valid URI reference: {}&quot;, serverUrl, e.getMessage());</span>
+<span class="fc" id="L182">            return serverUrl;</span>
+<span class="fc" id="L183">        }</span>
+
+<span class="fc" id="L185">        java.net.URI resolved = specBase.resolve(serverRef);</span>
+        // If the spec location was a local file (file:// scheme), the resolved URI inherits
+        // it. Callers expect an http(s)-style base for issuing requests, so when the resolved
+        // URI is still local we fall back to returning the server URL as-is — this preserves
+        // the historical behaviour where local-file specs assume an absolute server URL.
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (&quot;file&quot;.equalsIgnoreCase(resolved.getScheme())) {</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (serverRef.isAbsolute()) {</span>
+<span class="nc" id="L192">                return serverUrl;</span>
+            }
+<span class="fc" id="L194">            logger.warn(&quot;Spec location '{}' is a local file but the server URL '{}' is &quot;</span>
+                    + &quot;relative; the resulting base URL is also a file:// URI which is &quot;
+                    + &quot;almost certainly not what you want. Use an absolute server URL or &quot;
+                    + &quot;load the spec over HTTP.&quot;, specLocation, serverUrl);
+        }
+<span class="fc" id="L199">        logger.debug(&quot;Resolved server URL '{}' against spec '{}' -&gt; {}&quot;, serverUrl, specLocation, resolved);</span>
+<span class="fc" id="L200">        return resolved.toString();</span>
+    }
+
+    /**
+     * Treat the spec location as a URI for resolution. http(s) URLs come through verbatim;
+     * a path or file:// URL becomes a file URI so RFC 3986 reference resolution works against
+     * its parent directory.
+     */
+    @NotNull
+    private static java.net.URI specLocationAsUri(@NotNull String specLocation) throws java.net.URISyntaxException {
+<span class="fc bfc" id="L210" title="All 4 branches covered.">        if (specLocation.startsWith(&quot;http://&quot;) || specLocation.startsWith(&quot;https://&quot;)</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                || specLocation.startsWith(&quot;file://&quot;)) {</span>
+<span class="fc" id="L212">            return new java.net.URI(specLocation);</span>
+        }
+<span class="fc" id="L214">        return java.nio.file.Paths.get(specLocation).toUri();</span>
+    }
+
+    // ------------------------------------------------------------------------
+    // Typed entry point — the canonical &quot;Python/C++ feel&quot; API.
+    // ------------------------------------------------------------------------
+
+    /**
+     * Calls an OpenAPI method with a typed zserio request. The request is
+     * decomposed into path/query/header/cookie parameters and (if the
+     * operation declares it) a serialized {@code application/x-zserio-object}
+     * body, per {@code x-zserio-request-part} on each parameter.
+     *
+     * @param methodIdent OpenAPI {@code operationId} (matches zserio method name)
+     * @param zserioRequest typed zserio request object (must implement {@link Writer}
+     *                      if the operation declares a request body)
+     * @return raw response bytes (caller deserializes via zserio)
+     */
+    @NotNull
+    public byte[] callMethod(@NotNull String methodIdent, @NotNull Object zserioRequest) throws HttpException {
+<span class="nc" id="L234">        OpenAPIParser.MethodInfo info = parser.getMethod(methodIdent);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (info == null) {</span>
+<span class="nc" id="L236">            throw new HttpException(&quot;Method '&quot; + methodIdent + &quot;' is not part of the OpenAPI specification&quot;);</span>
+        }
+
+<span class="nc" id="L239">        Function&lt;OpenAPIParameter, Object&gt; resolver = param -&gt; {</span>
+<span class="nc" id="L240">            String requestPart = param.getRequestPart().orElse(null);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (requestPart == null) {</span>
+                // Parameters without x-zserio-request-part are not auto-filled by
+                // the dispatch; they may be supplied by HttpConfig (e.g. an
+                // API-key header). Return null to skip.
+<span class="nc" id="L245">                return null;</span>
+            }
+<span class="nc" id="L247">            return ZserioReflection.resolveOrSerialize(zserioRequest, requestPart);</span>
+        };
+
+<span class="nc" id="L250">        byte[] body = null;</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (info.hasZserioBody()) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (!(zserioRequest instanceof Writer)) {</span>
+<span class="nc" id="L253">                throw new HttpException(&quot;Operation &quot; + methodIdent + &quot; declares a zserio request body, but &quot;</span>
+<span class="nc" id="L254">                        + zserioRequest.getClass().getName() + &quot; does not implement zserio.runtime.io.Writer&quot;);</span>
+            }
+<span class="nc" id="L256">            body = ZserioReflection.serialize((Writer) zserioRequest);</span>
+        }
+
+<span class="nc" id="L259">        return dispatch(info, resolver, body);</span>
+    }
+
+    // ------------------------------------------------------------------------
+    // Map-based entry point — low-level / testing.
+    // ------------------------------------------------------------------------
+
+    @Override
+    @Nullable
+    public byte[] callMethod(@NotNull String methodPath, @NotNull Map&lt;String, Object&gt; parameters,
+                             @Nullable byte[] requestBody) throws HttpException {
+<span class="fc" id="L270">        OpenAPIParser.MethodInfo info = parser.getMethod(methodPath);</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (info == null) {</span>
+<span class="nc" id="L272">            throw new HttpException(&quot;Method '&quot; + methodPath + &quot;' is not part of the OpenAPI specification&quot;);</span>
+        }
+<span class="pc" id="L274">        Function&lt;OpenAPIParameter, Object&gt; resolver = param -&gt; parameters.get(param.getName());</span>
+<span class="fc" id="L275">        return dispatch(info, resolver, requestBody);</span>
+    }
+
+    // ------------------------------------------------------------------------
+    // Shared dispatch core.
+    // ------------------------------------------------------------------------
+
+    @NotNull
+    private byte[] dispatch(@NotNull OpenAPIParser.MethodInfo info,
+                            @NotNull Function&lt;OpenAPIParameter, Object&gt; resolver,
+                            @Nullable byte[] body) throws HttpException {
+<span class="fc" id="L286">        logger.debug(&quot;Calling {} {} ({})&quot;, info.getHttpMethod(), info.getPathTemplate(), info.getOperationId());</span>
+
+<span class="fc" id="L288">        String path = info.getPathTemplate();</span>
+<span class="fc" id="L289">        List&lt;Map.Entry&lt;String, String&gt;&gt; queryPairs = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L290">        Map&lt;String, String&gt; opHeaders = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L291">        Map&lt;String, String&gt; opCookies = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        for (OpenAPIParameter param : info.getParameters()) {</span>
+<span class="nc" id="L294">            Object value = resolver.apply(param);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc bnc" id="L296" title="All 4 branches missed.">                if (param.isRequired() &amp;&amp; param.getRequestPart().isPresent()) {</span>
+<span class="nc" id="L297">                    throw new HttpException(&quot;Required parameter '&quot; + param.getName()</span>
+<span class="nc" id="L298">                            + &quot;' resolved to null via x-zserio-request-part: &quot; + param.getRequestPart().get());</span>
+                }
+                continue;
+            }
+
+<span class="nc bnc" id="L303" title="All 5 branches missed.">            switch (param.getLocation()) {</span>
+                case PATH:
+                    // Use RFC 3986 path encoder (NOT URLEncoder which is form-urlencoded).
+                    // The form encoder would mangle matrix-style ';key=value' to '%3Bkey%3Dvalue'
+                    // and label-style '.value' to '%2Evalue', breaking the URL syntax the server
+                    // expects. See ParameterEncoder.pathEncode and RFC 3986 §3.3.
+<span class="nc" id="L309">                    path = path.replace(&quot;{&quot; + param.getName() + &quot;}&quot;,</span>
+<span class="nc" id="L310">                            ParameterEncoder.pathEncode(ParameterEncoder.encodeForPath(param, value)));</span>
+<span class="nc" id="L311">                    break;</span>
+                case QUERY:
+<span class="nc" id="L313">                    queryPairs.addAll(ParameterEncoder.encodeForQuery(param, value));</span>
+<span class="nc" id="L314">                    break;</span>
+                case HEADER:
+<span class="nc" id="L316">                    opHeaders.put(param.getName(), ParameterEncoder.encodeForHeader(param, value));</span>
+<span class="nc" id="L317">                    break;</span>
+                case COOKIE:
+<span class="nc" id="L319">                    opCookies.put(param.getName(), ParameterEncoder.encodeForCookie(param, value));</span>
+                    break;
+            }
+<span class="nc" id="L322">        }</span>
+
+        // Reject unfilled path placeholders rather than emitting them literally.
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (path.matches(&quot;.*\\{[^/}]+\\}.*&quot;)) {</span>
+<span class="nc" id="L326">            throw new HttpException(&quot;Unfilled path placeholder in '&quot; + path + &quot;' for &quot; + info.getOperationId());</span>
+        }
+
+        // Build full URL.
+<span class="fc" id="L330">        StringBuilder fullUrl = new StringBuilder(baseUrl);</span>
+<span class="pc bpc" id="L331" title="3 of 6 branches missed.">        if (!baseUrl.isEmpty() &amp;&amp; !baseUrl.endsWith(&quot;/&quot;) &amp;&amp; !path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L332">            fullUrl.append(&quot;/&quot;);</span>
+        }
+<span class="fc" id="L334">        fullUrl.append(path);</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        if (!queryPairs.isEmpty()) {</span>
+<span class="nc" id="L336">            fullUrl.append(&quot;?&quot;).append(ParameterEncoder.buildQueryString(queryPairs));</span>
+        }
+
+        // Operation-level cookies → Cookie header (merged with persistent/adhoc cookies in HttpClient).
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (!opCookies.isEmpty()) {</span>
+<span class="nc" id="L341">            StringJoiner sj = new StringJoiner(&quot;; &quot;);</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; e : opCookies.entrySet()) sj.add(e.getKey() + &quot;=&quot; + e.getValue());</span>
+<span class="nc" id="L343">            opHeaders.merge(&quot;Cookie&quot;, sj.toString(), (existing, incoming) -&gt; existing + &quot;; &quot; + incoming);</span>
+        }
+
+        // zswag protocol headers.
+<span class="fc" id="L347">        opHeaders.put(&quot;Accept&quot;, ZSERIO_OBJECT_CONTENT_TYPE);</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if (body != null) {</span>
+<span class="nc" id="L349">            opHeaders.put(&quot;Content-Type&quot;, ZSERIO_OBJECT_CONTENT_TYPE);</span>
+        }
+
+        // Apply security: route api-key to the right location and mint OAuth2 tokens.
+        // The merged config is needed to know which auth credentials are configured.
+<span class="fc" id="L354">        HttpConfig effective = mergedConfigFor(fullUrl.toString());</span>
+<span class="fc" id="L355">        applySecurity(info, effective, opHeaders, queryPairs);</span>
+
+        // Re-append the (possibly-extended) query string when applySecurity added api-key/query entries.
+        // Reset URL building since query may have grown.
+<span class="fc" id="L359">        StringBuilder finalUrl = new StringBuilder(baseUrl);</span>
+<span class="pc bpc" id="L360" title="3 of 6 branches missed.">        if (!baseUrl.isEmpty() &amp;&amp; !baseUrl.endsWith(&quot;/&quot;) &amp;&amp; !path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L361">            finalUrl.append(&quot;/&quot;);</span>
+        }
+<span class="fc" id="L363">        finalUrl.append(path);</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (!queryPairs.isEmpty()) {</span>
+<span class="fc" id="L365">            finalUrl.append(&quot;?&quot;).append(ParameterEncoder.buildQueryString(queryPairs));</span>
+        }
+
+        // Build the HTTP request.
+<span class="fc" id="L369">        io.github.ndsev.zswag.api.HttpRequest.Builder rb = io.github.ndsev.zswag.api.HttpRequest.builder()</span>
+<span class="fc" id="L370">                .method(info.getHttpMethod())</span>
+<span class="fc" id="L371">                .url(finalUrl.toString())</span>
+<span class="fc" id="L372">                .headers(opHeaders);</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        if (body != null) rb.body(body);</span>
+
+<span class="fc" id="L375">        io.github.ndsev.zswag.api.HttpResponse response = httpClient.execute(rb.build(), adhoc);</span>
+
+        // Strict 200 — matches C++ openapi-client.cpp:200.
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (response.getStatusCode() != 200) {</span>
+<span class="nc" id="L379">            String contextDesc = &quot;[&quot; + info.getHttpMethod() + &quot; &quot; + fullUrl + &quot;]&quot;;</span>
+<span class="nc" id="L380">            String errorMsg = contextDesc + &quot; Got HTTP status: &quot; + response.getStatusCode();</span>
+<span class="nc" id="L381">            throw new HttpException(errorMsg, response.getStatusCode(), response.getBody());</span>
+        }
+<span class="fc" id="L383">        byte[] respBody = response.getBody();</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        return respBody != null ? respBody : new byte[0];</span>
+    }
+
+    /**
+     * Computes the effective {@link HttpConfig} for a given URL: the persistent
+     * settings exposed by the underlying {@link IHttpClient} (scope-matched
+     * against the URL) merged with this client's adhoc config.
+     */
+    @NotNull
+    private HttpConfig mergedConfigFor(@NotNull String url) {
+<span class="fc" id="L394">        return httpClient.getPersistentSettings().forUrl(url).mergedWith(adhoc);</span>
+    }
+
+    /**
+     * Walks the operation's security alternatives and applies each scheme:
+     * &lt;ul&gt;
+     *   &lt;li&gt;HTTP basic / bearer: validated by the underlying {@link IHttpClient}
+     *       from the merged config; throws here if neither is configured.&lt;/li&gt;
+     *   &lt;li&gt;API-key: routes the merged config's {@link HttpConfig#getApiKey()}
+     *       to header / query / cookie based on the scheme's {@code in}.&lt;/li&gt;
+     *   &lt;li&gt;OAuth2: mints (or pulls cached) bearer token via
+     *       {@link OAuth2Handler}, applying spec/settings precedence rules,
+     *       then injects {@code Authorization: Bearer ...} into the request
+     *       headers.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * &lt;p&gt;Picks the first alternative whose schemes are all present in the
+     * merged config. Throws if no alternative can be satisfied.
+     */
+    private void applySecurity(@NotNull OpenAPIParser.MethodInfo info,
+                               @NotNull HttpConfig effective,
+                               @NotNull Map&lt;String, String&gt; opHeaders,
+                               @NotNull List&lt;Map.Entry&lt;String, String&gt;&gt; queryPairs) throws HttpException {
+<span class="fc" id="L417">        List&lt;SecurityRequirement&gt; alternatives = info.getSecurity()</span>
+<span class="fc" id="L418">                .orElse(parser.getDefaultSecurity().orElse(Collections.emptyList()));</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        if (alternatives.isEmpty()) return;</span>
+
+        // Pick the first alternative whose schemes can be satisfied.
+<span class="fc" id="L422">        Map&lt;String, SecurityScheme&gt; schemes = parser.getSecuritySchemes();</span>
+<span class="fc" id="L423">        List&lt;String&gt; failures = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        for (SecurityRequirement alt : alternatives) {</span>
+            try {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                for (Map.Entry&lt;String, List&lt;String&gt;&gt; req : alt.getSchemes().entrySet()) {</span>
+<span class="fc" id="L427">                    SecurityScheme scheme = schemes.get(req.getKey());</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">                    if (scheme == null) {</span>
+<span class="nc" id="L429">                        throw new HttpException(&quot;Security scheme '&quot; + req.getKey() + &quot;' referenced by operation but not defined in components.securitySchemes&quot;);</span>
+                    }
+<span class="fc" id="L431">                    applySingleScheme(scheme, req.getValue(), effective, opHeaders, queryPairs);</span>
+<span class="fc" id="L432">                }</span>
+<span class="fc" id="L433">                return; // all schemes in this alternative satisfied</span>
+<span class="fc" id="L434">            } catch (HttpException e) {</span>
+<span class="fc" id="L435">                failures.add(e.getMessage());</span>
+            }
+<span class="fc" id="L437">        }</span>
+<span class="fc" id="L438">        throw new HttpException(&quot;Operation &quot; + info.getOperationId() + &quot; requires security but none of the &quot;</span>
+<span class="fc" id="L439">                + alternatives.size() + &quot; alternatives could be satisfied: &quot; + failures);</span>
+    }
+
+    private void applySingleScheme(@NotNull SecurityScheme scheme, @NotNull List&lt;String&gt; requiredScopes,
+                                   @NotNull HttpConfig effective, @NotNull Map&lt;String, String&gt; opHeaders,
+                                   @NotNull List&lt;Map.Entry&lt;String, String&gt;&gt; queryPairs) throws HttpException {
+<span class="pc bpc" id="L445" title="2 of 5 branches missed.">        switch (scheme.getType()) {</span>
+            case HTTP: {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">                String s = scheme.getScheme() == null ? &quot;&quot; : scheme.getScheme().toLowerCase();</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                if (&quot;basic&quot;.equals(s)) {</span>
+                    // Accept either basic-auth credentials in the merged config OR a
+                    // pre-set Authorization: Basic header (matches C++ HttpBasicHandler::satisfy
+                    // at openapi-security.cpp:22-37). Without this, a user who configures
+                    // their own static Authorization header gets a misleading &quot;no basic-auth
+                    // configured&quot; error.
+<span class="nc" id="L454">                    boolean hasBasicHeader = effective.getHeader(&quot;Authorization&quot;)</span>
+<span class="nc" id="L455">                            .map(v -&gt; v.toLowerCase().startsWith(&quot;basic &quot;))</span>
+<span class="nc" id="L456">                            .orElse(false);</span>
+<span class="nc bnc" id="L457" title="All 4 branches missed.">                    if (!effective.getAuth().isPresent() &amp;&amp; !hasBasicHeader) {</span>
+<span class="nc" id="L458">                        throw new HttpException(&quot;HTTP Basic auth required but no basic-auth configured&quot;);</span>
+                    }
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">                } else if (&quot;bearer&quot;.equals(s)) {</span>
+<span class="fc" id="L461">                    boolean hasBearer = effective.getHeader(&quot;Authorization&quot;)</span>
+<span class="fc" id="L462">                            .map(v -&gt; v.startsWith(&quot;Bearer &quot;))</span>
+<span class="fc" id="L463">                            .orElse(false);</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">                    if (!hasBearer) {</span>
+<span class="fc" id="L465">                        throw new HttpException(&quot;HTTP Bearer auth required but no Authorization: Bearer header configured&quot;);</span>
+                    }
+<span class="fc" id="L467">                }</span>
+                break;
+            }
+            case API_KEY: {
+<span class="fc" id="L471">                String keyValue = effective.getApiKey().orElse(null);</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">                if (keyValue == null) {</span>
+                    // The user might have set the key directly via the matching channel.
+                    // Probe for it before declaring failure.
+<span class="fc" id="L475">                    keyValue = lookupConfiguredApiKey(scheme, effective);</span>
+                }
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                if (keyValue == null) {</span>
+<span class="fc" id="L478">                    throw new HttpException(&quot;API-key auth required by scheme '&quot; + scheme.getName()</span>
+                            + &quot;' but no api-key configured (set via http-settings api-key, or directly via &quot;
+<span class="fc" id="L480">                            + scheme.getApiKeyLocation() + &quot; '&quot; + scheme.getApiKeyName() + &quot;')&quot;);</span>
+                }
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">                if (effective.getApiKey().isPresent()) {</span>
+                    // Route the configured api-key to the appropriate location.
+<span class="pc bpc" id="L484" title="2 of 4 branches missed.">                    switch (scheme.getApiKeyLocation()) {</span>
+                        case HEADER:
+<span class="fc" id="L486">                            opHeaders.put(scheme.getApiKeyName(), keyValue);</span>
+<span class="fc" id="L487">                            break;</span>
+                        case QUERY:
+<span class="fc" id="L489">                            queryPairs.add(new java.util.AbstractMap.SimpleImmutableEntry&lt;&gt;(scheme.getApiKeyName(), keyValue));</span>
+<span class="fc" id="L490">                            break;</span>
+                        case COOKIE: {
+<span class="nc" id="L492">                            String cookieValue = scheme.getApiKeyName() + &quot;=&quot; + keyValue;</span>
+<span class="nc" id="L493">                            opHeaders.merge(&quot;Cookie&quot;, cookieValue,</span>
+<span class="nc" id="L494">                                    (existing, incoming) -&gt; existing + &quot;; &quot; + incoming);</span>
+<span class="nc" id="L495">                            break;</span>
+                        }
+                        default:
+<span class="nc" id="L498">                            break;</span>
+                    }
+                }
+                break;
+            }
+            case OAUTH2: {
+                // Resolve OAuth2 config from settings (effective.oauth2) — the spec scopes/tokenUrl
+                // are fallbacks when settings don't override.
+<span class="fc" id="L506">                HttpConfig.OAuth2 oauth = effective.getOAuth2().orElse(null);</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">                if (oauth == null) {</span>
+<span class="nc" id="L508">                    throw new HttpException(&quot;OAuth2 required by scheme '&quot; + scheme.getName()</span>
+                            + &quot;' but no oauth2 config in HTTP settings&quot;);
+                }
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">                String tokenUrl = !oauth.tokenUrlOverride.isEmpty()</span>
+<span class="nc" id="L512">                        ? oauth.tokenUrlOverride</span>
+<span class="fc" id="L513">                        : scheme.getTokenUrl().orElse(&quot;&quot;);</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                String refreshUrl = !oauth.refreshUrlOverride.isEmpty()</span>
+<span class="nc" id="L515">                        ? oauth.refreshUrlOverride</span>
+<span class="fc" id="L516">                        : scheme.getRefreshUrl().orElse(tokenUrl);</span>
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">                if (tokenUrl.isEmpty()) {</span>
+<span class="nc" id="L518">                    throw new HttpException(&quot;OAuth2 client-credentials: tokenUrl is missing in spec and http-settings&quot;);</span>
+                }
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">                List&lt;String&gt; scopes = !oauth.scopesOverride.isEmpty() ? oauth.scopesOverride : requiredScopes;</span>
+
+<span class="fc" id="L522">                OAuth2Handler handler = new OAuth2Handler(httpClient, keychain);</span>
+<span class="fc" id="L523">                String token = handler.getAccessToken(oauth, tokenUrl, refreshUrl, scopes);</span>
+<span class="fc" id="L524">                opHeaders.put(&quot;Authorization&quot;, &quot;Bearer &quot; + token);</span>
+<span class="fc" id="L525">                break;</span>
+            }
+            case OPEN_ID_CONNECT:
+<span class="nc" id="L528">                throw new HttpException(&quot;OpenID Connect security scheme '&quot; + scheme.getName()</span>
+                        + &quot;' is not supported by zswag clients&quot;);
+        }
+<span class="fc" id="L531">    }</span>
+
+    /**
+     * Probes the merged config for an API-key value already supplied directly
+     * via header/query/cookie (matching the scheme's location). Returns the
+     * value found, or null if none.
+     */
+    @Nullable
+    private String lookupConfiguredApiKey(@NotNull SecurityScheme scheme, @NotNull HttpConfig effective) {
+<span class="fc" id="L540">        String name = scheme.getApiKeyName();</span>
+<span class="pc bpc" id="L541" title="2 of 4 branches missed.">        if (name == null || scheme.getApiKeyLocation() == null) return null;</span>
+<span class="pc bpc" id="L542" title="3 of 4 branches missed.">        switch (scheme.getApiKeyLocation()) {</span>
+            case HEADER:
+<span class="fc" id="L544">                return effective.getHeader(name).orElse(null);</span>
+            case QUERY:
+<span class="nc" id="L546">                List&lt;String&gt; queryVals = effective.getQuery().get(name);</span>
+<span class="nc bnc" id="L547" title="All 4 branches missed.">                return (queryVals != null &amp;&amp; !queryVals.isEmpty()) ? queryVals.get(0) : null;</span>
+            case COOKIE:
+<span class="nc" id="L549">                return effective.getCookies().get(name);</span>
+            default:
+<span class="nc" id="L551">                return null;</span>
+        }
+    }
+
+    @Override
+    @NotNull
+    public IHttpClient getHttpClient() {
+<span class="nc" id="L558">        return httpClient;</span>
+    }
+
+    @Override
+    @NotNull
+    public String getOpenAPISpecLocation() {
+<span class="nc" id="L564">        return specLocation;</span>
+    }
+
+    /** Exposes the parsed spec for callers that need to introspect operations. */
+    @NotNull
+    public OpenAPIParser getParser() {
+<span class="nc" id="L570">        return parser;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

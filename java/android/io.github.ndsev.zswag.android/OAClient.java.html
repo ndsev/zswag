@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OAClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jzswag-android</a> &gt; <a href="index.source.html" class="el_package">io.github.ndsev.zswag.android</a> &gt; <span class="el_source">OAClient.java</span></div><h1>OAClient.java</h1><pre class="source lang-java linenums">package io.github.ndsev.zswag.android;
+
+import android.content.Context;
+import io.github.ndsev.zswag.api.HttpConfig;
+import io.github.ndsev.zswag.api.HttpException;
+import io.github.ndsev.zswag.api.HttpSettings;
+import io.github.ndsev.zswag.api.IKeychain;
+import io.github.ndsev.zswag.shared.HttpSettingsLoader;
+import io.github.ndsev.zswag.shared.OpenApiClient;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import zserio.runtime.ZserioError;
+import zserio.runtime.io.Writer;
+import zserio.runtime.service.ServiceClientInterface;
+import zserio.runtime.service.ServiceData;
+
+import java.io.IOException;
+
+/**
+ * Android counterpart of the JVM {@code OAClient}: implements zserio's
+ * {@link ServiceClientInterface} so any zserio-Java-generated {@code XClient}
+ * accepts an instance as its transport.
+ *
+ * &lt;p&gt;The only public-API difference from the JVM port is the {@link Context}
+ * parameter on the convenience constructors — needed so {@link AndroidKeychain}
+ * can reach {@link android.content.SharedPreferences} for credential storage.
+ *
+ * &lt;p&gt;Usage:
+ * &lt;pre&gt;{@code
+ * OAClient transport = new OAClient(context, &quot;https://api.example.com/openapi.json&quot;);
+ * Calculator.CalculatorClient calc = new Calculator.CalculatorClient(transport);
+ * Double result = calc.powerMethod(new BaseAndExponent(...));
+ * }&lt;/pre&gt;
+ */
+public final class OAClient implements ServiceClientInterface {
+<span class="fc" id="L38">    private static final Logger logger = LoggerFactory.getLogger(OAClient.class);</span>
+
+    private final OpenApiClient delegate;
+
+    /**
+     * Creates a client that uses persistent settings from {@code HTTP_SETTINGS_FILE}.
+     * Subsequent mtime changes to the settings file are picked up on the next request
+     * (matches the C++/JVM behaviour). Use the
+     * {@link #OAClient(Context, String, HttpSettings, HttpConfig)} form instead if you want
+     * to pin a specific snapshot.
+     */
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl) throws IOException {
+<span class="nc" id="L50">        this(context, openApiSpecUrl, HttpConfig.empty(), 0);</span>
+<span class="nc" id="L51">    }</span>
+
+    /**
+     * Env-driven constructor with an explicit {@code serverIndex}. Persistent
+     * settings come from {@code HTTP_SETTINGS_FILE} via a {@link HttpSettingsLoader.HotReloader}
+     * so file changes are picked up automatically.
+     */
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+<span class="nc" id="L59">                       @NotNull HttpConfig adhoc, int serverIndex) throws IOException {</span>
+<span class="nc" id="L60">        AndroidLogging.init();</span>
+<span class="nc" id="L61">        IKeychain keychain = new AndroidKeychain(context);</span>
+        // Package-private ctor: env-driven HotReloader so the source path is preserved.
+<span class="nc" id="L63">        AndroidHttpClient http = new AndroidHttpClient(HttpSettingsLoader.HotReloader.fromEnvironment(), keychain);</span>
+<span class="nc" id="L64">        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain, serverIndex);</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * Creates a client with explicit persistent settings (typically loaded via
+     * {@link HttpSettingsLoader}) and no adhoc config.
+     */
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+                       @NotNull HttpSettings persistent) throws IOException {
+<span class="nc" id="L73">        this(context, openApiSpecUrl, persistent, HttpConfig.empty());</span>
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * Creates a client with explicit persistent settings AND a per-instance
+     * adhoc {@link HttpConfig}.
+     */
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+                       @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc) throws IOException {
+<span class="nc" id="L82">        this(context, openApiSpecUrl, persistent, adhoc, 0);</span>
+<span class="nc" id="L83">    }</span>
+
+    /**
+     * Creates a client targeting a specific entry of the spec's {@code servers[]}
+     * array. Mirrors C++ {@code OAClient(..., uint32_t serverIndex)} and Python
+     * {@code OAClient(..., server_index=N)} — see issue #113.
+     *
+     * @param serverIndex index into the parsed {@code servers[]} array (default 0).
+     *                    {@link IOException} is thrown during construction if the
+     *                    index is out of bounds.
+     */
+    public OAClient(@NotNull Context context, @NotNull String openApiSpecUrl,
+                       @NotNull HttpSettings persistent, @NotNull HttpConfig adhoc,
+<span class="nc" id="L96">                       int serverIndex) throws IOException {</span>
+<span class="nc" id="L97">        AndroidLogging.init();</span>
+<span class="nc" id="L98">        IKeychain keychain = new AndroidKeychain(context);</span>
+<span class="nc" id="L99">        AndroidHttpClient http = new AndroidHttpClient(persistent, keychain);</span>
+<span class="nc" id="L100">        this.delegate = new OpenApiClient(openApiSpecUrl, http, adhoc, keychain, serverIndex);</span>
+<span class="nc" id="L101">    }</span>
+
+    /** Lower-level constructor — for tests / advanced use. */
+<span class="fc" id="L104">    public OAClient(@NotNull OpenApiClient delegate) {</span>
+<span class="fc" id="L105">        this.delegate = delegate;</span>
+<span class="fc" id="L106">    }</span>
+
+    /** Exposes the underlying OpenAPI client (read-only) for introspection. */
+    @NotNull
+    public OpenApiClient getOpenApiClient() {
+<span class="fc" id="L111">        return delegate;</span>
+    }
+
+    @Override
+    public byte[] callMethod(java.lang.String methodName,
+                             ServiceData&lt;? extends Writer&gt; requestData,
+                             @Nullable java.lang.Object zserioContext) throws ZserioError {
+<span class="fc" id="L118">        Writer typed = requestData.getZserioObject();</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (typed == null) {</span>
+<span class="fc" id="L120">            throw new ZserioError(&quot;OAClient.callMethod: requestData.getZserioObject() returned null&quot;);</span>
+        }
+        try {
+<span class="fc" id="L123">            return delegate.callMethod(methodName, typed);</span>
+<span class="fc" id="L124">        } catch (HttpException e) {</span>
+<span class="fc" id="L125">            throw new ZserioError(&quot;OAClient: &quot; + methodName + &quot; failed: &quot; + e.getMessage(), e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
