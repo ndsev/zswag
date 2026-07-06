@@ -1,3 +1,11 @@
+"""Extract zserio source comments for generated OpenAPI descriptions.
+
+``zswag.gen`` uses this module to enrich generated OpenAPI YAML with comments
+from ``.zs`` sources. The extraction deliberately stays lightweight: it scans
+the zserio package tree as text and applies a small set of regular expressions
+for services, structs, and RPC methods.
+"""
+
 from enum import Enum
 from typing import List, Dict
 import re
@@ -33,23 +41,31 @@ SERVICE_PATTERN = r"""
 
 
 class IdentType(Enum):
+    """Kind of zserio identifier looked up by :func:`get_doc_str`.
+
+    ``STRUCT`` and ``SERVICE`` expect a fully qualified type/service name.
+    ``RPC`` expects a fully qualified ``service.method`` name so the extractor
+    can match the method inside the correct service declaration.
     """
-    Use these enum entries with `get_doc_str()`.
-    """
+
     STRUCT = 0
     SERVICE = 1
     RPC = 2
 
 
-"""
-Caches glob.glob() results for *.zs file searches in get_doc_str().
-The dictionary points from a package path to amalgamated zserio code
-for that package.
-"""
+# Cache package roots to their concatenated zserio sources so repeated
+# documentation lookups during one OpenAPI generation pass stay cheap.
 zs_pkg_cache: Dict[str, str] = {}
 
 
 def get_amalgamated_zs(pkg_path):
+    """Return all ``.zs`` sources below *pkg_path* concatenated into one string.
+
+    The result is cached by package path. This keeps repeated service, method,
+    and struct doc lookups from walking the same package tree over and over
+    during OpenAPI generation.
+    """
+
     global zs_pkg_cache
     if pkg_path in zs_pkg_cache:
         return zs_pkg_cache[pkg_path]
@@ -63,25 +79,22 @@ def get_amalgamated_zs(pkg_path):
 
 
 def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: List[str] = None) -> List[str]:
-    f"""
-    Get a docstring for a particular zserio identifier. This method searches all .zs-files
-    under `pkg_path` for a specific pattern given by `ident_type` and `ident`
+    """Return captured zserio documentation groups for an identifier.
 
-    The following patterns are looked for:
+    The function searches all ``.zs`` files below ``pkg_path`` using a pattern
+    selected by ``ident_type``:
 
-      With `ident_type` IdentType.STRUCT:
-        With ident as "path.to.package.NAME":
-         {STRUCT_PATTERN}
+    * ``STRUCT`` looks up ``path.to.package.StructName``.
+    * ``SERVICE`` looks up ``path.to.package.ServiceName``.
+    * ``RPC`` looks up ``path.to.package.ServiceName.methodName`` and captures
+      the method documentation, return type, and request argument type.
 
-      With `ident_type` IdentType.SERVICE)
-        Same as STRUCT, except looking for "service NAME".
-
-      With `ident_type` IdentType.RPC)
-        With ident as "path.to.service.SERVICE.NAME":
-         {RPC_DOC_PATTERN}
-
-    The list of all capture group values is returned.
+    ``fallback`` is returned unchanged when ``pkg_path`` is empty, the
+    identifier is malformed, the identifier type is unsupported, or no match is
+    found. Callers use this to keep OpenAPI generation deterministic even when
+    source comments are unavailable.
     """
+
     if fallback is None:
         fallback = []
     if not pkg_path:
@@ -120,4 +133,6 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
 
 
 def md_filter_definition(md: str) -> str:
+    """Remove leading Markdown ``Definition`` headings from extracted text."""
+
     return re.sub(r"\n*\*\*[Dd]efinitions?[:\s]*\*\*\n*", "", md.strip()).strip()

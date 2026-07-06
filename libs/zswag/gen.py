@@ -1,3 +1,15 @@
+"""Generate OpenAPI YAML from zserio services.
+
+The generator inspects a zserio service, determines how each request object
+should be represented as HTTP parameters or request body data, and emits an
+OpenAPI 3 document understood by both the Python ``OAServer`` and the native
+``OAClient``.
+
+The module is primarily used through ``python -m zswag.gen``, but the
+``OpenApiSchemaGenerator`` class is public so build tooling can generate specs
+programmatically.
+"""
+
 import copy
 import os
 import random
@@ -36,6 +48,8 @@ from .doc import get_doc_str, IdentType, md_filter_definition
 
 
 class HttpParamLocation(Enum):
+    """OpenAPI location for an exposed zserio request parameter."""
+
     QUERY = "query"
     BODY = "body"
     PATH = "path"
@@ -43,6 +57,8 @@ class HttpParamLocation(Enum):
 
 
 class HttpParamFormat(Enum):
+    """Wire encoding used for a zserio request value exposed as HTTP text."""
+
     STRING = "string"
     BINARY = "binary"
     BYTE = "byte"
@@ -60,17 +76,29 @@ WILDCARD_CONFIG = "*"
 
 
 def argdoc(s: str):
+    """Format argparse help text with surrounding blank lines.
+
+    The command-line help contains long examples. This helper dedents the
+    example block and adds spacing so argparse renders each option readably.
+    """
     return "\n"+inspect.cleandoc(s)+"\n\n"
 
 
 def less_indent_formatter(prog):
+    """Create an argparse formatter with compact option indentation."""
     return RawTextHelpFormatter(prog, max_help_position=8, width=80)
 
 
 @dc.dataclass
 class ParamSpecifier:
-    """"Can be used to annotate a method config with a desired
-    location, format and parameter name for a request-part field."""
+    """Explicit mapping from a zserio request part to an OpenAPI parameter.
+
+    ``request_part`` is either ``ZSERIO_REQUEST_PART_WHOLE`` or a dotted zserio
+    field path such as ``requestMember.subfield``. ``name`` is the OpenAPI
+    parameter name. ``location`` and ``format`` describe where and how the
+    value is transferred. ``style`` and ``explode`` are optional OpenAPI
+    serialization hints used mostly for query/path arrays.
+    """
     request_part: str            # e.g. "request_member.subfield"
     name: Optional[str]          # e.g. "subfieldParam"
     location: HttpParamLocation  # e.g. QUERY
@@ -81,8 +109,12 @@ class ParamSpecifier:
 
 @dc.dataclass
 class MethodConfig:
-    """User-specified set of parameters to control how a zserio service method
-    is converted into an OpenAPI-file entry."""
+    """Resolved generation options for one zserio service method.
+
+    Instances are built from command-line tags and optional base YAML
+    configuration. During generation the object is enriched with extracted
+    zserio documentation and finalized OpenAPI parameter/request-body entries.
+    """
     name: str
     http_method: str = "post"
     param_loc: Optional[HttpParamLocation] = None  # None -> Whole request blob in body
@@ -105,6 +137,35 @@ class OpenApiGenError(RuntimeError):
 
 
 class OpenApiSchemaGenerator:
+    """Generate an OpenAPI schema for a zserio service.
+
+    The generator can operate on either a zserio source file or an already
+    generated Python package:
+
+    ``service``
+        Fully qualified zserio service name without the generated ``Service``
+        suffix, for example ``my.package.MyApi``.
+    ``path``
+        Either a zserio ``.zs`` file or a parent directory containing generated
+        Python modules.
+    ``package``
+        Optional top-level Python package name used when generating temporary
+        Python code from zserio sources.
+    ``config``
+        Command-line tag strings controlling HTTP method, parameter location,
+        flattening, security scheme assignment, and explicit paths.
+    ``output``
+        Writable text file object receiving the OpenAPI YAML.
+    ``base_config``
+        Optional readable YAML file object with reusable OpenAPI fragments and
+        per-method defaults.
+    ``zserio_src_root``
+        Optional zserio source root. If omitted for ``.zs`` inputs, the parent
+        directory of ``path`` is used.
+
+    ``generate()`` performs validation with both ``openapi-spec-validator`` and
+    the native zswag OpenAPI parser when the output path exists on disk.
+    """
 
     def __init__(self, *,
                  service: str,
@@ -183,6 +244,16 @@ class OpenApiSchemaGenerator:
             method_name: str,
             tag_list: List[str],
             default_entry: MethodConfig) -> MethodConfig:
+        """Merge command-line/base-config tags into a ``MethodConfig``.
+
+        Tags may specify HTTP method, default parameter location, flat/blob
+        request mapping, security scheme name, explicit method path, or one or
+        more explicit parameter specifiers. Wildcard method entries update the
+        rolling default for later method-specific entries.
+
+        Returns the new wildcard default when ``method_name`` is ``*``;
+        otherwise returns the unchanged default.
+        """
         new_config = deepcopy(default_entry)
         new_config.name = method_name
         # Make sure that HTTP method tags are always processed first!
@@ -239,6 +310,12 @@ class OpenApiSchemaGenerator:
         return default_entry
 
     def config_for_method(self, method_name: str) -> MethodConfig:
+        """Return the resolved configuration for *method_name*.
+
+        Method-specific configuration wins. If none exists, a deep copy of the
+        wildcard default is returned with its ``name`` set to *method_name* so
+        later processing can mutate it safely.
+        """
         if method_name in self.config:
             return self.config[method_name]
         else:
@@ -247,6 +324,13 @@ class OpenApiSchemaGenerator:
             return result
 
     def generate(self):
+        """Build, validate, and write the OpenAPI schema.
+
+        The method iterates over all zserio service methods, resolves their
+        generation config, emits OpenAPI paths/responses/security metadata, and
+        writes the final YAML to ``self.output``. Validation errors are wrapped
+        in :class:`OpenApiGenError` so the CLI can report one concise failure.
+        """
         service_name_parts = self.service_instance.service_full_name.split(".")
         schema = {
             "openapi": "3.0.0",
@@ -323,6 +407,13 @@ class OpenApiSchemaGenerator:
         print(f"[INFO] Done.")
 
     def process_method_config(self, method_name: str) -> MethodConfig:
+        """Finalize one method's config before schema emission.
+
+        This resolves the path, extracts zserio doc comments when source files
+        are available, expands legacy flat/blob tags into explicit
+        ``ParamSpecifier`` entries, and converts those specifiers into OpenAPI
+        request body/parameter definitions.
+        """
         result = self.config_for_method(method_name)
         req_t = service_method_request_type(self.service_instance, result.name)
         req_t_info = cached_type_info(req_t)
@@ -375,6 +466,13 @@ class OpenApiSchemaGenerator:
         return result
 
     def process_method_parameters(self, config: MethodConfig):
+        """Convert ``ParamSpecifier`` entries into OpenAPI parameter objects.
+
+        The conversion verifies referenced zserio fields through type
+        information, marks array parameters correctly, amends paths with missing
+        placeholders for path parameters, and applies method-level security
+        overrides.
+        """
         req_t = service_method_request_type(self.service_instance, config.name)
         req_t_info = cached_type_info(req_t)
         # Convert parameter specifiers to parameters-JSON
