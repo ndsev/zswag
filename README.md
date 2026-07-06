@@ -131,7 +131,7 @@ In your `CMakeLists.txt`:
 ```cmake
 FetchContent_Declare(zswag
     GIT_REPOSITORY https://github.com/ndsev/zswag.git
-    GIT_TAG v1.14.0)
+    GIT_TAG v2.0.1)
 FetchContent_MakeAvailable(zswag)
 
 add_zserio_library(myapp-zserio-cpp
