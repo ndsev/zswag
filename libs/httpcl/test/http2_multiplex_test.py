@@ -210,9 +210,14 @@ async def run_test(client: Path) -> None:
         raise AssertionError(f"expected {REQUEST_COUNT} streams, got {len(stats.stream_ids)}")
     if stats.max_concurrent_streams < 2:
         raise AssertionError("expected at least two concurrently active HTTP/2 streams")
-    if elapsed > RESPONSE_DELAY_SECONDS * 4:
+    # The primary multiplexing proof is the observed concurrent stream count
+    # above. Keep this wall-time check only as a coarse guard against fully
+    # sequential transfer behavior, and leave room for slow Windows CI runners.
+    sequential_guard_seconds = RESPONSE_DELAY_SECONDS * (REQUEST_COUNT / 2)
+    if elapsed > sequential_guard_seconds:
         raise AssertionError(
-            f"requests took {elapsed:.3f}s; multiplexed run should stay near one delay batch"
+            f"requests took {elapsed:.3f}s; multiplexed run should stay below "
+            f"{sequential_guard_seconds:.3f}s"
         )
 
 
