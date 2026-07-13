@@ -781,7 +781,7 @@ Config& Config::operator |= (Config const& other) {
         apiKey = other.apiKey;
     if (other.oauth2) {
         if (!oauth2)
-            oauth2.emplace();
+            oauth2 = Config::OAuth2{};
         if (!other.oauth2->clientId.empty())
             oauth2->clientId = other.oauth2->clientId;
         if (!other.oauth2->clientSecretKeychain.empty())
