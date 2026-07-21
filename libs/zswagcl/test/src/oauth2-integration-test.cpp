@@ -98,7 +98,7 @@ TEST_CASE("OAuth2 Integration with OpenAPI Parser", "[oauth2][integration]") {
         
         // Setup HTTP config with OAuth2
         httpcl::Config httpConfig;
-        httpConfig.oauth2.emplace();
+        httpConfig.oauth2 = httpcl::Config::OAuth2{};
         httpConfig.oauth2->clientId = "integration-test-client";
         httpConfig.oauth2->clientSecret = "integration-test-secret";
         httpConfig.oauth2->audience = "https://api.example.com";
