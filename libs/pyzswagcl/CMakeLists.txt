@@ -81,7 +81,7 @@ add_wheel(pyzswagcl
   TARGET_DEPENDENCIES
     zswagcl
   MODULE_DEPENDENCIES
-    "connexion~=2.14.2"
+    "connexion~=2.15.1"
     requests
     "zserio<3.0.0"
     pyyaml
