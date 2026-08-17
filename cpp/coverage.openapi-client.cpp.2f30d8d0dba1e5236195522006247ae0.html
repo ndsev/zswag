@@ -197,7 +197,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;private/openapi-client.hpp&quot;</span></td>
+        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">"private/openapi-client.hpp"</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l2" href="#l2">2</a></td>
@@ -239,21 +239,21 @@
         <td class="linebranch">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;stx/format.h&quot;</span></td>
+        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">"stx/format.h"</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l8" href="#l8">8</a></td>
         <td class="linebranch">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;spdlog/spdlog.h&quot;</span></td>
+        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">"spdlog/spdlog.h"</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l9" href="#l9">9</a></td>
         <td class="linebranch">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;httpcl/log.hpp&quot;</span></td>
+        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">"httpcl/log.hpp"</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l10" href="#l10">10</a></td>
@@ -351,7 +351,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount coveredLine show_coveredLine">63</td>
-        <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">auto</span><span class="w"> </span><span class="n">begin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="sc">&#39;{&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">pos</span><span class="p">);</span></td>
+        <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">auto</span><span class="w"> </span><span class="n">begin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="sc">'{'</span><span class="p">,</span><span class="w"> </span><span class="n">pos</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l23" href="#l23">23</a></td>
@@ -386,7 +386,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount coveredLine show_coveredLine">7</td>
-        <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">auto</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="sc">&#39;}&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">begin</span><span class="p">);</span></td>
+        <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">auto</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="sc">'}'</span><span class="p">,</span><span class="w"> </span><span class="n">begin</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l27" href="#l27">27</a></td>
@@ -572,7 +572,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">throw</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">runtime_error</span><span class="p">(</span><span class="n">stx</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="s">&quot;Could not find path parameter for name &#39;{}&#39; (path: &#39;{}&#39;)&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ident</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">path</span><span class="p">));</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">throw</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">runtime_error</span><span class="p">(</span><span class="n">stx</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="s">"Could not find path parameter for name '{}' (path: '{}')"</span><span class="p">,</span><span class="w"> </span><span class="n">ident</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="n">path</span><span class="p">));</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l48" href="#l48">48</a></td>
@@ -991,7 +991,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">                </span><span class="s">&quot;The server index {} is out of bounds (servers.size()={}).&quot;</span><span class="p">,</span></td>
+        <td class="src "><span class="w">                </span><span class="s">"The server index {} is out of bounds (servers.size()={})."</span><span class="p">,</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l96" href="#l96">96</a></td>
@@ -1037,7 +1037,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">110</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Instantiating OpenApiClient for node at &#39;{}&#39;&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">server_</span><span class="p">.</span><span class="n">build</span><span class="p">());</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"Instantiating OpenApiClient for node at '{}'"</span><span class="p">,</span><span class="w"> </span><span class="n">server_</span><span class="p">.</span><span class="n">build</span><span class="p">());</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l100" href="#l100">100</a></td>
@@ -1149,7 +1149,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">        </span><span class="k">throw</span><span class="w"> </span><span class="n">httpcl</span><span class="o">::</span><span class="n">logRuntimeError</span><span class="p">(</span><span class="n">stx</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="s">&quot;The method &#39;{}&#39; is not part of the used OpenAPI specification&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">methodIdent</span><span class="p">));</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">        </span><span class="k">throw</span><span class="w"> </span><span class="n">httpcl</span><span class="o">::</span><span class="n">logRuntimeError</span><span class="p">(</span><span class="n">stx</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="s">"The method '{}' is not part of the used OpenAPI specification"</span><span class="p">,</span><span class="w"> </span><span class="n">methodIdent</span><span class="p">));</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l113" href="#l113">113</a></td>
@@ -1232,7 +1232,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">56</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">debugContext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stx</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="s">&quot;[{} {}]&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="p">.</span><span class="n">httpMethod</span><span class="p">,</span><span class="w"> </span><span class="n">uri</span><span class="p">.</span><span class="n">buildPath</span><span class="p">());</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">debugContext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stx</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="s">"[{} {}]"</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="p">.</span><span class="n">httpMethod</span><span class="p">,</span><span class="w"> </span><span class="n">uri</span><span class="p">.</span><span class="n">buildPath</span><span class="p">());</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l120" href="#l120">120</a></td>
@@ -1248,7 +1248,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">112</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Calling endpoint {} ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">,</span><span class="w"> </span><span class="n">builtUri</span><span class="p">);</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Calling endpoint {} ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">,</span><span class="w"> </span><span class="n">builtUri</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l121" href="#l121">121</a></td>
@@ -1320,7 +1320,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">56</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpConfig</span><span class="p">.</span><span class="n">headers</span><span class="p">.</span><span class="n">insert</span><span class="p">({</span><span class="s">&quot;Accept&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ZSERIO_OBJECT_CONTENT_TYPE</span><span class="p">});</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpConfig</span><span class="p">.</span><span class="n">headers</span><span class="p">.</span><span class="n">insert</span><span class="p">({</span><span class="s">"Accept"</span><span class="p">,</span><span class="w"> </span><span class="n">ZSERIO_OBJECT_CONTENT_TYPE</span><span class="p">});</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l128" href="#l128">128</a></td>
@@ -1343,7 +1343,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">112</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Resolving query/path parameters ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Resolving query/path parameters ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l130" href="#l130">130</a></td>
@@ -1410,7 +1410,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">50</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">        </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Checking required security schemes for method ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">        </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Checking required security schemes for method ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l136" href="#l136">136</a></td>
@@ -1468,7 +1468,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">60</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">        </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Checking default security scheme ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">        </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Checking default security scheme ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l142" href="#l142">142</a></td>
@@ -1545,7 +1545,7 @@
           </details>
         </td>
         <td class="linecount coveredLine show_coveredLine">49</td>
-        <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;GET&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span></td>
+        <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">"GET"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l151" href="#l151">151</a></td>
@@ -1559,7 +1559,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">42</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">            </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Executing request ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">            </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Executing request ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l152" href="#l152">152</a></td>
@@ -1644,7 +1644,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">56</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">                </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Fetching body request body ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">                </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Fetching body request body ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l159" href="#l159">159</a></td>
@@ -1669,7 +1669,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">                    </span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ZSERIO_OBJECT_CONTENT_TYPE</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">                    </span><span class="s">""</span><span class="p">,</span><span class="w"> </span><span class="n">ZSERIO_OBJECT_CONTENT_TYPE</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l161" href="#l161">161</a></td>
@@ -1704,7 +1704,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">28</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">                </span><span class="n">bodyParameter</span><span class="p">.</span><span class="n">ident</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;body&quot;</span><span class="p">;</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">                </span><span class="n">bodyParameter</span><span class="p">.</span><span class="n">ident</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"body"</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l165" href="#l165">165</a></td>
@@ -1743,7 +1743,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">56</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">                </span><span class="n">body</span><span class="o">-&gt;</span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">paramCb</span><span class="p">(</span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ZSERIO_REQUEST_PART_WHOLE</span><span class="p">,</span><span class="w"> </span><span class="n">bodyHelper</span><span class="p">).</span><span class="n">bodyStr</span><span class="p">();</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">                </span><span class="n">body</span><span class="o">-&gt;</span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">paramCb</span><span class="p">(</span><span class="s">""</span><span class="p">,</span><span class="w"> </span><span class="n">ZSERIO_REQUEST_PART_WHOLE</span><span class="p">,</span><span class="w"> </span><span class="n">bodyHelper</span><span class="p">).</span><span class="n">bodyStr</span><span class="p">();</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l169" href="#l169">169</a></td>
@@ -1773,7 +1773,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">56</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">            </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Executing request ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">            </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Executing request ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l172" href="#l172">172</a></td>
@@ -1789,7 +1789,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">28</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;POST&quot;</span><span class="p">)</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">"POST"</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l173" href="#l173">173</a></td>
@@ -1841,7 +1841,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;PUT&quot;</span><span class="p">)</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">"PUT"</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l177" href="#l177">177</a></td>
@@ -1869,7 +1869,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;PATCH&quot;</span><span class="p">)</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">"PATCH"</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l181" href="#l181">181</a></td>
@@ -1897,7 +1897,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;DELETE&quot;</span><span class="p">)</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">httpMethod</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">"DELETE"</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l185" href="#l185">185</a></td>
@@ -1939,7 +1939,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">                </span><span class="s">&quot;{} Unsupported HTTP method!&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">));</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">                </span><span class="s">"{} Unsupported HTTP method!"</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">));</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l191" href="#l191">191</a></td>
@@ -1997,7 +1997,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">        </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Waiting for response ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">        </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Waiting for response ..."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l197" href="#l197">197</a></td>
@@ -2027,7 +2027,7 @@
           </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">98</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;{} Response received (code {}, content length {} bytes).&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">content</span><span class="p">.</span><span class="n">size</span><span class="p">());</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="n">httpcl</span><span class="o">::</span><span class="n">log</span><span class="p">().</span><span class="n">debug</span><span class="p">(</span><span class="s">"{} Response received (code {}, content length {} bytes)."</span><span class="p">,</span><span class="w"> </span><span class="n">debugContext</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">content</span><span class="p">.</span><span class="n">size</span><span class="p">());</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l199" href="#l199">199</a></td>
@@ -2090,7 +2090,7 @@
         <td class="linebranch">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">        </span><span class="s">&quot;{} Got HTTP status: {}&quot;</span><span class="p">,</span></td>
+        <td class="src "><span class="w">        </span><span class="s">"{} Got HTTP status: {}"</span><span class="p">,</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l207" href="#l207">207</a></td>
@@ -2141,7 +2141,7 @@
         <hr class="block-separator"/>
         <footer class="text-center">
           Created using <a href="http://gcovr.com/en/8.6">GCOVR (Version 8.6)</a>
-          at 2026-07-21 13:54:40
+          at 2026-08-17 09:44:12
         </footer>
       </div>
     </div>
