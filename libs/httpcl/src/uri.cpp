@@ -314,7 +314,7 @@ URIComponents URIComponents::resolveReference(std::string const& reference,
     if (reference.empty())
         return base;
 
-    // RFC 3986 §5.3 step 1: a reference with its own scheme is absolute.
+    // A reference with its own scheme is parsed independently of the base.
     // Detect via "<alpha>(<alpha>|<digit>|+|-|.)*:" (the parser will validate).
     auto colonIdx = reference.find(':');
     if (colonIdx != std::string::npos && colonIdx > 0) {
@@ -339,7 +339,7 @@ URIComponents URIComponents::resolveReference(std::string const& reference,
     result.host = base.host;
     result.port = base.port;
 
-    // Split reference into path + query (OpenAPI server URLs don't carry fragments).
+    // Split path/query for the supported server references; no fragment parsing occurs here.
     std::string refPath;
     std::string refQuery;
     if (auto qIdx = reference.find('?'); qIdx != std::string::npos) {

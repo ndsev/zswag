@@ -16,7 +16,7 @@ namespace zswagcl
 {
 
 /**
- * Any value type container
+ * Scalar representations accepted by the generic Python/native parameter bridge.
  */
 using Any = std::variant<std::int64_t, std::uint64_t, double, std::string>;
 
@@ -37,7 +37,7 @@ static _Type htobe(_Type v)
     return v;
 }
 
-/** Format buffer to string */
+/** Encode bytes without borrowing the input; String/Binary copy bytes unchanged. */
 std::string formatBuffer(Format f, const std::uint8_t* ptr, std::size_t size);
 
 template <class _Type, class _Enable = void>
@@ -135,6 +135,7 @@ struct FormatHelper<Any>
 
 }
 
+/** Owned, already formatted scalar/array/object values; URI escaping is a later step. */
 struct ParameterValue
 {
     using ValueHolder = std::variant<std::string,
@@ -148,13 +149,13 @@ struct ParameterValue
     {}
 
     /**
-     * Returns the values string-value.
-     * Throws if the current value is not a string/buffer.
+     * Copy the scalar bytes for a request body. Arrays and objects throw runtime_error.
      */
     std::string bodyStr() const;
 
     /**
-     * Make path string.
+     * Format path substitution text without percent-encoding it. Unsupported
+     * styles return the parameter's defaultValue.
      *
      * Styles supported:
      *   * Simple
@@ -166,7 +167,8 @@ struct ParameterValue
     std::string pathStr(const OpenAPIConfig::Parameter&) const;
 
     /**
-     * Make query key-value pair.
+     * Format query/header pairs without percent-encoding them. Unsupported
+     * styles return an empty list. Query explode=true may emit repeated names.
      *
      * For Query location, supported styles are:
      *   * Form, explode=false
@@ -180,6 +182,12 @@ struct ParameterValue
     std::vector<std::pair<std::string, std::string>> queryOrHeaderPairs(const OpenAPIConfig::Parameter&) const;
 };
 
+/**
+ * Borrow one parameter descriptor while producing independently owned values.
+ * Integral Hex uses signed/unsigned numeric text; other binary numeric formats
+ * use sizeof(T) bytes in big-endian order, not zserio bit-width serialization.
+ * Keep the descriptor alive and unchanged for the helper's lifetime.
+ */
 class ParameterValueHelper
 {
 public:

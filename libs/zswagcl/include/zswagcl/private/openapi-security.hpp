@@ -10,6 +10,7 @@
 namespace zswagcl
 {
 
+/** Borrowed dependencies and a caller-owned request config; valid for one synchronous check. */
 struct AuthContext
 {
     httpcl::IHttpClient& httpClient;
@@ -24,8 +25,10 @@ public:
     virtual ~ISecurityHandler() = default;
 
     /**
-     * Checks if current HTTP settings can satisfy the derived Security scheme handler.
-     * Potentially modifies the AuthContext::httpConfig.
+     * Check credentials and optionally add authorization to the caller's config.
+     * OAuth handlers may perform blocking HTTP requests. False reports a mismatch
+     * through mismatchReason; neither failure nor exceptions roll back mutations.
+     * A successful return means credentials are available, not server acceptance.
      */
     virtual bool satisfy(
         const OpenAPIConfig::SecurityRequirement& req,
@@ -42,7 +45,11 @@ public:
     AuthRegistry();
 
     /**
-     * Try to satisfy an OR of AND-sets. Throws if none can be satisfied.
+     * Try alternatives in order, requiring every scheme within one alternative.
+     * An empty alternatives list requires no authentication. Throw runtime_error
+     * if none match. All attempts share the same mutable request config, so
+     * authorization added by a failed alternative remains for later attempts.
+     * Concurrent calls need separate request configs and a concurrent HTTP client.
      */
     void satisfySecurity(
         const OpenAPIConfig::SecurityAlternatives& alts,

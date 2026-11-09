@@ -10,18 +10,27 @@ namespace zswagcl
 {
 
 /**
- * Download and parse OpenAPI config from URL.
+ * Fetch a complete OpenAPI document synchronously through the borrowed client.
+ * Persistent URL settings are merged into httpConfig before optional OAuth token
+ * acquisition. The transport runs on a worker that is joined before return.
  *
- * Throws on error.
+ * Any 2xx response is parsed; other statuses raise IHttpClient::Error with the
+ * response attached. URI/YAML/configuration errors propagate. Relative servers
+ * are resolved against the document URL; an absent/empty server list becomes its
+ * origin root. Reuse this client in OAClient to retain transport connections.
  */
 OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
                                  httpcl::IHttpClient& client,
                                  httpcl::Config httpConfig = {});
 
 /**
- * Parse OpenAPI config from input-stream.
+ * Consume the remaining stream and retain its text in OpenAPIConfig::content.
+ * Parses the zswag subset: GET/POST/PUT/DELETE operations, explicitly mapped
+ * parameters, zserio bodies and supported security schemes. This is not full
+ * OpenAPI/JSON Schema validation or $ref resolution. YAML/config errors propagate.
  *
- * Throws on error.
+ * Without a document URL, relative servers remain unresolved and an absent
+ * server list stays empty. Use fetchOpenAPIConfig for remote URL resolution.
  */
 OpenAPIConfig parseOpenAPIConfig(std::istream&);
 

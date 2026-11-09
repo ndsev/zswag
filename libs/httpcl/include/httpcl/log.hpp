@@ -6,11 +6,10 @@ namespace httpcl
 {
 
 /**
- * Obtain global logger, which is initialized from
- * the following environment variables:
- *  - HTTP_LOG_LEVEL
- *  - HTTP_LOG_FILE
- *  - HTTP_LOG_FILE_MAXSIZE
+ * Obtain the process logger, initialized once on first use. HTTP_LOG_LEVEL is
+ * case-insensitive; HTTP_LOG_FILE selects a rotating file instead of stderr,
+ * and HTTP_LOG_FILE_MAXSIZE is bytes (default 1 GiB, two rotated files).
+ * Later environment changes do not reconfigure the existing logger.
  */
 spdlog::logger& log();
 

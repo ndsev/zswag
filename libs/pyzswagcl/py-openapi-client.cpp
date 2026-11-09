@@ -64,7 +64,8 @@ namespace
 }
 
 void PyOpenApiClient::bind(py::module_& m) {
-    auto serviceClient = py::class_<PyOpenApiClient>(m, "OAClient", R"doc(
+    auto serviceClient =
+        py::class_<PyOpenApiClient>(m, "OAClient", R"doc(
 Native OpenAPI client for zserio services.
 
 ``OAClient`` loads an OpenAPI document, selects one configured server URL, and
@@ -72,39 +73,60 @@ uses the generated zserio Python request wrappers to call service methods over
 HTTP. The class is also registered as a ``zserio.ServiceInterface`` subclass so
 generated zserio client helpers can use it directly.
 )doc")
-        .def(py::init<std::string, bool, httpcl::Config, std::optional<std::string>, std::optional<std::string>, std::optional<uint32_t>>(),
-            R"doc(
-Create an OpenAPI client from a URL or local OpenAPI document.
+            .def(
+                py::init<
+                    std::string,
+                    bool,
+                    httpcl::Config,
+                    std::optional<std::string>,
+                    std::optional<std::string>,
+                    std::optional<uint32_t>>(),
+                R"doc(
+Create a blocking OpenAPI client from a URL or local YAML/JSON document.
 
-``url`` is either the OpenAPI document URL or, when ``is_local_file`` is true,
-the path to a local OpenAPI YAML/JSON file. ``config`` supplies reusable HTTP
-settings such as headers, query parameters, proxy, and authentication.
-``api_key`` and ``bearer`` are convenience overrides applied on top of
-``config``. ``server_index`` selects the entry from the OpenAPI ``servers``
-list; omitted values select the first server.
+``config`` is copied. ``api_key`` replaces its API-key shortcut; ``bearer``
+appends an Authorization header, including when one is already configured.
+``server_index`` selects an advertised server (default zero); invalid indices
+raise RuntimeError. Local documents need an absolute selected server URL.
+Remote loading resolves relative servers and supplies the origin root when
+none are declared. Construction retains the GIL while fetching/parsing and
+owns one reusable native HTTP transport for subsequent calls.
 )doc",
-            "url"_a, "is_local_file"_a = false, "config"_a = httpcl::Config(),
-            "api_key"_a = std::optional<std::string>(), "bearer"_a = std::optional<std::string>(), "server_index"_a = std::optional<uint32_t>())
-        // zserio >= 2.3.0
-        .def("call_method", &PyOpenApiClient::callMethod,
-            R"doc(
-Call a zserio service method and return the serialized response bytes.
+                "url"_a,
+                "is_local_file"_a = false,
+                "config"_a = httpcl::Config(),
+                "api_key"_a = std::optional<std::string>(),
+                "bearer"_a = std::optional<std::string>(),
+                "server_index"_a = std::optional<uint32_t>())
+            // zserio >= 2.3.0
+            .def(
+                "call_method",
+                &PyOpenApiClient::callMethod,
+                R"doc(
+Call a service synchronously and return the serialized response as byte values.
 
-``method_name`` must match the zserio service method name in the OpenAPI
-document. ``request`` is the zserio-generated request wrapper object; zswag
-reads its ``byte_array`` when the whole request is transferred as the body, or
-reads fields from ``request.zserio_object`` for parameterized methods. The
-``unused`` argument is kept for compatibility with the zserio Python
-``ServiceInterface`` calling convention.
+``method_name`` must match an OpenAPI operation. The generated request wrapper
+supplies ``byte_array`` for whole-request mappings, or ``zserio_object`` for
+field mappings. ``unused`` preserves the zserio ServiceInterface signature.
+The binding keeps the GIL while waiting and returns a list of integers from
+the native byte vector. Unknown methods or field/conversion failures raise;
+only HTTP 200 succeeds, with other statuses reported as HTTPError.
 )doc",
-            "method_name"_a, "request"_a, "unused"_a)
-        .def("config", [](PyOpenApiClient const& self)->OpenAPIConfig const&{
-            return self.client_->config_;
-        }, R"doc(
+                "method_name"_a,
+                "request"_a,
+                "unused"_a)
+            .def(
+                "config",
+                [](PyOpenApiClient const& self) -> OpenAPIConfig const&
+                {
+                    return self.client_->config_;
+                },
+                R"doc(
 Return the parsed OpenAPI configuration owned by this client.
 
 The returned :class:`OAConfig` stays valid as long as the client object exists.
-)doc", py::return_value_policy::reference_internal);
+)doc",
+                py::return_value_policy::reference_internal);
 
     py::object serviceClientBase = py::module::import("zserio").attr("ServiceInterface");
     serviceClient.attr("__bases__") = py::make_tuple(serviceClientBase) + serviceClient.attr("__bases__");

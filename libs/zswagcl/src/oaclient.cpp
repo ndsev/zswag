@@ -129,6 +129,7 @@ std::vector<uint8_t> OAClient::callMethod(
     if (!requestData.getReflectable()) {
         throw std::runtime_error(stx::format("Cannot use OAClient: Make sure that zserio generator call has -withTypeInfoCode flag!"));
     }
+
     const auto strMethodName = std::string(methodName.begin(), methodName.end());
 
     auto response = client_.call(strMethodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper) -> ParameterValue {
@@ -138,6 +139,9 @@ std::vector<uint8_t> OAClient::callMethod(
             requestData.getReflectable()->write(writer);
             return helper.binary(std::vector<uint8_t>(buffer.getBuffer(), buffer.getBuffer() + buffer.getByteSize()));
         }
+
+        // Mapped fields/functions are reflected individually; whole requests above
+        // retain their generated zserio serialization.
         auto reflectableField = requestData.getReflectable()->find(field);
         if (!reflectableField)
             throw std::runtime_error(stx::format("Could not find field/function for identifier '{}'", field));

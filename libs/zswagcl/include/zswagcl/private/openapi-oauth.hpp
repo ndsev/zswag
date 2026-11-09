@@ -5,9 +5,16 @@
 namespace zswagcl
 {
 
+/**
+ * Cache bearer tokens for this handler's lifetime. Settings overrides win over the
+ * spec. Cache identity uses token URL, client ID, audience and ordered scopes;
+ * changing a secret alone does not invalidate an otherwise live token. Refresh
+ * and mint hold one exclusive lock, including network waits, across all keys.
+ */
 class OAuth2ClientCredentialsHandler final : public ISecurityHandler
 {
 public:
+    /** Append a bearer header, or return false with a reason if acquisition fails. */
     bool satisfy(
         const OpenAPIConfig::SecurityRequirement& req,
         AuthContext const& ctx,
@@ -21,6 +28,7 @@ private:
     struct TokenKey
     {
         std::string tokenUrl, clientId, audience, scopeKey;
+
         bool operator==(const TokenKey& o) const
         {
             return tokenUrl == o.tokenUrl && clientId == o.clientId && audience == o.audience &&
@@ -47,7 +55,8 @@ private:
     std::shared_mutex m_;
     std::unordered_map<TokenKey, MintedToken, TokenKeyHash> cache_;
 
-    // Method for both token fetch and refresh requests
+    // Use token-URL settings and accept 2xx responses with a non-empty access_token.
+    // Missing expires_in defaults to one hour; subtract 30 seconds for early refresh.
     MintedToken requestToken(
         AuthContext const& httpCtx,
         const httpcl::Config::OAuth2& oauthConfig,
@@ -58,8 +67,12 @@ private:
 };
 
 /**
- * Acquire OAuth2 token for OpenAPI spec fetching if configured.
- * Returns the token string if successful, empty optional otherwise.
+ * Try configured OAuth2 before fetching the specification itself. A token URL
+ * override is required because no OpenAPI security scheme has been parsed yet.
+ * A fresh handler is used per call, so this helper has no cross-call token cache.
+ * The input config is copied; a successful bearer token is returned for the
+ * caller to apply. Disabled/missing configuration or failed acquisition returns
+ * nullopt so the caller can continue with its existing authorization.
  */
 std::optional<std::string> acquireOAuth2TokenForSpecFetch(
     httpcl::IHttpClient& httpClient,

@@ -102,7 +102,7 @@ class ParamSpecifier:
     request_part: str            # e.g. "request_member.subfield"
     name: Optional[str]          # e.g. "subfieldParam"
     location: HttpParamLocation  # e.g. QUERY
-    format: HttpParamFormat        # e.g. BASE64
+    format: HttpParamFormat      # e.g. BASE64
     style: Optional[str] = None
     explode: Optional[str] = None
 
@@ -131,7 +131,8 @@ class MethodConfig:
 
 
 class OpenApiGenError(RuntimeError):
-    """Raised by OpenApiSchemaGenerator when something goes wrong."""
+    """A rejected generation option or wrapped schema-validation failure."""
+
     def __init__(self, what: str):
         super(OpenApiGenError, self).__init__(what)
 
@@ -155,16 +156,23 @@ class OpenApiSchemaGenerator:
         Command-line tag strings controlling HTTP method, parameter location,
         flattening, security scheme assignment, and explicit paths.
     ``output``
-        Writable text file object receiving the OpenAPI YAML.
+        Writable text file object receiving the OpenAPI YAML. It must expose
+        ``name`` and is closed by ``generate()`` after writing.
     ``base_config``
         Optional readable YAML file object with reusable OpenAPI fragments and
         per-method defaults.
     ``zserio_src_root``
         Optional zserio source root. If omitted for ``.zs`` inputs, the parent
-        directory of ``path`` is used.
+        directory of ``path`` is used. Existing Python-package inputs disable
+        source documentation extraction, even when this argument is supplied.
 
-    ``generate()`` performs validation with both ``openapi-spec-validator`` and
-    the native zswag OpenAPI parser when the output path exists on disk.
+    Construction imports or generates service code and creates a service
+    instance. Existing-package inputs append ``path`` to ``sys.path``. Source
+    inputs leave their generated temporary directory available after return.
+
+    ``generate()`` validates the in-memory schema before writing, then runs the
+    native parser after closing the output if its path exists on disk. A native
+    validation failure therefore leaves the written file in place.
     """
 
     def __init__(self, *,
@@ -219,7 +227,8 @@ class OpenApiSchemaGenerator:
         self.config[WILDCARD_CONFIG] = default_entry = MethodConfig(WILDCARD_CONFIG)
         self.output = output
         self.base_config = dict()
-        # ... first load base-config.
+
+        # Base wildcard tags precede per-method tags; CLI tags follow in order.
         if base_config:
             self.base_config = yaml.load(base_config, yaml.Loader)
         if methods_base_config := self.base_config.get("methods", None):
@@ -229,6 +238,7 @@ class OpenApiSchemaGenerator:
             # Then process tags for other methods from the base-config.
             for method_name, tags in ((m, t) for m, t in methods_base_config.items() if m != WILDCARD_CONFIG):
                 self.add_method_config_from_tags(method_name, tags, default_entry)
+
         # ... then process additional tags from the command line.
         if config:
             for entry in config:
@@ -244,18 +254,21 @@ class OpenApiSchemaGenerator:
             method_name: str,
             tag_list: List[str],
             default_entry: MethodConfig) -> MethodConfig:
-        """Merge command-line/base-config tags into a ``MethodConfig``.
+        """Build a method config from the current wildcard default and tags.
 
         Tags may specify HTTP method, default parameter location, flat/blob
         request mapping, security scheme name, explicit method path, or one or
         more explicit parameter specifiers. Wildcard method entries update the
-        rolling default for later method-specific entries.
+        rolling default for later method-specific entries. A repeated named
+        method replaces its previous config; it does not merge with that entry.
+        ``tag_list`` is sorted in place so HTTP-method tags are processed first.
 
         Returns the new wildcard default when ``method_name`` is ``*``;
         otherwise returns the unchanged default.
         """
         new_config = deepcopy(default_entry)
         new_config.name = method_name
+
         # Make sure that HTTP method tags are always processed first!
         tag_list.sort(key=lambda x: x in HTTP_METHOD_TAGS, reverse=True)
         for tag in tag_list:
@@ -302,6 +315,7 @@ class OpenApiSchemaGenerator:
                     raise OpenApiGenError(f"Parameter specifier tag {tag} has no value for '{missing_key}' key.")
             else:
                 raise OpenApiGenError(f"Did not understand tag '{tag}'.")
+
         if method_name in self.config and method_name != WILDCARD_CONFIG:
             print(f"[WARNING] Overwriting config for method {method_name}!")
         self.config[method_name] = new_config
@@ -312,7 +326,8 @@ class OpenApiSchemaGenerator:
     def config_for_method(self, method_name: str) -> MethodConfig:
         """Return the resolved configuration for *method_name*.
 
-        Method-specific configuration wins. If none exists, a deep copy of the
+        A method-specific configuration is returned by reference and later
+        processing mutates that stored object. If none exists, a deep copy of the
         wildcard default is returned with its ``name`` set to *method_name* so
         later processing can mutate it safely.
         """
@@ -328,8 +343,10 @@ class OpenApiSchemaGenerator:
 
         The method iterates over all zserio service methods, resolves their
         generation config, emits OpenAPI paths/responses/security metadata, and
-        writes the final YAML to ``self.output``. Validation errors are wrapped
-        in :class:`OpenApiGenError` so the CLI can report one concise failure.
+        writes the final YAML to ``self.output``, then closes it. The in-memory
+        validator runs before writing; native parsing runs afterward only for
+        an existing output file. Their validation failures are wrapped in
+        :class:`OpenApiGenError`; I/O and unrelated reflection errors propagate.
         """
         service_name_parts = self.service_instance.service_full_name.split(".")
         schema = {
@@ -383,6 +400,8 @@ class OpenApiSchemaGenerator:
             }
         if security := self.base_config.get("security", None):
             schema["security"] = security
+
+        # Validate the schema before committing text to the caller-owned stream.
         print(f"[INFO] Validating with openapi-spec-validator ... ", end="")
         try:
             validate_spec(schema)
@@ -390,10 +409,13 @@ class OpenApiSchemaGenerator:
             print()
             raise OpenApiGenError(f"Spec is invalid: {e}")
         print("OK")
+
         print(f"[INFO] Writing to '{self.output.name}' ... ", end="")
         yaml.dump(schema, self.output, default_flow_style=False)
         self.output.close()
         print("OK")
+
+        # The native parser reads a file, so this check necessarily follows write/close.
         if os.path.isfile(self.output.name):
             print(f"[INFO] Validating with zswag parser ... ", end="")
             try:
@@ -422,6 +444,7 @@ class OpenApiSchemaGenerator:
         if not result.path:
             print(f"[INFO] Auto-generating path for `{method_ident}`.")
             result.path = f"/{method_name}"
+
         # Generate doc-strings
         if self.zs_pkg_path:
             doc_strings = get_doc_str(
@@ -442,6 +465,7 @@ class OpenApiSchemaGenerator:
                     pkg_path=self.zs_pkg_path,
                     ident=result.openapi_arg_type,
                     fallback=[f"### struct {result.openapi_arg_type}"])[0])
+
         # Convert simple legacy instructions into parameter specifiers
         if not result.param_specifiers:
             if result.param_loc == HttpParamLocation.BODY or (not result.param_loc and not result.flatten):
@@ -461,6 +485,7 @@ class OpenApiSchemaGenerator:
                 result.param_specifiers.append(
                     ParamSpecifier(
                         ZSERIO_REQUEST_PART_WHOLE, "requestBody", result.param_loc, HttpParamFormat.BINARY))
+
         # Convert MethodConfig.param_specifiers to MethodConfig.openapi_parameters
         self.process_method_parameters(result)
         return result
@@ -471,7 +496,11 @@ class OpenApiSchemaGenerator:
         The conversion verifies referenced zserio fields through type
         information, marks array parameters correctly, amends paths with missing
         placeholders for path parameters, and applies method-level security
-        overrides.
+        overrides. Mutates ``config.path`` and ``config.openapi_parameters``.
+        Body specifiers always send the whole serialized request; field lookup
+        applies only to non-body specifiers. Every emitted HTTP parameter is
+        required. An empty security name emits an explicit unauthenticated
+        override, while ``None`` leaves global security inherited.
         """
         req_t = service_method_request_type(self.service_instance, config.name)
         req_t_info = cached_type_info(req_t)
@@ -492,6 +521,7 @@ class OpenApiSchemaGenerator:
                     }
                 }
                 continue
+
             # Fallthrough - the parameter has a name, a format and a request part
             # Process type-info first and determine if the field even exists.
             openapi_schema_info = {
@@ -510,12 +540,14 @@ class OpenApiSchemaGenerator:
                             "type": "string"
                         }
                     })
+
             # If the parameter is to be placed in the path, make sure there's a placeholder
             if param_specifier.location == HttpParamLocation.PATH:
                 placeholder = f"{{{param_specifier.name}}}"
                 if placeholder not in config.path:
                     print(f"[INFO] Appending /{placeholder} to path for {config.name}")
                     config.path += f"/{placeholder}"
+
             # Append the OpenAPI information for the new parameter
             openapi_param_list.append({
                 "in": param_specifier.location.value.lower(),
@@ -531,6 +563,7 @@ class OpenApiSchemaGenerator:
                 openapi_param_list[-1]["style"] = param_specifier.style
             if param_specifier.explode:
                 openapi_param_list[-1]["explode"] = param_specifier.explode == "true"
+
         # Process security scheme
         if config.security is not None:
             if config.security == "":
@@ -538,6 +571,7 @@ class OpenApiSchemaGenerator:
                 config.openapi_parameters["security"] = []
             else:
                 config.openapi_parameters["security"] = [{config.security: []}]
+
         # Set the finalized parameter list
         config.openapi_parameters["parameters"] = openapi_param_list
 
@@ -626,7 +660,7 @@ if __name__ == "__main__":
                           
                             `-c post getLayerByTileId:get,flat,path`
                             
-                          For myMethod, put the whole request blob into the a
+                          For myMethod, put the whole request blob into a
                           query "data" parameter as base64:
                           
                             `-c myMethod:*?name=data&in=query&format=base64`
@@ -636,20 +670,20 @@ if __name__ == "__main__":
                             `-c myMethod:security=AwesomeAuth`
                             
                           For myMethod, provide the path and place myField
-                          explicitely in a path placeholder:
+                          explicitly in a path placeholder:
                           
                             `-c 'myMethod:path=/my-method/{param},...
                                  myField?name=param&in=path&format=string'`
                             
                         Note:
                             * The HTTP-method defaults to `post`.
-                            * The parameter 'in' defaults to `query` for
-                              `get`, `body` otherwise.
-                            * If a method uses a parameter specifier, the
-                              `flat`, `body`, `query`, `path`, `header` and
-                              `body`-tags are ignored.
-                            * The `flat` tag is only meaningful in conjunction
-                              with `query` or `path`.
+                            * Without explicit parameter specifiers, requests
+                              use the body by default. `flat` defaults to query.
+                            * Explicit parameter specifiers determine mapping
+                              and location; flat/blob and default-location tags
+                              do not generate additional parameters.
+                            * `flat` supports query, path, or header parameters.
+                              An explicit body location sends the whole request.
                             * An unspecific tag list (no service-method-name)
                               affects the defaults only for following, not
                               preceding specialized tag assignments.
@@ -665,7 +699,7 @@ if __name__ == "__main__":
                         substitute --config arguments, and to provide additional
                         OpenAPI information. The YAML file must look like this:
                         
-                          method: # Optional method tags dictionary
+                          methods: # Optional method tags dictionary
                             <method-name|*>: <list of config tags>
                           securitySchemes: ... # Optional OpenAPI securitySchemes
                           info: ...            # Optional OpenAPI info section
