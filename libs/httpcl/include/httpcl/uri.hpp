@@ -12,6 +12,7 @@ struct URIError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
+/** Mutable URI parts. Parsing discards user info/fragments; build is not a lossless round trip. */
 struct URIComponents
 {
     std::string scheme;
@@ -29,62 +30,65 @@ struct URIComponents
                   std::string query);
 
     /**
-     * Split RFC3986 URI into parts.
-     *
-     * See https://tools.ietf.org/html/rfc3986
-     *
-     * Throws URIError.
+     * Split an absolute URI with scheme/authority into stored parts. Path and
+     * query percent escapes are decoded, but query pairs are not split into
+     * queryVars. User info and fragments are discarded. Unsupported syntax
+     * raises URIError; this helper is not a general URI validator.
+     * See https://tools.ietf.org/html/rfc3986 for the URI syntax.
      */
     static URIComponents fromStrRfc3986(std::string const& uriString);
 
     /**
-     * Extract the path and query URI components from a string. No leading
-     * scheme, host or port info must be present.
+     * Extract an empty or slash-prefixed path and optional query. No leading
+     * scheme, host or port info may be present. Escapes are decoded and any
+     * fragment is discarded, as with fromStrRfc3986.
      *
      * Throws URIError.
      */
     static URIComponents fromStrPath(std::string const& pathAndQueryString);
 
     /**
-     * Resolve a URI reference against a base URI per RFC 3986 §5.3 (Strict
-     * Resolution). Supports the three reference forms permitted in OpenAPI
-     * 3.0+ {@code servers[].url}:
-     *   - Absolute URI:           {@code https://example.com/v1}   returned as-is
-     *   - Server-relative path:   {@code /v1}                       base scheme+host + /v1
-     *   - Document-relative path: {@code .}, {@code ./v2}, {@code ../v2}, {@code v2}
-     *                                                               base scheme+host + base
-     *                                                               directory merged with the
-     *                                                               reference, with dot-segments
-     *                                                               (§5.2.4) removed.
+     * Resolve the reference forms used in OpenAPI servers[].url:
+     * - Absolute URI: https://example.com/v1 is parsed independently.
+     * - Server-relative path: /v1 replaces the base path.
+     * - Document-relative path: ., ./v2, ../v2 and v2 merge with the base
+     *   directory and remove dot segments (RFC 3986 section 5.2.4).
+     * Relative references retain the base scheme, host and port and take their
+     * own query. Use a path-bearing reference: network-path (//host), query-only
+     * and fragment references do not receive general RFC resolution semantics.
      *
-     * The base URI must be absolute (scheme and host present); otherwise
-     * URIError is thrown for non-absolute references.
+     * An empty reference returns base unchanged. Other relative references
+     * require a base scheme and host, otherwise URIError is thrown.
      */
     static URIComponents resolveReference(std::string const& reference,
                                           URIComponents const& base);
 
     /**
-     * Append one or multiple path-parts ("/a/b/c") to the URIs
-     * path.
+     * Append slash-separated path segments, encoding each with encode().
+     * Repeated interior separators are collapsed, while an empty input or
+     * trailing separator produces a final slash. Already percent-encoded input
+     * is encoded again.
      */
     void appendPath(const std::string& part);
 
     /**
-     * Add a query-var key-value pair.
+     * Append a query pair; duplicate keys are retained and emitted in key order.
      */
     void addQuery(std::string key, std::string value);
 
     /**
-     * Build the final URI string.
-     *
-     * Throws URIError.
+     * Build the final URI string by joining buildHost() and buildPath().
+     * A missing scheme or host raises URIError.
+     * The stored path is used as-is, while query text and queryVars are encoded.
      */
     std::string build() const; /* Full URI */
     std::string buildPath() const; /* URI path + query */
-    std::string buildHost() const; /* Scheme + host */
+    std::string buildHost() const; /* Scheme + host + nonzero port */
 
     /**
-     * Helper function for URL encoding a string.
+     * Encode bytes except unreserved characters and URI sub-delimiters.
+     * In particular & and = remain literal; use encodeComponent for an isolated
+     * value that must not introduce form/query separators.
      */
     static std::string encode(std::string str);
 
@@ -95,7 +99,8 @@ struct URIComponents
     static std::string encodeComponent(std::string str);
 
     /**
-     * Decode percent-encoded octets in a URI component.
+     * Decode valid percent-encoded octets. Invalid escapes and plus signs are
+     * retained unchanged; this is not form-urlencoded plus-to-space decoding.
      */
     static std::string decodeComponent(std::string str);
 };

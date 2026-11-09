@@ -43,9 +43,9 @@ SERVICE_PATTERN = r"""
 class IdentType(Enum):
     """Kind of zserio identifier looked up by :func:`get_doc_str`.
 
-    ``STRUCT`` and ``SERVICE`` expect a fully qualified type/service name.
-    ``RPC`` expects a fully qualified ``service.method`` name so the extractor
-    can match the method inside the correct service declaration.
+    ``STRUCT`` and ``SERVICE`` use the last identifier segment. ``RPC`` uses
+    the last two segments as ``service.method``. Package prefixes are ignored,
+    so equal names in different packages are not disambiguated.
     """
 
     STRUCT = 0
@@ -63,7 +63,9 @@ def get_amalgamated_zs(pkg_path):
 
     The result is cached by package path. This keeps repeated service, method,
     and struct doc lookups from walking the same package tree over and over
-    during OpenAPI generation.
+    during OpenAPI generation. The cache has no invalidation; later source
+    edits are invisible until the entry is removed or the process restarts.
+    Files are read in glob order and I/O failures propagate.
     """
 
     global zs_pkg_cache
@@ -89,10 +91,12 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
     * ``RPC`` looks up ``path.to.package.ServiceName.methodName`` and captures
       the method documentation, return type, and request argument type.
 
-    ``fallback`` is returned unchanged when ``pkg_path`` is empty, the
-    identifier is malformed, the identifier type is unsupported, or no match is
-    found. Callers use this to keep OpenAPI generation deterministic even when
-    source comments are unavailable.
+    ``fallback`` is returned unchanged when ``pkg_path`` is empty, an RPC
+    identifier has fewer than two segments, the identifier type is unsupported,
+    or no match is found. This lets OpenAPI generation proceed when source
+    comments are unavailable. A successful match returns a new list. Matching
+    uses terminal names only and returns the first regex match in the concatenated
+    sources; it is not a package-aware zserio parser.
     """
 
     if fallback is None:
@@ -100,6 +104,7 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
     if not pkg_path:
         return fallback
     zs_src = get_amalgamated_zs(pkg_path)
+
     ident_parts = ident.split(".")
     pattern_format_replacements = {}
     if ident_type == IdentType.STRUCT:
@@ -124,6 +129,7 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
     else:
         print("[ERROR] get_doc_str: Unsupported identifier type!")
         return fallback
+
     compiled_pattern = re.compile(pattern.format(**pattern_format_replacements), re.X)
     match = compiled_pattern.search(zs_src)
     if match:
@@ -133,6 +139,9 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
 
 
 def md_filter_definition(md: str) -> str:
-    """Remove leading Markdown ``Definition`` headings from extracted text."""
+    """Remove bold ``Definition``/``Definitions`` markers and surrounding space.
+
+    Matching markers are removed throughout the text, not only at its start.
+    """
 
     return re.sub(r"\n*\*\*[Dd]efinitions?[:\s]*\*\*\n*", "", md.strip()).strip()

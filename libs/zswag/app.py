@@ -1,7 +1,7 @@
 """Pure-Python OpenAPI server integration for zserio services.
 
 This module provides :class:`OAServer`, a Connexion application subclass that
-loads or generates an OpenAPI document for a zserio service, wires that document
+loads an existing OpenAPI document for a zserio service, wires that document
 to a user-provided controller module, and forwards incoming HTTP requests
 through the zserio-generated Python service codec.
 
@@ -29,22 +29,19 @@ from .reflect import request_object_blob, service_method_request_type, to_snake
 # to hold the service instance.
 CONTROLLER_SERVICE_INSTANCE = "_service"
 
-# Name of OpenApi extension field from which connexion
-# reads the target wsgi function.
+# Connexion uses this extension to resolve operationId against the service instance.
 CONTROLLER_OPENAPI_FIELD = "x-openapi-router-controller"
 
-# Utility function for slash conversion in format strings
+
 def to_slashes(s: str):
     """Return *s* with Windows path separators converted to forward slashes.
 
-    The OpenAPI generator prints shell snippets and YAML paths. Forward slashes
-    keep those snippets stable across platforms and avoid accidental escaping in
-    generated command examples.
+    Startup diagnostics use this for paths in the suggested generator command,
+    avoiding accidental backslash escapes in the printed shell example.
     """
     return s.replace("\\", "/")
 
 
-# Raised if the controller passed to OAServer is missing a function
 class IncompleteSchemaError(RuntimeError):
     """Raised when an OpenAPI document lacks a zserio service operation.
 
@@ -70,8 +67,13 @@ class OAServer(connexion.App):
 
     For every method in the zserio service, the server finds the corresponding
     snake_case function in the controller module, injects a service instance
-    into that module, and installs a Connexion route handler that decodes HTTP
-    parameters into a zserio request object before calling the controller.
+    into that module if ``_service`` is absent, and replaces methods on that
+    shared instance with route and controller adapters. Controller functions
+    accept one request object and return the generated response object. Avoid
+    sharing a controller module between independently configured servers.
+
+    Raw request bodies pass directly to the generated service codec. Mapped
+    HTTP parameters are assembled into a request object and serialized first.
 
     Parameters are keyword-only:
 
@@ -82,13 +84,19 @@ class OAServer(connexion.App):
         zserio-generated service class deriving from
         ``zserio.ServiceInterface``.
     ``zs_pkg_path``
-        Optional zserio source package root used for documentation extraction
-        when generating OpenAPI text.
+        Optional source root retained on the server instance; construction does
+        not generate YAML or extract source documentation.
     ``yaml_path``
         Optional OpenAPI YAML path. If omitted, the default path is derived from
         the generated service module. The file must already exist; if it does
         not, ``OAServer`` prints the matching ``python -m zswag.gen`` command
         and exits.
+
+    A missing controller attribute raises ``AttributeError``. Non-function
+    attributes and functions with the wrong arity are reported and skipped.
+    Generated codec ``PythonRuntimeException`` failures are translated to HTTP
+    400 for BitStreamReader errors and 500 otherwise; other exceptions propagate
+    to Connexion.
 
     If ``connexion[swagger-ui]`` is installed, Connexion exposes the interactive
     API UI at the configured ``/ui`` endpoint.
@@ -113,7 +121,8 @@ class OAServer(connexion.App):
         self.service_type = service_type
         assert inspect.isclass(self.service_type)
 
-        # Initialise zserio service working instance
+        # Reuse the controller-owned instance so route resolution and generated
+        # dispatch refer to the same object.
         self.controller_path = controller_module.__name__
         self.controller = controller_module
         self.service_instance_path = self.controller_path+f".{CONTROLLER_SERVICE_INSTANCE}"
@@ -121,7 +130,7 @@ class OAServer(connexion.App):
             setattr(self.controller, CONTROLLER_SERVICE_INSTANCE, self.service_type())
         self.service_instance = getattr(self.controller, CONTROLLER_SERVICE_INSTANCE)
 
-        # Verify or generate yaml file
+        # Missing YAML is a startup error; print a generation command and exit.
         if not os.path.isfile(yaml_path):
             print("\n" + inspect.cleandoc(f"""
                 ERROR: File does not exist: {yaml_path}
@@ -149,7 +158,8 @@ class OAServer(connexion.App):
         self.spec = parse_openapi_config(yaml_path)
         self.verify_openapi_schema()
 
-        # Re-route service impl methods
+        # Capture each method's codec and metadata in defaults before replacing
+        # the shared instance methods; loop variables must not be late-bound.
         for method_name in self.service_instance.method_names:
             method_snake_name = to_snake(method_name)
             user_function = getattr(self.controller, method_snake_name)
@@ -177,6 +187,7 @@ class OAServer(connexion.App):
                         spec=spec,
                         headers=flask_request.headers,
                         **kwargs)
+
                 try:
                     return bytes(fun(request_blob, None).byte_array)
                 except zserio.PythonRuntimeException as e:
@@ -184,13 +195,15 @@ class OAServer(connexion.App):
                         return "Error in BitStreamReader: Could not parse malformed request.", 400
                     else:
                         return f"Internal Server Error: {e}", 500
+
             setattr(self.service_instance, method_name, wsgi_method)
 
             def method_impl(request, ctx=None, fun=user_function):
                 return fun(request)
+
             setattr(self.service_instance, f"_{method_snake_name}_impl", method_impl)
 
-        # Load spec and inject openapi-router-controller
+        # Preserve explicit controller overrides; fill only absent router targets.
         print(f"Loading spec from {yaml_path} ...")
         with open(yaml_path, 'r') as swagger_file:
             openapi = yaml.load(swagger_file, Loader=yaml.FullLoader)

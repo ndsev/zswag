@@ -14,6 +14,7 @@
 namespace zswagcl
 {
 
+/** Owned zswag transport metadata, with shared security-scheme references between requirements. */
 struct OpenAPIConfig
 {
     enum class ParameterLocation {
@@ -106,11 +107,9 @@ struct OpenAPIConfig
     using SecurityAlternative = std::vector<SecurityRequirement>;
     using SecurityAlternatives = std::vector<SecurityAlternative>;
 
-    /**
-     * Supported Authentication Schemes
-     */
-
-    struct Parameter {
+    /** One mapped request field; parameters without x-zserio-request-part are not retained. */
+    struct Parameter
+    {
         ParameterLocation location = ParameterLocation::Query;
 
         /**
@@ -126,8 +125,8 @@ struct OpenAPIConfig
         std::string field;
 
         /**
-         * Default parameter value.
-         * Used if value could not be read.
+         * Fallback used by parameter formatting and Python request assembly.
+         * The native parser currently leaves this empty; it does not read schema.default.
          */
         std::string defaultValue;
 
@@ -141,16 +140,16 @@ struct OpenAPIConfig
             String,
 
             /**
-             * Hexadicamal (hexpair per octet) encoding.
-             * Does not include a prefix.
+             * Hexadecimal without a prefix: integers use numeric digits (with
+             * an optional minus), while byte/string buffers use hex pairs per octet.
              */
             Hex,
 
             /**
              * Base64 encoding.
              */
-            Base64,    // Standard
-            Base64url, // URL safe
+            Base64,     // Standard
+            Base64url,  // URL safe
 
             /**
              * Binary (octet) encoding
@@ -203,7 +202,7 @@ struct OpenAPIConfig
         std::string path;
 
         /**
-         * HTTP method.
+         * Uppercase HTTP method, such as GET or POST.
          */
         std::string httpMethod = "POST";
 
@@ -213,23 +212,21 @@ struct OpenAPIConfig
         std::map<std::string, Parameter> parameters;
 
         /**
-         * Zserio structure field or function identifier that is transferred
-         * as request body.
-         * The special identifier '*' represents the binary
-         * encoded request object.
-         *
-         * Ignored if HTTP-Method is GET.
+         * True when requestBody advertises the zserio object content type.
+         * The entire serialized request becomes the body; this is not a field
+         * name. Native GET dispatch ignores this flag.
          */
         bool bodyRequestObject = false;
 
         /**
-         * Optional security schemes override for the global default.
+         * Absent inherits global security; an engaged empty list disables it.
          */
         std::optional<SecurityAlternatives> security;
     };
 
     /**
-     * URI parts.
+     * Advertised server URIs. Stream parsing may leave relative entries or an
+     * empty list; fetchOpenAPIConfig resolves them against the fetched URL.
      */
     std::vector<httpcl::URIComponents> servers;
 

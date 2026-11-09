@@ -7,6 +7,7 @@
 
 namespace py = pybind11;
 
+/** Python zserio adapter owning one native client; bound calls retain the GIL. */
 class PyOpenApiClient
 {
 public:
@@ -21,10 +22,9 @@ public:
                     std::optional<std::string> bearer,
                     std::optional<uint32_t> serverIndex);
 
-    std::vector<uint8_t> callMethod(
-        const std::string& methodName,
-        py::object request,
-        py::object unused);
+    /** Borrow the generated request wrapper for this blocking call and return owned bytes. */
+    std::vector<uint8_t>
+    callMethod(const std::string& methodName, py::object request, py::object unused);
 
 private:
     std::unique_ptr<zswagcl::OpenAPIClient> client_;

@@ -34,6 +34,7 @@ bool isEnvNameChar(char c)
     return isEnvNameStart(c) || (c >= '0' && c <= '9');
 }
 
+// Expand scalar values once; inserted environment text is not recursively expanded.
 std::string expandEnvReferences(std::string const& value)
 {
     static constexpr std::string_view kPrefix = "$env.";
@@ -238,7 +239,9 @@ std::string convertToRegex(const std::string& scope) {
     return regexPattern;
 }
 
-YAML::Node configToNode(Config const& config) {
+// This storage representation uses maps, so repeated header/query names collapse.
+YAML::Node configToNode(Config const& config)
+{
     YAML::Node result;
     if (config.scope)
         result["scope"] = *config.scope;
@@ -619,6 +622,8 @@ Config::Config(const std::string& yamlConf)
 Config Settings::operator[] (const std::string &url) const
 {
     std::shared_lock lock(mutex);
+
+    // Reload needs the exclusive lock; reacquire shared access before traversing entries.
     if (lastRead < lastUpdated.load(std::memory_order_relaxed)) {
         lock.unlock();
         try {
@@ -769,10 +774,14 @@ std::string Config::toSafeString() const {
     return result;
 }
 
-Config& Config::operator |= (Config const& other) {
+Config& Config::operator|=(Config const& other)
+{
+    // Map insertion preserves existing cookies; multimaps append every header/query pair.
     cookies.insert(other.cookies.begin(), other.cookies.end());
     headers.insert(other.headers.begin(), other.headers.end());
     query.insert(other.query.begin(), other.query.end());
+
+    // Scalar options replace earlier matches, while OAuth fields merge individually.
     if (other.auth)
         auth = other.auth;
     if (other.proxy)

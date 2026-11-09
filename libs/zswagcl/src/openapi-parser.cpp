@@ -521,15 +521,16 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
     httpcl::log().debug("{} Applying HTTP settings ...", debugContext);
     httpConfig |= httpcl::Settings()[url];
 
-    // NEW: Log OAuth2 configuration status
+    // Inspect discovery authorization before attempting the document request.
     if (httpConfig.oauth2) {
         httpcl::log().trace("{} OAuth2 config present (clientId={})",
             debugContext, httpConfig.oauth2->clientId);
-    } else {
+    }
+    else {
         httpcl::log().trace("{} No OAuth2 config for this URL", debugContext);
     }
 
-    // NEW: Acquire OAuth2 token for spec fetch if configured
+    // OAuth acquisition is best effort; otherwise keep the configured credentials.
     if (auto token = acquireOAuth2TokenForSpecFetch(client, httpConfig, url)) {
         httpcl::log().debug("{} Using OAuth2 Bearer token for OpenAPI spec fetch", debugContext);
         httpConfig.headers.insert({"Authorization", "Bearer " + *token});
@@ -547,12 +548,13 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
     auto res = resFuture.get();
     httpcl::log().debug("{} Got HTTP status {}, {} bytes.", debugContext, res.status, res.content.size());
 
-    // Parse loaded JSON
+    // Parse YAML/JSON only after a successful HTTP response.
     if (res.status >= 200 && res.status < 300) {
         std::stringstream ss(res.content, std::ios_base::in);
 
         httpcl::log().debug("{} Parsing OpenAPI spec", debugContext);
         auto config = parseOpenAPIConfig(ss);
+
         // Per OpenAPI 3.0+ §4.7.5, an absent or empty `servers` array implies
         // `[{ "url": "/" }]` (server-relative to the spec's origin root).
         if (config.servers.empty()) {
@@ -560,10 +562,11 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
             implicit.path = "/";
             config.servers.emplace_back(std::move(implicit));
         }
+
         // Resolve relative server URLs against the spec URL.
         // parseServer leaves scheme/host empty when the URL is server-relative
         // (path-only) or document-relative; URIComponents::resolveReference
-        // implements RFC 3986 §5.3 reference resolution.
+        // handles the supported OpenAPI server-reference forms.
         for (auto& server : config.servers) {
             if (server.scheme.empty() || server.host.empty()) {
                 try {

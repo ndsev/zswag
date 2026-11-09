@@ -50,7 +50,7 @@ bool OAuth2ClientCredentialsHandler::satisfy(
     const std::string scopeKey = stx::join(scopes.begin(), scopes.end(), ":");
     TokenKey key{tokenUrl, oauthConfig.clientId, oauthConfig.audience, scopeKey};
 
-    // Try cache
+    // Fast-path live tokens under a shared lock; request configuration is local to the caller.
     {
         std::shared_lock lk(m_);
         auto it = cache_.find(key);
@@ -62,6 +62,7 @@ bool OAuth2ClientCredentialsHandler::satisfy(
     }
 
     {
+        // Hold the exclusive lock through refresh/mint to coalesce concurrent misses.
         std::unique_lock lk(m_);
         auto it = cache_.find(key);
 
@@ -95,7 +96,7 @@ bool OAuth2ClientCredentialsHandler::satisfy(
             httpcl::log().debug("[OAuth2] No cached token, minting new...");
         }
 
-        // Mint fresh
+        // A failed refresh falls back to a fresh client-credentials grant.
         try {
             httpcl::log().debug("Trying token mint at {} ...", tokenUrl);
             auto minted = requestToken(ctx, oauthConfig, tokenUrl,
@@ -115,7 +116,8 @@ bool OAuth2ClientCredentialsHandler::satisfy(
 }
 
 /**
- * Parse URL-encoded body into parameter map.
+ * Collect generated form fields for OAuth1 signing. Decode values only; duplicate
+ * keys keep the last value and plus signs remain literal (our encoder emits %20).
  */
 static std::map<std::string, std::string> parseBodyParams(const std::string& body)
 {
@@ -267,7 +269,7 @@ OAuth2ClientCredentialsHandler::MintedToken OAuth2ClientCredentialsHandler::requ
     int expiresIn = 3600;
     if (auto expiresInNode = jsonResult["expires_in"])
         expiresIn = expiresInNode.as<int>();
-    // Subtract a thirty-second jiggle period from the token TTL
+    // Refresh 30 seconds early; short-lived tokens may already be expired on return.
     out.expiresAt = steady_clock::now() + seconds(expiresIn - 30);
 
     // Handle refresh token in response
@@ -302,7 +304,7 @@ std::optional<std::string> acquireOAuth2TokenForSpecFetch(
     auto scheme = std::make_shared<OpenAPIConfig::SecurityScheme>();
     scheme->type = SecuritySchemeType::OAuth2ClientCredentials;
 
-    // Use tokenUrlOverride if available, otherwise we'll need a dummy (handler will fail gracefully if missing)
+    // Discovery has no parsed scheme URL; the handler rejects a missing override.
     if (!httpConfig.oauth2->tokenUrlOverride.empty()) {
         scheme->oauthTokenUrl = httpConfig.oauth2->tokenUrlOverride;
     }

@@ -108,8 +108,12 @@ std::string ParameterValue::bodyStr() const
 
 std::string ParameterValue::pathStr(const OpenAPIConfig::Parameter& param) const
 {
-    return visitValue<std::string>(value, param.defaultValue,
-        [&](const std::string& v) -> std::optional<std::string> {
+    // An unsupported style falls back to defaultValue; actual URI escaping is deferred.
+    return visitValue<std::string>(
+        value,
+        param.defaultValue,
+        [&](const std::string& v) -> std::optional<std::string>
+        {
             switch (param.style) {
             case Style::Simple:
                 return v;
@@ -121,7 +125,8 @@ std::string ParameterValue::pathStr(const OpenAPIConfig::Parameter& param) const
                 return {};
             }
         },
-        [&](const std::vector<std::string>& v) -> std::optional<std::string> {
+        [&](const std::vector<std::string>& v) -> std::optional<std::string>
+        {
             switch (param.style) {
             case Style::Simple:
                 return stx::join(v.begin(), v.end(), ",");
@@ -137,7 +142,8 @@ std::string ParameterValue::pathStr(const OpenAPIConfig::Parameter& param) const
                 return {};
             }
         },
-        [&](const std::map<std::string, std::string>& v) -> std::optional<std::string> {
+        [&](const std::map<std::string, std::string>& v) -> std::optional<std::string>
+        {
             switch (param.style) {
             case Style::Simple:
                 if (param.explode)
@@ -157,9 +163,7 @@ std::string ParameterValue::pathStr(const OpenAPIConfig::Parameter& param) const
             default:
                 return {};
             }
-        }
-    );
-
+        });
 }
 
 std::vector<std::pair<std::string, std::string>> ParameterValue::queryOrHeaderPairs(const OpenAPIConfig::Parameter& param) const
@@ -167,8 +171,13 @@ std::vector<std::pair<std::string, std::string>> ParameterValue::queryOrHeaderPa
     using Pair = std::pair<std::string, std::string>;
     using List = std::vector<Pair>;
 
-    return visitValue<List>(value, {},
-        [&](const std::string& v) -> std::optional<List> {
+    // Preserve exploded pairs so the request config can retain duplicate query names.
+
+    return visitValue<List>(
+        value,
+        {},
+        [&](const std::string& v) -> std::optional<List>
+        {
             switch (param.style) {
             case Style::Form:
                 return {{{param.ident, v}}};
@@ -176,7 +185,8 @@ std::vector<std::pair<std::string, std::string>> ParameterValue::queryOrHeaderPa
                 return {};
             }
         },
-        [&](const std::vector<std::string>& v) -> std::optional<List> {
+        [&](const std::vector<std::string>& v) -> std::optional<List>
+        {
             switch (param.style) {
             case Style::Form:
                 /* Result example: ?id=1&id=2&id=3*/
@@ -194,7 +204,8 @@ std::vector<std::pair<std::string, std::string>> ParameterValue::queryOrHeaderPa
                 return {};
             }
         },
-        [&](const std::map<std::string, std::string>& v) -> std::optional<List> {
+        [&](const std::map<std::string, std::string>& v) -> std::optional<List>
+        {
             switch (param.style) {
             case Style::Form:
                 if (param.explode)
@@ -203,8 +214,7 @@ std::vector<std::pair<std::string, std::string>> ParameterValue::queryOrHeaderPa
             default:
                 return {};
             }
-        }
-    );
+        });
 }
 
 }
