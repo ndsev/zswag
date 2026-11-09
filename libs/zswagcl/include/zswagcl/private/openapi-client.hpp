@@ -40,7 +40,8 @@ public:
      * `fun` runs synchronously for path, query and header parameters. A non-GET
      * operation with a request body also calls it with an empty identifier and
      * ZSERIO_REQUEST_PART_WHOLE. ParameterValueHelper references are borrowed
-     * only for the callback. The subsequent HTTP worker is joined before return.
+     * only for the callback. The asynchronous request wrapper is awaited before
+     * return.
      *
      * Unknown/unsupported methods, parameter resolution and unsatisfied security
      * requirements can throw before transport. Only HTTP 200 returns content;

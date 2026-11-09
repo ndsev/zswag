@@ -65,7 +65,9 @@ struct URIComponents
 
     /**
      * Append slash-separated path segments, encoding each with encode().
-     * Empty segments are collapsed; already percent-encoded input is encoded again.
+     * Repeated interior separators are collapsed, while an empty input or
+     * trailing separator produces a final slash. Already percent-encoded input
+     * is encoded again.
      */
     void appendPath(const std::string& part);
 

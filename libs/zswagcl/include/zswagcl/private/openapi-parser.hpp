@@ -12,7 +12,7 @@ namespace zswagcl
 /**
  * Fetch a complete OpenAPI document synchronously through the borrowed client.
  * Persistent URL settings are merged into httpConfig before optional OAuth token
- * acquisition. The transport runs on a worker that is joined before return.
+ * acquisition. The asynchronous request wrapper is awaited before return.
  *
  * Any 2xx response is parsed; other statuses raise IHttpClient::Error with the
  * response attached. URI/YAML/configuration errors propagate. Relative servers

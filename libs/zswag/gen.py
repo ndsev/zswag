@@ -131,7 +131,7 @@ class MethodConfig:
 
 
 class OpenApiGenError(RuntimeError):
-    """Raised by OpenApiSchemaGenerator for rejected options or schema-validation failures."""
+    """Raised when generator input, code generation, or schema validation fails."""
 
     def __init__(self, what: str):
         super(OpenApiGenError, self).__init__(what)

@@ -243,8 +243,8 @@ unauthenticated proxy.
 Parsed OpenAPI configuration used by the native zswag client.
 
 The object behaves like a read-only mapping from zserio service method name to
-:class:`OAMethod`. It also exposes the original YAML content and the resolved
-server URLs from the OpenAPI document.
+:class:`OAMethod`. It also exposes the original YAML content and server URL
+entries from the OpenAPI document.
 )doc")
         .def(
             "__contains__",

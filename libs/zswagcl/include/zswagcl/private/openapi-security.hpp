@@ -45,7 +45,7 @@ public:
     AuthRegistry();
 
     /**
- * Try an OR of AND-sets: alternatives in order, requiring every scheme within one alternative.
+     * Try an OR of AND-sets: alternatives in order, requiring every scheme within one alternative.
      * An empty alternatives list requires no authentication. Throw runtime_error
      * if none match. All attempts share the same mutable request config, so
      * authorization added by a failed alternative remains for later attempts.
