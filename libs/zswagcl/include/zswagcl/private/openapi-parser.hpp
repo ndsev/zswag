@@ -24,7 +24,8 @@ OpenAPIConfig fetchOpenAPIConfig(const std::string& url,
                                  httpcl::Config httpConfig = {});
 
 /**
- * Consume the remaining stream and retain its text in OpenAPIConfig::content.
+ * Parse OpenAPI configuration from the remaining input stream.
+ * Retain its text in OpenAPIConfig::content.
  * Parses the zswag subset: GET/POST/PUT/DELETE operations, explicitly mapped
  * parameters, zserio bodies and supported security schemes. This is not full
  * OpenAPI/JSON Schema validation or $ref resolution. YAML/config errors propagate.

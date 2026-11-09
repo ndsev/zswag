@@ -131,7 +131,7 @@ class MethodConfig:
 
 
 class OpenApiGenError(RuntimeError):
-    """A rejected generation option or wrapped schema-validation failure."""
+    """Raised by OpenApiSchemaGenerator for rejected options or schema-validation failures."""
 
     def __init__(self, what: str):
         super(OpenApiGenError, self).__init__(what)

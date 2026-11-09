@@ -93,9 +93,10 @@ def get_doc_str(*, ident_type: IdentType, pkg_path: str, ident: str, fallback: L
 
     ``fallback`` is returned unchanged when ``pkg_path`` is empty, an RPC
     identifier has fewer than two segments, the identifier type is unsupported,
-    or no match is found. A successful match returns a new list. Matching uses terminal names
-    only and returns the first regex match in the concatenated sources; it is
-    not a package-aware zserio parser.
+    or no match is found. This lets OpenAPI generation proceed when source
+    comments are unavailable. A successful match returns a new list. Matching
+    uses terminal names only and returns the first regex match in the concatenated
+    sources; it is not a package-aware zserio parser.
     """
 
     if fallback is None:

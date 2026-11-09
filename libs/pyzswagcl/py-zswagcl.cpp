@@ -141,7 +141,8 @@ Objects are returned from :class:`OAConfig` by method name and are used by
     py::class_<httpcl::Config>(m, "HTTPConfig", R"doc(
 Mutable HTTP transport configuration used by :class:`OAClient`.
 
-Mutators return ``self`` for chaining. Header/query calls append values,
+Mutators return ``self`` for chaining, e.g.
+``HTTPConfig().header("X-Trace", "1").bearer(token)``. Header/query calls append values,
 including duplicate names; cookie calls preserve an existing name's value.
 Pickling uses Config's YAML representation, which includes cleartext secrets
 and collapses duplicate header/query names, so it is not a lossless snapshot.
@@ -294,6 +295,8 @@ server URLs from the OpenAPI document.
         },
         R"doc(
 Parse the supported zswag OpenAPI subset from a local YAML/JSON file.
+
+Returns an :class:`OAConfig`, the configuration type used by :class:`OAClient`.
 
 Relative server entries stay unresolved and an absent server list stays empty.
 File/YAML/configuration failures raise; this does not perform general OpenAPI

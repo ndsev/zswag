@@ -34,6 +34,7 @@ struct URIComponents
      * query percent escapes are decoded, but query pairs are not split into
      * queryVars. User info and fragments are discarded. Unsupported syntax
      * raises URIError; this helper is not a general URI validator.
+     * See https://tools.ietf.org/html/rfc3986 for the URI syntax.
      */
     static URIComponents fromStrRfc3986(std::string const& uriString);
 
@@ -47,9 +48,11 @@ struct URIComponents
     static URIComponents fromStrPath(std::string const& pathAndQueryString);
 
     /**
-     * Resolve the server-reference forms used by this OpenAPI client:
-     * absolute URIs are parsed independently; /v1 replaces the base path;
-     * ./v2, ../v2 and v2 merge with its directory and remove dot segments.
+     * Resolve the reference forms used in OpenAPI servers[].url:
+     * - Absolute URI: https://example.com/v1 is parsed independently.
+     * - Server-relative path: /v1 replaces the base path.
+     * - Document-relative path: ., ./v2, ../v2 and v2 merge with the base
+     *   directory and remove dot segments (RFC 3986 section 5.2.4).
      * Relative references retain the base scheme, host and port and take their
      * own query. Use a path-bearing reference: network-path (//host), query-only
      * and fragment references do not receive general RFC resolution semantics.
@@ -72,7 +75,8 @@ struct URIComponents
     void addQuery(std::string key, std::string value);
 
     /**
-     * Join buildHost() and buildPath(); missing scheme or host raises URIError.
+     * Build the final URI string by joining buildHost() and buildPath().
+     * A missing scheme or host raises URIError.
      * The stored path is used as-is, while query text and queryVars are encoded.
      */
     std::string build() const; /* Full URI */

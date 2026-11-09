@@ -55,6 +55,7 @@ private:
     std::shared_mutex m_;
     std::unordered_map<TokenKey, MintedToken, TokenKeyHash> cache_;
 
+    // Shared method for token fetch and refresh requests.
     // Use token-URL settings and accept 2xx responses with a non-empty access_token.
     // Missing expires_in defaults to one hour; subtract 30 seconds for early refresh.
     MintedToken requestToken(

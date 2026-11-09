@@ -147,6 +147,7 @@ def find_field(t: TypeInfo, field: str, offset: int = 0, py_path="") -> Tuple[st
     ``field`` uses schema names, not Python property names. The returned tuple
     contains the equivalent dotted Python attribute path and the matching
     ``MemberInfo``. If no field matches, ``("", None)`` is returned.
+    For example, ``myField1.myField2`` becomes ``my_field_1.my_field_2``.
     """
     next_dot = field.find(".", offset)
     subfield = field[offset:next_dot] if next_dot >= 0 else field[offset:]
@@ -179,7 +180,9 @@ def members(t: TypeInfo, recursive=False, field_prefix="") -> Iterator[MemberInf
 
 
 def check_uninstantiable(t: TypeInfo, field_name="", recursive=False) -> Optional[NotInstantiableReason]:
-    """Return the first unsupported constructor/array shape, or ``None``.
+    """Check whether a type can be auto-instantiated from flat parameters.
+
+    Return the first unsupported constructor/array shape, or ``None``.
 
     Auto-instantiation is only safe for request objects with parameterless
     constructors and scalar arrays. Compound arrays and parameterized zserio

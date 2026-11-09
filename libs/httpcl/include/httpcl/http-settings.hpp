@@ -110,15 +110,15 @@ struct Config
     Config& operator |= (Config const& other);
 
     /**
-     * Serialize the current values as YAML, including cleartext secrets. Repeated
-     * header/query names collapse to one value; this is not a lossless round trip
+     * Convert this configuration to YAML for Config(yamlConf), including cleartext
+     * secrets. Repeated header/query names collapse to one value; this is not a lossless round trip
      * for the multimap fields or a secret-redacting export.
      */
     std::string toYaml() const;
 
     /**
-     * Create a diagnostic summary with partial credential redaction. Passwords,
-     * client secrets and exactly named Authorization headers are masked; long API
+     * Create a human-readable summary for logging, with partial credential redaction.
+     * Passwords, client secrets and exactly named Authorization headers are masked; long API
      * keys retain their first/last four characters. Other headers, query parameters
      * and cookies are printed verbatim, so this is not a general secret scrubber.
      */
@@ -126,7 +126,8 @@ struct Config
 };
 
 /**
- * Load HTTP_SETTINGS_FILE and combine entries matching each request URL.
+ * Load/store settings from/to HTTP_SETTINGS_FILE and combine entries matching
+ * each request URL.
  * Lookups lazily reload after updateTimestamp; no filesystem watcher is installed.
  * Lookup/load synchronize internally. Direct edits through the public containers,
  * getOrCreateConfigScope and store require external synchronization.
@@ -150,8 +151,9 @@ struct Settings
     Config operator[](const std::string& url) const;
 
     /**
-     * Borrow or append an exact scope entry for editing. The caller must exclude
-     * concurrent lookups/reloads and must not retain the reference across load().
+     * Get or create a Config entry for an exact scope and return a reference for editing.
+     * The caller must exclude concurrent lookups/reloads and must not retain
+     * the reference across load().
      */
     Config& getOrCreateConfigScope(std::string_view const& scope);
 

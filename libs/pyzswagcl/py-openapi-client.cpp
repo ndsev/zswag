@@ -84,6 +84,10 @@ generated zserio client helpers can use it directly.
                 R"doc(
 Create a blocking OpenAPI client from a URL or local YAML/JSON document.
 
+``url`` is the OpenAPI document URL, or a local file path when ``is_local_file``
+is true. ``config`` supplies reusable HTTP settings such as headers, query
+parameters, proxy, and authentication.
+
 ``config`` is copied. ``api_key`` replaces its API-key shortcut; ``bearer``
 appends an Authorization header, including when one is already configured.
 ``server_index`` selects an advertised server (default zero); invalid indices

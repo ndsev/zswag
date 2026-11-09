@@ -37,7 +37,7 @@ static _Type htobe(_Type v)
     return v;
 }
 
-/** Encode bytes without borrowing the input; String/Binary copy bytes unchanged. */
+/** Format a buffer as a string without borrowing the input; String/Binary copy bytes unchanged. */
 std::string formatBuffer(Format f, const std::uint8_t* ptr, std::size_t size);
 
 template <class _Type, class _Enable = void>
