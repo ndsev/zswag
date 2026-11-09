@@ -13,6 +13,7 @@ import logging
 
 from .oauth1_validator import validate_oauth1_signature
 import oauth_test.api as api
+from server_test_utils import run_loopback_test_server
 
 # Configure logging
 logging.basicConfig(
@@ -292,4 +293,4 @@ def run_server(host='127.0.0.1', port=8080):
     logger.info(f"Test clients: {', '.join(MOCK_CLIENTS.keys())}")
 
     server = create_app()
-    server.run(host=host, port=port)
+    run_loopback_test_server(server.app, host, port)
