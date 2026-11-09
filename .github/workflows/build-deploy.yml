@@ -101,12 +101,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-14: Apple Silicon runners (arm64)
-        os: [macos-14, windows-latest]
+        # macos-15: Apple Silicon runners (arm64)
+        os: [macos-15, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         exclude:
           # Python 3.10 doesn't have ARM64 builds for macOS
-          - os: macos-14
+          - os: macos-15
             python-version: "3.10"
     env:
       SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.determine-version.outputs.version }}
