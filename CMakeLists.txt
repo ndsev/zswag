@@ -25,6 +25,12 @@ endif()
 
 if (ZSWAG_ENABLE_TESTING)
   enable_testing()
+  add_test(
+    NAME openssl-msvc-discovery-test
+    COMMAND "${CMAKE_COMMAND}"
+      -S "${CMAKE_CURRENT_SOURCE_DIR}/cmake/test/openssl-msvc-discovery"
+      -B "${CMAKE_CURRENT_BINARY_DIR}/cmake/test/openssl-msvc-discovery"
+      -DZSWAG_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 # Include coverage configuration if enabled
