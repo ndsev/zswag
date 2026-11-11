@@ -259,5 +259,5 @@ The script starts the Python `zswag.test.calc` server on port 5555, builds the J
 ## Looking deeper
 
 - [HTTP Settings File in README.md](../README.md#http-settings-file) — full spec of the HTTP_SETTINGS_FILE YAML format, shared with Python and C++ clients.
-- [`../libs/jzswag/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java`](../libs/jzswag/jzswag-test/src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java) — exhaustive working examples covering each parameter style, format, and authentication scheme.
+- [`CalculatorTestClient.java`](../libs/jzswag/jzswag-test/src/main/java/io/github/ndsev/zswag/test/CalculatorTestClient.java) — exhaustive working examples covering each parameter style, format, and authentication scheme.
 - [`../libs/zswag/test/calc/api.yaml`](../libs/zswag/test/calc/api.yaml) — the OpenAPI spec the integration test uses; useful reference for what `x-zserio-request-part` looks like in practice.

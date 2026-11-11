@@ -14,6 +14,8 @@ import zserio
 
 import zswag
 
+from server_test_utils import run_loopback_test_server
+
 
 def working_dir() -> Path:
     return Path(__file__).resolve().parent / "calc"
@@ -82,7 +84,7 @@ def main() -> int:
             yaml_path=str(calc_dir / "api.yaml"),
             zs_pkg_path=str(calc_dir),
         )
-        app.run(host=host, port=port)
+        run_loopback_test_server(app.app, host, int(port))
         return 0
 
     if mode == "path":

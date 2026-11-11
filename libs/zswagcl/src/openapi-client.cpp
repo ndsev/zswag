@@ -13,9 +13,9 @@ namespace zswagcl
 
 namespace {
 
+// Expand placeholders once from left to right; replacement text is not expanded again.
 template <class _Fun>
-std::string replaceTemplate(std::string str,
-                            _Fun paramCb)
+std::string replaceTemplate(std::string str, _Fun paramCb)
 {
     auto pos = std::string::size_type(0);
     while (pos != std::string::npos) {
@@ -123,7 +123,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
     auto httpConfig = settings_[builtUri];
     httpConfig |= httpConfig_;
 
-    // Make sure that the server responds with correct content type
+    // Request a Zserio body; the response's content type is not validated here.
     httpConfig.headers.insert({"Accept", ZSERIO_OBJECT_CONTENT_TYPE});
 
     httpcl::log().debug("{} Resolving query/path parameters ...", debugContext);
@@ -191,7 +191,7 @@ std::string OpenAPIClient::call(const std::string& methodIdent,
         }
     }());
 
-    // Wait for resultFuture
+    // The public call remains blocking; the worker permits periodic progress logs.
     while (resultFuture.wait_for(std::chrono::seconds{1}) != std::future_status::ready)
         httpcl::log().debug("{} Waiting for response ...", debugContext);
     auto result = resultFuture.get();

@@ -92,7 +92,9 @@ struct CurlSlist {
     curl_slist* headers = nullptr;
 };
 
-struct Transfer {
+// All buffers referenced by curl belong to the transfer until completion/cleanup.
+struct Transfer
+{
     std::string method;
     std::string uri;
     httpcl::OptionalBodyAndContentType body;
@@ -255,6 +257,7 @@ struct CurlHttpClient::Impl {
 
     void addPendingTransfers()
     {
+        // Detach the admission queue under lock; only the worker touches easy/multi handles.
         std::deque<std::shared_ptr<Transfer>> toAdd;
         {
             std::lock_guard lock(mutex);
@@ -291,6 +294,7 @@ struct CurlHttpClient::Impl {
             active.erase(iter);
 
             long responseCode = 0;
+            // Copy completion fields before removing/cleaning the easy handle.
             const auto resultCode = message->data.result;
             curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &responseCode);
             curl_multi_remove_handle(multi, easy);
@@ -333,9 +337,13 @@ struct CurlHttpClient::Impl {
         while (true) {
             {
                 std::unique_lock lock(mutex);
-                cv.wait(lock, [this] {
-                    return stopping || !pending.empty() || !active.empty();
-                });
+                cv.wait(
+                    lock,
+                    [this]
+                    {
+                        return stopping || !pending.empty() || !active.empty();
+                    });
+                // Shutdown drains already admitted work before joining the worker.
                 if (stopping && pending.empty() && active.empty())
                     break;
             }

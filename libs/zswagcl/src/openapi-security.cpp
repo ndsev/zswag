@@ -62,8 +62,11 @@ public:
     bool satisfy(const SecurityRequirement& req, AuthContext const& ctx, std::string& mismatchReason) override {
         const auto& s = *req.scheme;
 
-        // Convenience: support the global apiKey shortcut if your Config has one (ctx.httpConfig.apiKey)
-        auto ensure = [&](auto& container, const std::string& keyName, char const* containerName) -> bool {
+        // Existing named credentials win; otherwise fill the required location
+        // from the request-level API-key shortcut.
+        auto ensure =
+            [&](auto& container, const std::string& keyName, char const* containerName) -> bool
+        {
             if (container.find(keyName) != container.end()) {
                 return true;
             }
@@ -140,7 +143,8 @@ void AuthRegistry::satisfySecurity(
             std::string reasonForMismatch;
             auto handlerIt = handlers_.find(req.scheme->type);
             if (handlerIt != handlers_.end()) {
-                // Note: Handlers may mutate ctx.httpConf
+                // Handlers mutate the shared request config; failed alternatives
+                // do not undo authorization already added by earlier requirements.
                 if (handlerIt->second->satisfy(req, ctx, reasonForMismatch))
                     continue;
             }

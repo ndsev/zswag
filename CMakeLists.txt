@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # without requiring CMakeLists.txt updates between releases.
 # For official releases, this value should match the git tag.
 if(NOT DEFINED ZSWAG_VERSION)
-  set(ZSWAG_VERSION 2.0.2)
+  set(ZSWAG_VERSION 2.0.3)
 endif()
 
 option(ZSWAG_BUILD_WHEELS "Enable zswag whl-output to WHEEL_DEPLOY_DIRECTORY." ON)
@@ -25,6 +25,12 @@ endif()
 
 if (ZSWAG_ENABLE_TESTING)
   enable_testing()
+  add_test(
+    NAME openssl-msvc-discovery-test
+    COMMAND "${CMAKE_COMMAND}"
+      -S "${CMAKE_CURRENT_SOURCE_DIR}/cmake/test/openssl-msvc-discovery"
+      -B "${CMAKE_CURRENT_BINARY_DIR}/cmake/test/openssl-msvc-discovery"
+      -DZSWAG_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 # Include coverage configuration if enabled

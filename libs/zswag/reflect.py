@@ -83,9 +83,8 @@ def rsetattr(obj, attr, val):
 def rgetattr(obj, attr):
     """Resolve a possibly dotted attribute path on an object.
 
-    A descriptive ``RuntimeError`` is raised when any path segment is missing.
-    This makes malformed OpenAPI parameter mappings easier to diagnose than a
-    plain ``AttributeError`` on an intermediate generated zserio object.
+    Each intermediate object must expose the next path segment. This helper
+    does not create missing objects or resolve schema names to Python names.
     """
     def _getattr(obj, attr):
         if not hasattr(obj, attr):
@@ -93,10 +92,10 @@ def rgetattr(obj, attr):
                 f"\nERROR: `{attr}` does not exist not in {obj.__name__}; choices are ..." +
                 "".join("\n  * "+choice for choice in dir(obj) if not choice.startswith("__")))
         return getattr(obj, attr)
+
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 
-# Get the request type for a zserio service method.
 def service_method_request_type(service_instance: Any, method_name: str) -> Any:
     """Return the generated request class for a zserio service method.
 
@@ -119,21 +118,20 @@ def to_snake(s: str, patterns=(re("([a-z])([A-Z])"), re("([0-9A-Z])([A-Z][a-z])"
     return s.lower()
 
 
-# Returns true if t is atomic (not a compound struct),
-# false otherwise.
 def is_scalar(t: TypeInfo):
     """Return whether zserio type info represents a scalar or enum value."""
     return t.py_type in SCALAR_T or issubclass(t.py_type, Enum)
 
 
-# Retrieve zserio type info for a schema class -
-# result is cached for maximum performance.
 def cached_type_info(zserio_t) -> Optional[TypeInfo]:
     """Return cached zserio ``TypeInfo`` for a generated schema class.
 
     The zserio Python runtime computes type information from generated metadata.
     Caching avoids repeated reflection work when generating large OpenAPI files
-    or handling many incoming requests.
+    or handling many incoming requests. Types without ``type_info`` return
+    ``None``. Entries are keyed by module and qualified class name and retained
+    for the process lifetime; regenerating a class under the same name does not
+    invalidate its entry.
     """
     if not hasattr(zserio_t, "type_info"):
         return None
@@ -143,17 +141,13 @@ def cached_type_info(zserio_t) -> Optional[TypeInfo]:
     return TYPE_INFO_CACHE[key]
 
 
-# Recursively find a member info (e.g. "myField1.myField2") in
-# a TypeInfo. Member names may be pythonic. The input field path
-# must be with original (not necessarily pythonic) schema field
-# names. The first output tuple entry is the pythonic conversion
-# ("my_field_1.my_field_2").
 def find_field(t: TypeInfo, field: str, offset: int = 0, py_path="") -> Tuple[str, Optional[MemberInfo]]:
     """Find a dotted zserio schema field in ``TypeInfo``.
 
     ``field`` uses schema names, not Python property names. The returned tuple
     contains the equivalent dotted Python attribute path and the matching
     ``MemberInfo``. If no field matches, ``("", None)`` is returned.
+    For example, ``myField1.myField2`` becomes ``my_field_1.my_field_2``.
     """
     next_dot = field.find(".", offset)
     subfield = field[offset:next_dot] if next_dot >= 0 else field[offset:]
@@ -168,12 +162,13 @@ def find_field(t: TypeInfo, field: str, offset: int = 0, py_path="") -> Tuple[st
     return "", None
 
 
-# Simply yields all MemberInfo for a TypeInfo.
 def members(t: TypeInfo, recursive=False, field_prefix="") -> Iterator[MemberInfo]:
     """Yield ``(schema_field_name, MemberInfo)`` pairs from zserio type info.
 
     When ``recursive`` is true, nested compound members are traversed and field
-    names are emitted as dotted schema paths.
+    names are emitted as dotted schema paths. Each compound member is yielded
+    before its descendants; this is not a leaf-only traversal. Recursive schema
+    cycles are not detected.
     """
     if TypeAttribute.FIELDS in t.attributes:
         for member in t.attributes[TypeAttribute.FIELDS]:
@@ -184,15 +179,17 @@ def members(t: TypeInfo, recursive=False, field_prefix="") -> Iterator[MemberInf
                 yield from members(member.type_info, recursive, field_name)
 
 
-# Checks whether is a type is not trivially constructable:
-# It (or a subtype) might take extra parameters, or be
-# an array of non-scalar types.
 def check_uninstantiable(t: TypeInfo, field_name="", recursive=False) -> Optional[NotInstantiableReason]:
-    """Return why a type cannot be auto-instantiated, or ``None`` if it can.
+    """Check whether a type can be auto-instantiated from flat parameters.
+
+    Return the first unsupported constructor/array shape, or ``None``.
 
     Auto-instantiation is only safe for request objects with parameterless
     constructors and scalar arrays. Compound arrays and parameterized zserio
     structs require user data the generic OpenAPI path cannot synthesize.
+    By default only this type and its direct array fields are checked; set
+    ``recursive=True`` to inspect nested compound fields too. This check does
+    not execute constructors or prove arbitrary schema constraints are valid.
     """
     if TypeAttribute.PARAMETERS in t.attributes and t.attributes[TypeAttribute.PARAMETERS]:
         return NotInstantiableReason(field_name, t.schema_name)
@@ -206,31 +203,35 @@ def check_uninstantiable(t: TypeInfo, field_name="", recursive=False) -> Optiona
                 return reason
 
 
-# Returns a fully recursively initialized class instance
-# of a zserio schema type, if possible.
 def instantiate(t: Type) -> Any:
     """Create a recursively initialized instance of a generated zserio class.
 
     Non-scalar fields are recursively instantiated so flattened HTTP parameters
     can later be assigned into nested request objects. Raises
-    :class:`NotInstantiableReason` when the type cannot be synthesized safely.
+    :class:`NotInstantiableReason` for unsupported array/parameter shapes
+    reached after construction. The generated no-argument constructor runs
+    first, so its own exceptions can propagate before that check.
     """
     result_instance = t()
     type_info = cached_type_info(t)
     if reason := check_uninstantiable(type_info):
         raise reason
+
     for _, member_info in members(type_info):
         field_name: str = member_info.attributes[MemberAttribute.PROPERTY_NAME]
         member_type_info = member_info.type_info
         if not is_scalar(member_type_info):
             compound_field_value = instantiate(member_type_info.py_type)
             setattr(result_instance, f"_{field_name}_", compound_field_value)
+
     return result_instance
 
 
-# Get a byte buffer from a string which is encoded in a given format
 def str_to_bytes(s: str, fmt: OAParamFormat) -> bytes:
-    """Decode an OpenAPI string parameter into bytes according to ``fmt``."""
+    """Decode base64/base64url/hex, or encode other formats as raw Unicode bytes.
+
+    Decoder errors propagate. This helper does not perform zserio validation.
+    """
     if fmt == OAParamFormat.BASE64:
         return base64.b64decode(s)
     elif fmt == OAParamFormat.BASE64URL:
@@ -241,47 +242,48 @@ def str_to_bytes(s: str, fmt: OAParamFormat) -> bytes:
         return bytes(s, encoding="raw_unicode_escape")
 
 
-# Convert a single passed parameter value to it's correct type
 def parse_param_value(param: OAParam, target_type: Type, value: str) -> Any:
     """Convert one raw OpenAPI parameter value into a target Python type.
 
-    Handles native string conversion, boolean conversion through ``0``/``1``,
-    enum conversion through the enum value, hexadecimal integer conversion, and
-    binary encodings used for serialized numeric/string zserio values.
+    String-format booleans use ``bool(int(value))``; numeric text other than
+    zero is true. Enums convert through their integer value. Hex integers use
+    ``int(value, 16)``. Other binary numeric encodings are signed, big-endian
+    C-width values, not arbitrary zserio bitstreams; strings decode as UTF-8.
+    Unsupported type/byte-length combinations raise ``RuntimeError`` and
+    conversion or decoder exceptions propagate.
     """
-    # Check if it's an enum ...
+    # Enums share the numeric conversion path before resolving the member.
     if issubclass(target_type, Enum):
         return target_type(parse_param_value(param, int, value))
-    # Check if the parameter format is native string conversion
+
+    # String and hex integers bypass binary decoding.
     if param.format == OAParamFormat.STRING:
         if target_type is bool:
             return bool(int(value))
         return target_type(value)
-    # Is it hex-to-int conversion?
+
     if param.format == OAParamFormat.HEX and target_type is int:
         return int(value, 16)
-    # It is some kind of blob conversion!
+
+    # Binary numeric encodings select a fixed-width, network-order struct.
     value_as_bytes = str_to_bytes(value, param.format)
-    # Is it a serialized C type (char/uchar/float/double/long...)?
     struct_literal_key = (target_type, len(value_as_bytes))
     if struct_literal_key in C_STRUCT_LITERAL_PER_TYPE_AND_SIZE:
         return target_type(struct.unpack(
             C_STRUCT_LITERAL_PER_TYPE_AND_SIZE[struct_literal_key],
             value_as_bytes)[0])
-    # Is it a string blob?
+
     if target_type is str:
         return str(value_as_bytes, 'utf-8')
+
     raise RuntimeError(f"Cannot convert {len(value_as_bytes)} to {target_type}")
 
 
-# Convert an array of passed parameter values to their correct type
 def parse_param_values(param: OAParam, target_type: Type, value: List[str]) -> List[Any]:
     """Convert a repeated OpenAPI parameter into a list of typed values."""
     return [parse_param_value(param, target_type, item) for item in value]
 
 
-# Get a blob for a zserio request type, a set of request parameter values
-# and an OpenAPI method path spec.
 def request_object_blob(*, req_t: Type, headers: Dict[str, Any], spec: OAMethod, **kwargs) -> bytes:
     """Build a serialized zserio request blob from HTTP request data.
 
@@ -289,11 +291,15 @@ def request_object_blob(*, req_t: Type, headers: Dict[str, Any], spec: OAMethod,
     object. Whole-request blob parameters are returned directly after decoding.
     For field-level parameters, the function lazily instantiates ``req_t``,
     converts raw parameter/header values, assigns them into the generated object,
-    and serializes the object with ``zserio.BitStreamWriter``.
+    and serializes the object with ``zserio.BitStreamWriter``. Keyword values
+    take precedence over headers, then declared defaults. At least one whole
+    blob or field mapping is required; a field-only request with no parameters
+    reaches an assertion. Conversion, lookup and serialization errors propagate.
     """
     # Lazy instantiation of request object and type info
     req: Optional[req_t] = None
     req_t_info = cached_type_info(req_t)
+
     # Apply parameters
     param_name: str
     param: OAParam
@@ -306,12 +312,15 @@ def request_object_blob(*, req_t: Type, headers: Dict[str, Any], spec: OAMethod,
         else:
             if param_name in headers:
                 value = headers[param_name]
-        # Convert string value to whole blob
+
+        # A whole-request mapping supplies the complete payload immediately.
         if param.field == ZSERIO_REQUEST_PART_WHOLE:
             return str_to_bytes(value, param.format)
+
         # First non-whole request parameter: Synthetic request object
         if not req:
             req = instantiate(req_t)
+
         # Convert string value to correct type
         pythonic_field_path, target_type = find_field(req_t_info, param.field)
         if not target_type:
@@ -322,6 +331,7 @@ def request_object_blob(*, req_t: Type, headers: Dict[str, Any], spec: OAMethod,
             converted_value = parse_param_value(param, target_type.type_info.py_type, value)
         # Apply value to request object field
         rsetattr(req, pythonic_field_path, converted_value)
+
     # Serialise request object. Assert at least one parameter given.
     assert req
     serializer = zserio.BitStreamWriter()
