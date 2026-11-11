@@ -58,6 +58,6 @@ The build downloads the zserio Java compiler and generates Java classes from `li
 
 ## See also
 
-- [`docs/java.md`](../../docs/java.md) — canonical Java client guide.
-- [`libs/zswag/test/calc/api.yaml`](../../libs/zswag/test/calc/api.yaml) — the OpenAPI spec the test exercises (good reference for `x-zserio-request-part` usage).
-- [`CalculatorTestClient.java`](src/main/java/com/ndsev/zswag/test/CalculatorTestClient.java) — the test source.
+- [`docs/java.md`](../../../docs/java.md) — canonical Java client guide.
+- [`libs/zswag/test/calc/api.yaml`](../../zswag/test/calc/api.yaml) — the OpenAPI spec the test exercises (good reference for `x-zserio-request-part` usage).
+- [`CalculatorTestClient.java`](src/main/java/io/github/ndsev/zswag/test/CalculatorTestClient.java) — the test source.

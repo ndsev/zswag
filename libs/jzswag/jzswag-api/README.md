@@ -21,4 +21,4 @@ No third-party dependencies (the YAML loader for `HttpSettings` lives in `jzswag
 
 ## Usage
 
-This module is a peer dependency of the platform implementations; you don't depend on it directly. See [`docs/java.md`](../../docs/java.md) for client usage examples.
+This module is a peer dependency of the platform implementations; you don't depend on it directly. See [`docs/java.md`](../../../docs/java.md) for client usage examples.

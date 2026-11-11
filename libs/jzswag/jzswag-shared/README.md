@@ -9,7 +9,7 @@ Platform-agnostic core of the zswag Java client. Sits between `jzswag-api` (inte
 - **`ParameterEncoder`** — per-location encoding (`encodeForPath`, `encodeForQuery`, `encodeForHeader`, `encodeForCookie`) covering `simple`/`label`/`matrix`/`form` × `explode` × `string`/`byte`/`base64`/`base64url`/`hex`/`binary`.
 - **`OAuth2Handler`** — client-credentials flow with cached, refresh-token-aware token minting. Supports both `rfc6749-client-secret-basic` and `rfc5849-oauth1-signature` token-endpoint authentication. Takes an `IKeychain` so it can resolve a `clientSecretKeychain` reference on either platform.
 - **`OAuth1Signature`** — RFC 5849 HMAC-SHA256 signature builder used by the `rfc5849-oauth1-signature` token-endpoint auth method.
-- **`HttpSettingsLoader`** — YAML loader for the multi-scope settings file (`HTTP_SETTINGS_FILE`). Schema documented in [`docs/http-settings.md`](../../docs/http-settings.md), shared with the C++ and Python clients.
+- **`HttpSettingsLoader`** — YAML loader for the multi-scope settings file (`HTTP_SETTINGS_FILE`). Schema documented in the [README HTTP settings section](../../../README.md#http-settings-file), shared with the C++ and Python clients.
 - **`ZserioReflection`** — POJO getter reflection that resolves dotted `x-zserio-request-part` paths against zserio-Java-generated request structs.
 
 ## Dependencies
