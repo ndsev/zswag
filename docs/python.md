@@ -9,12 +9,14 @@ The Python module `zswag` provides:
 ## Install
 
 ```bash
-pip install zswag
+python -m pip install zswag
 ```
 
 One wheel per operating system and CPU architecture covers CPython 3.10-3.14:
 Linux (x86_64 / aarch64), macOS (x86_64 / arm64), and Windows (x64). Pip
-installs the matching `nanobind-backend` runtime automatically. On Windows
+installs the matching `nanobind-backend` runtime automatically. If you maintain
+an offline wheelhouse, include the backend for each target interpreter and
+platform alongside `zswag` and its other dependencies. On Windows
 install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
 
 ## Client usage

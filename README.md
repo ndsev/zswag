@@ -100,11 +100,11 @@ flowchart TB
 
 Detailed guides for each client + the server + the generator:
 
-- [`docs/python.md`](docs/python.md) — Python `OAClient` and `OAServer`.
-- [`docs/cpp.md`](docs/cpp.md) — C++ client and CMake integration.
-- [`docs/java.md`](docs/java.md) — Java client.
-- [`docs/openapi-generator.md`](docs/openapi-generator.md) — `zswag.gen` CLI reference.
-- [`docs/release-process.md`](docs/release-process.md) — CI/CD platforms, release tagging, and dev snapshot conventions (maintainer-facing).
+- [Python guide](https://github.com/ndsev/zswag/blob/main/docs/python.md): `OAClient` and `OAServer`.
+- [C++ guide](https://github.com/ndsev/zswag/blob/main/docs/cpp.md): client and CMake integration.
+- [Java guide](https://github.com/ndsev/zswag/blob/main/docs/java.md): Java client.
+- [OpenAPI generator](https://github.com/ndsev/zswag/blob/main/docs/openapi-generator.md): `zswag.gen` CLI reference.
+- [Release process](https://github.com/ndsev/zswag/blob/main/docs/release-process.md): platforms, release tags, and development snapshots.
 
 The shared YAML format for `HTTP_SETTINGS_FILE` (used by all three clients) is documented in the [HTTP Settings File](#http-settings-file) section below.
 
@@ -113,7 +113,7 @@ The shared YAML format for `HTTP_SETTINGS_FILE` (used by all three clients) is d
 ### Python
 
 ```bash
-pip install zswag
+python -m pip install zswag
 ```
 
 ```python
@@ -191,15 +191,18 @@ The only difference is the `Context` parameter on the constructor — needed so 
 
 ### Python users
 
-Wheels are published for 64-bit Python 3.10-3.14 on Linux (x86_64), macOS (x86_64 / arm64), and Windows (x64). On Windows install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
+One wheel per platform supports 64-bit CPython 3.10 through 3.14: Linux
+(x86_64 or aarch64), macOS (Intel or Apple Silicon), and Windows (x64).
+Install `zswag`; pip selects the matching `nanobind-backend` automatically.
+On Windows install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
 
 ### C++ users
 
-zswag uses CMake's `FetchContent` for dependencies; CMake ≥ 3.22.3 required. See [`docs/cpp.md`](docs/cpp.md) for full build options including offline / disconnected builds and code coverage.
+zswag uses CMake's `FetchContent` for dependencies; CMake ≥ 3.22.3 required. See the [C++ guide](https://github.com/ndsev/zswag/blob/main/docs/cpp.md) for full build options including offline / disconnected builds and code coverage.
 
 ### Java users
 
-Java 11+ source/target. The integration test depends on `pip install zswag` for its counterparty server. See [`docs/java.md`](docs/java.md).
+Java 11+ source/target. The integration test depends on `pip install zswag` for its counterparty server. See the [Java guide](https://github.com/ndsev/zswag/blob/main/docs/java.md).
 
 ## Client environment variables
 

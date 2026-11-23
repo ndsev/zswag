@@ -24,7 +24,7 @@ For tests:
 ctest --verbose
 ```
 
-For wheels (Python wheels for the `zswag`/`pyzswagcl` packages — these embed parts of the C++ stack):
+To build the `zswag` wheel, including its native `pyzswagcl` module:
 
 ```bash
 cmake -DZSWAG_BUILD_WHEELS=ON ..
@@ -32,7 +32,9 @@ cmake --build .
 # Output under build/bin/wheel/
 ```
 
-The Python environment used at CMake configure time is the one wheels are built against.
+CMake uses the Python interpreter selected at configure time (CPython 3.10
+or newer). The resulting `cp310-abi3` wheel is shared across supported
+Python versions on the same platform; `pyzswagcl` is not a separate install.
 
 ### Common build options
 

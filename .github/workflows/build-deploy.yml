@@ -310,60 +310,30 @@ jobs:
       - name: Create GitHub pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_REF: ${{ github.event.inputs.ref }}
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          RELEASE_TAG: ${{ steps.release_info.outputs.release_tag }}
+          SHORT_SHA: ${{ steps.release_info.outputs.short_sha }}
+          CUSTOM_NOTES: ${{ github.event.inputs.release_notes }}
         run: |
-          VERSION="${{ needs.determine-version.outputs.version }}"
-          RELEASE_TAG="${{ steps.release_info.outputs.release_tag }}"
-          SHORT_SHA="${{ steps.release_info.outputs.short_sha }}"
-          CUSTOM_NOTES="${{ github.event.inputs.release_notes }}"
+          repo_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          shopt -s failglob
+          {
+            printf '## Test snapshot from %s\n\n' "$SNAPSHOT_REF"
+            printf '**Version:** `%s`\n**Commit:** `%s`\n' "$VERSION" "$SHORT_SHA"
+            printf '**Build:** [%s](%s/actions/runs/%s)\n\n' "$GITHUB_RUN_ID" "$repo_url" "$GITHUB_RUN_ID"
+            printf '%s\n\n' 'In a fresh CPython 3.10 through 3.14 virtual environment, run only the command for your OS and CPU. Pip installs the matching nanobind backend automatically.'
+            for wheel in dist/*.whl; do
+              printf -- '- `python -m pip install "%s/releases/download/%s/%s"`\n' "$repo_url" "$RELEASE_TAG" "${wheel##*/}"
+            done
+            if [ -n "$CUSTOM_NOTES" ]; then
+              printf '\n### Release notes\n\n%s\n' "$CUSTOM_NOTES"
+            fi
+          } > release_notes.md
 
-          # Build release notes
-          cat > release_notes.md <<'EOF'
-          ## Test Snapshot from ${{ github.event.inputs.ref }}
-
-          **Version:** `${{ needs.determine-version.outputs.version }}`
-          **Commit:** `${{ steps.release_info.outputs.short_sha }}`
-          **Build:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-          ### Installation Instructions
-
-          This is a test snapshot for customer verification. To install:
-
-          1. **Use a virtual environment** (recommended):
-             ```bash
-             python -m venv venv
-             source venv/bin/activate  # On Windows: venv\Scripts\activate
-             ```
-             [Learn more about virtual environments](https://docs.python.org/3/tutorial/venv.html)
-
-          2. **Install/upgrade the wheel** (force reinstall to ensure version consistency):
-             ```bash
-             pip install --force-reinstall dist/zswag-${VERSION}-*.whl
-             ```
-
-          ⚠️ **Warning:** This will remove any existing `zswag` installation.
-
-          ### Direct Installation from Release
-
-          You can install directly from this release (replace `<platform-python>` with your platform, e.g., `cp310-manylinux_x86_64`):
-          ```bash
-          pip install --force-reinstall \
-            https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/zswag-${VERSION}-<platform-python>.whl
-          ```
-
-          EOF
-
-          # Add custom notes if provided
-          if [ -n "$CUSTOM_NOTES" ]; then
-            echo "" >> release_notes.md
-            echo "### Release Notes" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "$CUSTOM_NOTES" >> release_notes.md
-          fi
-
-          # Create the pre-release
-          gh release create "${RELEASE_TAG}" \
+          gh release create "$RELEASE_TAG" \
             --prerelease \
-            --target "${{ github.event.inputs.ref }}" \
-            --title "Test Snapshot: ${{ github.event.inputs.ref }} (${SHORT_SHA})" \
+            --target "$SNAPSHOT_REF" \
+            --title "Test Snapshot: $SNAPSHOT_REF ($SHORT_SHA)" \
             --notes-file release_notes.md \
             dist/*
