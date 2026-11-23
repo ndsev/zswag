@@ -12,66 +12,41 @@ using namespace httpcl;
 
 namespace
 {
-    Any valueFromPyObject(PyObject* value) {
-        if (PyLong_Check(value)) {
-            auto i64 = static_cast<int64_t>(PyLong_AsLongLong(value));
-            if (i64 == -1 && PyErr_Occurred()) {
-                return static_cast<uint64_t>(PyLong_AsUnsignedLongLong(value));
-            }
-            return i64;
+    Any valueFromPyObject(py::handle value) {
+        if (py::isinstance<py::int_>(value)) {
+            int64_t signedValue;
+            if (py::try_cast(value, signedValue))
+                return signedValue;
+            return py::cast<uint64_t>(value);
         }
 
-        if (PyObject_HasAttrString(value, "value")) { // enum item
-            return valueFromPyObject(PyObject_GetAttrString(value, "value"));
-        }
+        if (py::hasattr(value, "value")) // enum item
+            return valueFromPyObject(value.attr("value"));
+        if (py::isinstance<py::float_>(value))
+            return py::cast<double>(value);
+        if (py::isinstance<py::str>(value))
+            return py::cast<std::string>(value);
 
-        if (PyFloat_Check(value)) {
-            return PyFloat_AsDouble(value);
-        }
-
-        if (auto s = PyUnicode_AsUTF8(value)) {
-            return s;
-        }
-
-        if (value == Py_True) {
-            return static_cast<uint64_t>(1);
-        }
-
-        if (value == Py_False) {
-            return static_cast<uint64_t>(0);
-        }
-
-        throw pybind11::type_error(
-            stx::format("Conversion error: Got {}, which was not recognized as a valid value type.",
-                std::string(py::repr(value))));
+        throw py::type_error(stx::format("Unsupported request value: {}",
+                                        py::cast<std::string>(py::repr(value))).c_str());
     }
 
-    std::vector<Any> valuesFromPyArray(PyObject* value) {
-        const auto len = PySequence_Size(value);
-        if (len == -1)
-            return {};
-
+    std::vector<Any> valuesFromPyArray(py::handle value) {
         std::vector<Any> result;
-        result.reserve(len);
-
-        for (Py_ssize_t i = 0; i < len; ++i) {
-            auto* item = PySequence_GetItem(value, i);
+        result.reserve(py::len(value));
+        for (py::handle item : value)
             result.push_back(valueFromPyObject(item));
-        }
-
-        return {std::move(result)};
+        return result;
     }
 }
 
 void PyOpenApiClient::bind(py::module_& m) {
-    auto serviceClient =
-        py::class_<PyOpenApiClient>(m, "OAClient", R"doc(
+    py::class_<PyOpenApiClient>(m, "OAClient", R"doc(
 Native OpenAPI client for zserio services.
 
 ``OAClient`` loads an OpenAPI document, selects one configured server URL, and
 uses the generated zserio Python request wrappers to call service methods over
-HTTP. The class is also registered as a ``zserio.ServiceInterface`` subclass so
-generated zserio client helpers can use it directly.
+HTTP. The public Python class adds the zserio ServiceInterface base.
 )doc")
             .def(
                 py::init<
@@ -118,7 +93,7 @@ only HTTP 200 succeeds, with other statuses reported as HTTPError.
 )doc",
                 "method_name"_a,
                 "request"_a,
-                "unused"_a)
+                "unused"_a.none())
             .def(
                 "config",
                 [](PyOpenApiClient const& self) -> OpenAPIConfig const&
@@ -130,10 +105,8 @@ Return the parsed OpenAPI configuration owned by this client.
 
 The returned :class:`OAConfig` stays valid as long as the client object exists.
 )doc",
-                py::return_value_policy::reference_internal);
+                py::rv_policy::reference_internal);
 
-    py::object serviceClientBase = py::module::import("zserio").attr("ServiceInterface");
-    serviceClient.attr("__bases__") = py::make_tuple(serviceClientBase) + serviceClient.attr("__bases__");
 }
 
 PyOpenApiClient::PyOpenApiClient(std::string const& openApiUrl,
@@ -169,23 +142,24 @@ std::vector<uint8_t> PyOpenApiClient::callMethod(
         py::object request,
         py::object unused)
 {
-    if (!request) {
+    if (request.is_none()) {
         throw std::runtime_error("The request argument is None!");
     }
 
     auto response = client_->call(methodName, [&](const std::string& parameter, const std::string& field, ParameterValueHelper& helper)
     {
         if (field == ZSERIO_REQUEST_PART_WHOLE) {
-            auto requestData = request.attr("byte_array");
-            py::buffer_info info(py::buffer(requestData).request());
-            auto* data = reinterpret_cast<uint8_t*>(info.ptr);
-            auto length = static_cast<size_t>(info.size);
-            return helper.binary(std::vector<uint8_t>(data, data + length));
+            // Python's buffer protocol is not part of the 3.10 limited API.
+            // Convert bytes-like request wrappers without losing embedded NULs.
+            py::object buffer = request.attr("byte_array");
+            py::bytes requestData(buffer);
+            auto data = static_cast<const uint8_t*>(requestData.data());
+            return helper.binary(std::vector<uint8_t>(data, data + requestData.size()));
         }
 
         auto parts = stx::split<std::vector<std::string>>(field, ".");
         auto currentField = parts.begin();
-        auto value = request.attr("zserio_object").cast<py::object>();
+        py::object value = request.attr("zserio_object");
 
         while (currentField != parts.end()) {
             auto internalFieldName = stx::format("_{}_", *currentField);
@@ -195,15 +169,14 @@ std::vector<uint8_t> PyOpenApiClient::callMethod(
                     methodName));
             }
             value = value.attr(internalFieldName.c_str());
-            assert(value);
             ++currentField;
         }
 
-        if (PySequence_Check(value.ptr())) {
-            return helper.array(valuesFromPyArray(value.ptr()));
+        if (PySequence_Check(value.ptr()) && !py::isinstance<py::str>(value)) {
+            return helper.array(valuesFromPyArray(value));
         }
 
-        return helper.value(valueFromPyObject(value.ptr()));
+        return helper.value(valueFromPyObject(value));
     });
 
     std::vector<uint8_t> responseData;

@@ -56,7 +56,7 @@ cmake -DFETCHCONTENT_FULLY_DISCONNECTED=ON ..
 cmake --build .
 ```
 
-Override individual deps with `-DFETCHCONTENT_SOURCE_DIR_<NAME>=/path/to/local`. Available names: `ZLIB`, `SPDLOG`, `YAML_CPP`, `STX`, `CURL`, `NGHTTP2`, `OPENSSL`, `PYBIND11`, `PYTHON_CMAKE_WHEEL`, `ZSERIO_CMAKE_HELPER`, `KEYCHAIN`, `CATCH2`.
+Override individual deps with `-DFETCHCONTENT_SOURCE_DIR_<NAME>=/path/to/local`. Available names: `ZLIB`, `SPDLOG`, `YAML_CPP`, `STX`, `CURL`, `NGHTTP2`, `OPENSSL`, `NANOBIND`, `PYTHON_CMAKE_WHEEL`, `ZSERIO_CMAKE_HELPER`, `KEYCHAIN`, `CATCH2`.
 
 ## Integrating into your project
 

@@ -23,8 +23,8 @@ add_custom_target(zswag-python-package
     "${ZSWAG_RUNTIME_PACKAGE_DIR}/reflect.py"
   COMMENT "Preparing runtime Python package files for the zswag wheel")
 
-pybind11_add_module(pyzswagcl
-  MODULE
+nanobind_add_module(pyzswagcl
+  BACKEND_MODULE nanobind_backend
     py-zswagcl.cpp
     py-openapi-client.cpp
     py-openapi-client.h)
@@ -76,11 +76,13 @@ add_wheel(pyzswagcl
   URL "https://github.com/ndsev/zswag"
   VERSION "${ZSWAG_VERSION}"
   PYTHON_REQUIRES ">=3.10"
+  LIMITED_API cp310
   DESCRIPTION "OpenAPI service transport layer for zserio."
   README_PATH "${ZSWAG_SOURCE_ROOT}/README.md"
   TARGET_DEPENDENCIES
     zswagcl
   MODULE_DEPENDENCIES
+    "nanobind-backend>=1.0,<2"
     "connexion~=2.15.1"
     requests
     "zserio<3.0.0"

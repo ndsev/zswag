@@ -40,7 +40,7 @@ flowchart TB
       oaserver["<b>OAServer</b> (Python only)<br/>request dispatch<br/>+ auth enforcement"]:::py
     end
 
-    subgraph cppcore[" &nbsp;C++ core (shared with Python via pybind11)&nbsp; "]
+    subgraph cppcore[" &nbsp;C++ core (shared with Python via nanobind)&nbsp; "]
       direction LR
       zswagcl["<b>zswagcl</b><br/>OpenAPI parser<br/>+ dispatch"]:::cpp
       httpcl["<b>httpcl</b><br/>HTTP transport<br/>+ OS keychain"]:::cpp
@@ -87,10 +87,10 @@ flowchart TB
 
 | Component | Language | Role |
 |---|---|---|
-| `zswagcl` | C++ | Core OpenAPI client (`OAClient`, `OpenApiClient`, `OpenApiConfig`); reused by the Python client via pybind11. |
+| `zswagcl` | C++ | Core OpenAPI client (`OAClient`, `OpenApiClient`, `OpenApiConfig`); reused by the Python client via nanobind. |
 | `httpcl` | C++ | HTTP wrapper around [libcurl](https://curl.se/libcurl/) with HTTP/2 support; request configuration; OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain). |
 | `zswag` | Python | Python `OAClient`, the Flask/Connexion-based `OAServer`, and the `zswag.gen` OpenAPI generator. |
-| `pyzswagcl` | Python | pybind11 bindings exposing `zswagcl` to Python. Bundled inside the `zswag` wheel; not installed separately. |
+| `pyzswagcl` | Python | nanobind bindings exposing `zswagcl` to Python. Bundled inside the `zswag` wheel; not installed separately. |
 | `jzswag-api` | Java | Platform-agnostic contracts (`HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `IHttpClient`, `IKeychain`, …). No third-party deps. |
 | `jzswag-shared` | Java | Portable core: OpenAPI dispatch, `x-zserio-request-part`, parameter encoding, OAuth2/OAuth1 token endpoint flow, YAML loader. Used by both platform modules. |
 | `jzswag-jvm` | Java | JVM port using JDK 11 `HttpClient`. Runs on any standard JVM (server, desktop, lambda, CLI). Implements zserio's `ServiceClientInterface`. |

@@ -46,7 +46,7 @@ jobs:
     needs: [determine-version]
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11"]
         arch: ["x86_64", "aarch64"]
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     container: ghcr.io/klebert-engineering/manylinux-cpp17-py${{ matrix.python-version }}-${{ matrix.arch }}:2025.1
@@ -102,12 +102,8 @@ jobs:
     strategy:
       matrix:
         # macos-15: Apple Silicon runners (arm64)
-        os: [macos-15, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        exclude:
-          # Python 3.10 doesn't have ARM64 builds for macOS
-          - os: macos-15
-            python-version: "3.10"
+        os: [macos-15, macos-15-intel, windows-latest]
+        python-version: ["3.11"]
     env:
       SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.determine-version.outputs.version }}
     steps:
@@ -118,16 +114,17 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: x64
+        architecture: ${{ matrix.os == 'macos-15' && 'arm64' || 'x64' }}
     - run: python -m pip install setuptools wheel
     - run: mkdir build
     - name: Build (macOS)
       if: startsWith(matrix.os, 'macos')
       working-directory: build
       run: |
-        export MACOSX_DEPLOYMENT_TARGET=11.0  # ARM64 requires macOS 11.0+
+        export MACOSX_DEPLOYMENT_TARGET=11.0
+        export _PYTHON_HOST_PLATFORM="macosx-11.0-$(uname -m)"
         python -m pip install delocate "h2>=4.1,<5"
-        cmake -DPython3_ROOT_DIR=$pythonLocation \
+        cmake -DCMAKE_OSX_ARCHITECTURES="$(uname -m)" -DPython3_ROOT_DIR=$pythonLocation \
               -DPython3_FIND_FRAMEWORK=LAST \
               -DCMAKE_BUILD_TYPE=Release \
               -DHTTPLIB_USE_BROTLI_IF_AVAILABLE=OFF \
@@ -175,8 +172,35 @@ jobs:
         pip install bin/wheel/zswag-*.whl
         python ../libs/zswag/test/oauth2_mock/test_oauth_e2e.py
 
+  test-shared-wheel:
+    name: Install the same Linux wheel on CPython ${{ matrix.python-version }}
+    needs: build-manylinux
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels-linux-x86_64-py3.11
+          path: dist
+      - name: Audit the stable Python ABI
+        if: matrix.python-version == '3.14'
+        run: |
+          python -m pip install abi3audit
+          abi3audit --strict dist/*.whl
+      - name: Install and exercise the repaired stable-ABI wheel
+        run: |
+          python -m pip install dist/zswag-*-cp310-abi3-*.whl
+          python libs/zswag/test/split-wheel-smoke.py
+
   deploy:
-    needs: [determine-version, build-manylinux, build]
+    needs: [determine-version, build-manylinux, build, test-shared-wheel]
     if: |
       success() && 
       github.event_name == 'push' && 
