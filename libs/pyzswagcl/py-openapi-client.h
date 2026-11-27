@@ -1,11 +1,11 @@
 #include "zswagcl/private/openapi-client.hpp"
-#include <pybind11/pybind11.h>
-#include <pybind11/stl_bind.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/optional.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 #include <map>
 
-namespace py = pybind11;
+namespace py = nanobind;
 
 /** Python zserio adapter owning one native client; bound calls retain the GIL. */
 class PyOpenApiClient

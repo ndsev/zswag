@@ -1,7 +1,4 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl_bind.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
+#include <nanobind/stl/bind_map.h>
 #include <fstream>
 
 #include "zswagcl/private/openapi-parser.hpp"
@@ -9,11 +6,10 @@
 #include "py-openapi-client.h"
 #include "stx/format.h"
 
-namespace py = pybind11;
 using namespace py::literals;
 using namespace std::string_literals;
 
-PYBIND11_MODULE(pyzswagcl, m)
+NB_MODULE(pyzswagcl, m)
 {
     using namespace zswagcl;
     using namespace httpcl;
@@ -26,25 +22,21 @@ imported through :mod:`zswag`, which combines these native client bindings with
 the pure-Python server-side helpers.
 )doc";
 
-    auto parameterMap = py::bind_map<std::map<std::string, OpenAPIConfig::Parameter>>(m, "ParameterMap");
-    parameterMap.attr("__doc__") = R"doc(
+    py::bind_map<std::map<std::string, OpenAPIConfig::Parameter>>(m, "ParameterMap", R"doc(
 Mutable mapping from OpenAPI parameter names to :class:`OAParam` descriptors.
 
 Instances are returned by :attr:`OAMethod.parameters` and describe how a zserio
 request field is placed into the HTTP request for one service method.
-)doc";
-    py::implicitly_convertible<py::dict, std::map<std::string, OpenAPIConfig::Parameter>>();
+)doc");
 
-    auto headerMap = py::bind_map<PyOpenApiClient::Headers>(m, "HeaderMap");
-    headerMap.attr("__doc__") = R"doc(
+    py::bind_map<PyOpenApiClient::Headers>(m, "HeaderMap", R"doc(
 Mutable mapping from HTTP header names to header values.
 
 The map type is accepted wherever the native client expects explicit request or
 configuration headers.
-)doc";
-    py::implicitly_convertible<py::dict, PyOpenApiClient::Headers>();
+)doc");
 
-    auto httpError = py::register_exception<httpcl::IHttpClient::Error>(m, "HTTPError");
+    py::exception<httpcl::IHttpClient::Error> httpError(m, "HTTPError");
     httpError.attr("__doc__") = R"doc(
 Raised when OpenAPI discovery or a service call rejects the HTTP result.
 
@@ -58,7 +50,7 @@ member containing status and response content.
     ///////////////////////////////////////////////////////////////////////////
     // ParameterLocation
 
-    py::enum_<OpenAPIConfig::ParameterLocation>(m, "OAParamLocation", py::arithmetic(), R"doc(
+    py::enum_<OpenAPIConfig::ParameterLocation>(m, "OAParamLocation", py::is_arithmetic(), R"doc(
 Location of an OpenAPI parameter in an outgoing HTTP request.
 )doc")
             .value("PATH", OpenAPIConfig::ParameterLocation::Path, "Parameter value is substituted into the URL path.")
@@ -70,7 +62,7 @@ Location of an OpenAPI parameter in an outgoing HTTP request.
     ///////////////////////////////////////////////////////////////////////////
     // ParameterFormat
 
-    py::enum_<OpenAPIConfig::Parameter::Format>(m, "OAParamFormat", py::arithmetic(), R"doc(
+    py::enum_<OpenAPIConfig::Parameter::Format>(m, "OAParamFormat", py::is_arithmetic(), R"doc(
 Wire encoding used for a zserio request value exposed as an HTTP parameter.
 )doc")
             .value("STRING", OpenAPIConfig::Parameter::Format::String, "Use the scalar value's textual representation.")
@@ -92,19 +84,19 @@ Description of one OpenAPI parameter for a zswag service method.
 The descriptor maps an OpenAPI parameter name to a zserio request field, the
 parameter's HTTP location, the optional default value, and the value encoding.
 )doc")
-        .def_readonly(
+        .def_ro(
             "location",
             &OpenAPIConfig::Parameter::location,
             "Where the parameter is placed in the HTTP request.")
-        .def_readonly(
+        .def_ro(
             "field",
             &OpenAPIConfig::Parameter::field,
             "Dotted zserio request-field path read to populate this parameter.")
-        .def_readonly(
+        .def_ro(
             "default_value",
             &OpenAPIConfig::Parameter::defaultValue,
             "Fallback value; the current parser leaves this empty instead of reading schema.default.")
-        .def_readonly(
+        .def_ro(
             "format",
             &OpenAPIConfig::Parameter::format,
             "Wire encoding applied to the extracted request-field value.");
@@ -118,19 +110,19 @@ Resolved OpenAPI transport configuration for one zserio service method.
 Objects are returned from :class:`OAConfig` by method name and are used by
 :class:`OAClient` to construct the concrete HTTP request for a zserio call.
 )doc")
-        .def_readonly(
+        .def_ro(
             "path",
             &OpenAPIConfig::Path::path,
             "URL path template for the service method.")
-        .def_readonly(
+        .def_ro(
             "http_method",
             &OpenAPIConfig::Path::httpMethod,
             "Uppercase HTTP method such as ``GET`` or ``POST``.")
-        .def_readonly(
+        .def_ro(
             "parameters",
             &OpenAPIConfig::Path::parameters,
             "Mapping from OpenAPI parameter names to :class:`OAParam` descriptors.")
-        .def_readonly(
+        .def_ro(
             "body_request_object",
             &OpenAPIConfig::Path::bodyRequestObject,
             "Whether the operation advertises a whole zserio request object as its body.");
@@ -227,15 +219,12 @@ unauthenticated proxy.
             "port"_a,
             "user"_a = "",
             "pw"_a = "")
-        .def(py::pickle(
-            [](httpcl::Config const& self)
-            {
-                return py::make_tuple(self.toYaml());
-            },
-            [](py::tuple const& t)
-            {
-                return Config(t[0].cast<std::string>());
-            }));
+        .def("__getstate__", [](Config const& self) { return py::make_tuple(self.toYaml()); })
+        .def("__setstate__", [](Config* self, py::tuple state) {
+            if (state.size() != 1)
+                throw py::value_error("Expected a one-element HTTPConfig pickle");
+            new (self) Config(py::cast<std::string>(state[0]));
+        });
 
     ///////////////////////////////////////////////////////////////////////////
     // OpenAPIConfig
@@ -267,13 +256,13 @@ entries from the OpenAPI document.
             },
             "Return a copy of the method descriptor; missing names raise RuntimeError.",
             py::is_operator(),
-            py::return_value_policy::reference_internal,
+            py::rv_policy::reference_internal,
             "method_name"_a)
-        .def_readonly(
+        .def_ro(
             "content",
             &OpenAPIConfig::content,
             "Raw OpenAPI YAML/JSON document content that was parsed.")
-        .def_property_readonly(
+        .def_prop_ro(
             "servers",
             [](const OpenAPIConfig& self) -> std::vector<std::string>
             {
@@ -282,7 +271,7 @@ entries from the OpenAPI document.
                     result.emplace_back(uri.build());
                 return result;
             },
-            py::return_value_policy::automatic,
+            py::rv_policy::automatic,
             "Build advertised server URLs; unresolved relative entries from local parsing raise RuntimeError.");
 
     m.def(
@@ -302,7 +291,7 @@ Relative server entries stay unresolved and an absent server list stays empty.
 File/YAML/configuration failures raise; this does not perform general OpenAPI
 validation or resolve references from other documents.
 )doc",
-        py::return_value_policy::move,
+        py::rv_policy::move,
         "path"_a);
 
     m.def(
@@ -320,14 +309,14 @@ configured proxy/authentication, and resolves relative server URLs against the
 document URL. This binding keeps the GIL. Use OAClient with HTTPConfig for
 additional per-client settings and a transport reused across service calls.
 )doc",
-        py::return_value_policy::move,
+        py::rv_policy::move,
         "url"_a);
 
     ///////////////////////////////////////////////////////////////////////////
     // Global Constants
-    m.attr("ZSERIO_OBJECT_CONTENT_TYPE") = py::str(ZSERIO_OBJECT_CONTENT_TYPE);
-    m.attr("ZSERIO_REQUEST_PART") = py::str(ZSERIO_REQUEST_PART);
-    m.attr("ZSERIO_REQUEST_PART_WHOLE") = py::str(ZSERIO_REQUEST_PART_WHOLE);
+    m.attr("ZSERIO_OBJECT_CONTENT_TYPE") = ZSERIO_OBJECT_CONTENT_TYPE;
+    m.attr("ZSERIO_REQUEST_PART") = ZSERIO_REQUEST_PART;
+    m.attr("ZSERIO_REQUEST_PART_WHOLE") = ZSERIO_REQUEST_PART_WHOLE;
 
     ///////////////////////////////////////////////////////////////////////////
     // PyOpenApiClient

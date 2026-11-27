@@ -138,14 +138,20 @@ else()
     unset(BUILD_SHARED_LIBS)
 endif()
 
-# pybind11 (only needed when building wheels)
+# Split-mode bindings use the same build interpreter as python-cmake-wheel.
 if(ZSWAG_BUILD_WHEELS)
-    CPMAddPackage("gh:pybind/pybind11@2.13.6")
+    find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
+    set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
+    find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module
+                 OPTIONAL_COMPONENTS Development.SABIModule)
+    CPMAddPackage(NAME nanobind GITHUB_REPOSITORY wjakob/nanobind
+                  GIT_TAG v3.1.0 DOWNLOAD_ONLY YES)
+    include("${nanobind_SOURCE_DIR}/cmake/nanobind-config.cmake")
 endif()
 
 # python-cmake-wheel (only needed when building wheels)
 if(ZSWAG_BUILD_WHEELS)
-    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel@1.2.8")
+    CPMAddPackage("gh:Klebert-Engineering/python-cmake-wheel#v1.3.0")
 endif()
 
 # keychain
