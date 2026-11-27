@@ -9,10 +9,15 @@ The Python module `zswag` provides:
 ## Install
 
 ```bash
-pip install zswag
+python -m pip install zswag
 ```
 
-Wheels are published for 64-bit Python 3.10-3.14 on Linux (x86_64), macOS (x86_64 / arm64), and Windows (x64). On Windows make sure the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe) is installed.
+One wheel per operating system and CPU architecture covers CPython 3.10-3.14:
+Linux (x86_64 / aarch64), macOS (x86_64 / arm64), and Windows (x64). Pip
+installs the matching `nanobind-backend` runtime automatically. If you maintain
+an offline wheelhouse, include the backend for each target interpreter and
+platform alongside `zswag` and its other dependencies. On Windows
+install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
 
 ## Client usage
 
@@ -131,5 +136,5 @@ See [the interop matrix in README.md](../README.md#openapi-options-interoperabil
 ## Where things live in the repo
 
 - `libs/zswag/` — the Python package proper (`OAServer`, `OAClient`, `zswag.gen`).
-- `libs/pyzswagcl/` — pybind11 bindings exposing the C++ `zswagcl` core to Python; treat as internal.
+- `libs/pyzswagcl/` — nanobind bindings exposing the C++ `zswagcl` core to Python; treat as internal.
 - `libs/zswag/test/calc/` — the canonical end-to-end fixture (Calculator service, OpenAPI YAML, Python server, Python client, used by C++ and Java integration tests too).

@@ -40,7 +40,7 @@ flowchart TB
       oaserver["<b>OAServer</b> (Python only)<br/>request dispatch<br/>+ auth enforcement"]:::py
     end
 
-    subgraph cppcore[" &nbsp;C++ core (shared with Python via pybind11)&nbsp; "]
+    subgraph cppcore[" &nbsp;C++ core (shared with Python via nanobind)&nbsp; "]
       direction LR
       zswagcl["<b>zswagcl</b><br/>OpenAPI parser<br/>+ dispatch"]:::cpp
       httpcl["<b>httpcl</b><br/>HTTP transport<br/>+ OS keychain"]:::cpp
@@ -87,10 +87,10 @@ flowchart TB
 
 | Component | Language | Role |
 |---|---|---|
-| `zswagcl` | C++ | Core OpenAPI client (`OAClient`, `OpenApiClient`, `OpenApiConfig`); reused by the Python client via pybind11. |
+| `zswagcl` | C++ | Core OpenAPI client (`OAClient`, `OpenApiClient`, `OpenApiConfig`); reused by the Python client via nanobind. |
 | `httpcl` | C++ | HTTP wrapper around [libcurl](https://curl.se/libcurl/) with HTTP/2 support; request configuration; OS keychain integration via [`keychain`](https://github.com/hrantzsch/keychain). |
 | `zswag` | Python | Python `OAClient`, the Flask/Connexion-based `OAServer`, and the `zswag.gen` OpenAPI generator. |
-| `pyzswagcl` | Python | pybind11 bindings exposing `zswagcl` to Python. Bundled inside the `zswag` wheel; not installed separately. |
+| `pyzswagcl` | Python | nanobind bindings exposing `zswagcl` to Python. Bundled inside the `zswag` wheel; not installed separately. |
 | `jzswag-api` | Java | Platform-agnostic contracts (`HttpConfig`, `HttpSettings`, `OpenAPIParameter`, `IHttpClient`, `IKeychain`, …). No third-party deps. |
 | `jzswag-shared` | Java | Portable core: OpenAPI dispatch, `x-zserio-request-part`, parameter encoding, OAuth2/OAuth1 token endpoint flow, YAML loader. Used by both platform modules. |
 | `jzswag-jvm` | Java | JVM port using JDK 11 `HttpClient`. Runs on any standard JVM (server, desktop, lambda, CLI). Implements zserio's `ServiceClientInterface`. |
@@ -100,11 +100,11 @@ flowchart TB
 
 Detailed guides for each client + the server + the generator:
 
-- [`docs/python.md`](docs/python.md) — Python `OAClient` and `OAServer`.
-- [`docs/cpp.md`](docs/cpp.md) — C++ client and CMake integration.
-- [`docs/java.md`](docs/java.md) — Java client.
-- [`docs/openapi-generator.md`](docs/openapi-generator.md) — `zswag.gen` CLI reference.
-- [`docs/release-process.md`](docs/release-process.md) — CI/CD platforms, release tagging, and dev snapshot conventions (maintainer-facing).
+- [Python guide](https://github.com/ndsev/zswag/blob/main/docs/python.md): `OAClient` and `OAServer`.
+- [C++ guide](https://github.com/ndsev/zswag/blob/main/docs/cpp.md): client and CMake integration.
+- [Java guide](https://github.com/ndsev/zswag/blob/main/docs/java.md): Java client.
+- [OpenAPI generator](https://github.com/ndsev/zswag/blob/main/docs/openapi-generator.md): `zswag.gen` CLI reference.
+- [Release process](https://github.com/ndsev/zswag/blob/main/docs/release-process.md): platforms, release tags, and development snapshots.
 
 The shared YAML format for `HTTP_SETTINGS_FILE` (used by all three clients) is documented in the [HTTP Settings File](#http-settings-file) section below.
 
@@ -113,7 +113,7 @@ The shared YAML format for `HTTP_SETTINGS_FILE` (used by all three clients) is d
 ### Python
 
 ```bash
-pip install zswag
+python -m pip install zswag
 ```
 
 ```python
@@ -191,15 +191,18 @@ The only difference is the `Context` parameter on the constructor — needed so 
 
 ### Python users
 
-Wheels are published for 64-bit Python 3.10-3.14 on Linux (x86_64), macOS (x86_64 / arm64), and Windows (x64). On Windows install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
+One wheel per platform supports 64-bit CPython 3.10 through 3.14: Linux
+(x86_64 or aarch64), macOS (Intel or Apple Silicon), and Windows (x64).
+Install `zswag`; pip selects the matching `nanobind-backend` automatically.
+On Windows install the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/16/release/vc_redist.x64.exe).
 
 ### C++ users
 
-zswag uses CMake's `FetchContent` for dependencies; CMake ≥ 3.22.3 required. See [`docs/cpp.md`](docs/cpp.md) for full build options including offline / disconnected builds and code coverage.
+zswag uses CMake's `FetchContent` for dependencies; CMake ≥ 3.22.3 required. See the [C++ guide](https://github.com/ndsev/zswag/blob/main/docs/cpp.md) for full build options including offline / disconnected builds and code coverage.
 
 ### Java users
 
-Java 11+ source/target. The integration test depends on `pip install zswag` for its counterparty server. See [`docs/java.md`](docs/java.md).
+Java 11+ source/target. The integration test depends on `pip install zswag` for its counterparty server. See the [Java guide](https://github.com/ndsev/zswag/blob/main/docs/java.md).
 
 ## Client environment variables
 
